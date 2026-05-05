@@ -1,10 +1,11 @@
 import { useCallback, useRef, useState } from "react";
-import { AUDIO_SAMPLE_RATE, AUDIO_CHUNK_MS } from "@voxhelp/shared";
+import { MicVAD } from "@ricky0123/vad-web";
 
 type AudioSource = "microphone" | "tab";
 
 interface UseAudioCaptureReturn {
   isCapturing: boolean;
+  isSpeaking: boolean;
   audioSource: AudioSource | null;
   startMicrophone: () => Promise<void>;
   startTabCapture: () => Promise<void>;
@@ -12,68 +13,65 @@ interface UseAudioCaptureReturn {
   error: string | null;
 }
 
+function float32ToBase64(float32: Float32Array): string {
+  const int16 = new Int16Array(float32.length);
+  for (let i = 0; i < float32.length; i++) {
+    const s = Math.max(-1, Math.min(1, float32[i]));
+    int16[i] = s < 0 ? s * 0x8000 : s * 0x7fff;
+  }
+  const uint8 = new Uint8Array(int16.buffer);
+  let binary = "";
+  for (let i = 0; i < uint8.length; i++) {
+    binary += String.fromCharCode(uint8[i]);
+  }
+  return btoa(binary);
+}
+
 export function useAudioCapture(
   onAudioChunk: (base64: string) => void
 ): UseAudioCaptureReturn {
   const [isCapturing, setIsCapturing] = useState(false);
+  const [isSpeaking, setIsSpeaking] = useState(false);
   const [audioSource, setAudioSource] = useState<AudioSource | null>(null);
   const [error, setError] = useState<string | null>(null);
 
+  const vadRef = useRef<Awaited<ReturnType<typeof MicVAD.new>> | null>(null);
   const streamRef = useRef<MediaStream | null>(null);
-  const contextRef = useRef<AudioContext | null>(null);
-  const processorRef = useRef<ScriptProcessorNode | null>(null);
 
-  const setupAudioPipeline = useCallback(
-    (stream: MediaStream, source: AudioSource) => {
-      const audioContext = new AudioContext({ sampleRate: AUDIO_SAMPLE_RATE });
-      const sourceNode = audioContext.createMediaStreamSource(stream);
+  const startVAD = useCallback(
+    async (stream: MediaStream, source: AudioSource) => {
+      try {
+        const vad = await MicVAD.new({
+          getStream: async () => stream,
+          baseAssetPath: "/",
+          onnxWASMBasePath:
+            "https://cdn.jsdelivr.net/npm/onnxruntime-web@1.25.1/dist/",
+          model: "v5",
+          positiveSpeechThreshold: 0.5,
+          negativeSpeechThreshold: 0.35,
+          preSpeechPadMs: 200,
+          redemptionMs: 400,
+          onFrameProcessed: (probs, frame) => {
+            if (probs.isSpeech > 0.5) {
+              onAudioChunk(float32ToBase64(frame));
+            }
+          },
+          onSpeechStart: () => setIsSpeaking(true),
+          onSpeechEnd: (_audio: Float32Array) => setIsSpeaking(false),
+          onVADMisfire: () => setIsSpeaking(false),
+        });
 
-      // ScriptProcessor for raw PCM access
-      // (AudioWorklet would be cleaner but ScriptProcessor is simpler for MVP)
-      const bufferSize = Math.round(
-        (AUDIO_SAMPLE_RATE * AUDIO_CHUNK_MS) / 1000
-      );
-      // Round to nearest power of 2
-      const roundedBufferSize = Math.pow(
-        2,
-        Math.ceil(Math.log2(bufferSize))
-      );
-      const processor = audioContext.createScriptProcessor(
-        roundedBufferSize,
-        1,
-        1
-      );
-
-      processor.onaudioprocess = (event) => {
-        const float32 = event.inputBuffer.getChannelData(0);
-
-        // Convert Float32 → Int16 PCM
-        const int16 = new Int16Array(float32.length);
-        for (let i = 0; i < float32.length; i++) {
-          const s = Math.max(-1, Math.min(1, float32[i]));
-          int16[i] = s < 0 ? s * 0x8000 : s * 0x7fff;
-        }
-
-        // Convert to base64
-        const uint8 = new Uint8Array(int16.buffer);
-        let binary = "";
-        for (let i = 0; i < uint8.length; i++) {
-          binary += String.fromCharCode(uint8[i]);
-        }
-        const base64 = btoa(binary);
-
-        onAudioChunk(base64);
-      };
-
-      sourceNode.connect(processor);
-      processor.connect(audioContext.destination);
-
-      streamRef.current = stream;
-      contextRef.current = audioContext;
-      processorRef.current = processor;
-      setAudioSource(source);
-      setIsCapturing(true);
-      setError(null);
+        vadRef.current = vad;
+        streamRef.current = stream;
+        setAudioSource(source);
+        setIsCapturing(true);
+        setError(null);
+      } catch (err) {
+        const msg =
+          err instanceof Error ? err.message : "VAD initialization failed";
+        setError(msg);
+        stream.getTracks().forEach((t) => t.stop());
+      }
     },
     [onAudioChunk]
   );
@@ -82,31 +80,29 @@ export function useAudioCapture(
     try {
       const stream = await navigator.mediaDevices.getUserMedia({
         audio: {
-          sampleRate: AUDIO_SAMPLE_RATE,
+          sampleRate: 16000,
           channelCount: 1,
           echoCancellation: true,
           noiseSuppression: true,
         },
       });
-      setupAudioPipeline(stream, "microphone");
+      await startVAD(stream, "microphone");
     } catch (err) {
-      const msg = err instanceof Error ? err.message : "Microphone access denied";
-      setError(msg);
+      setError(
+        err instanceof Error ? err.message : "Microphone access denied"
+      );
     }
-  }, [setupAudioPipeline]);
+  }, [startVAD]);
 
   const startTabCapture = useCallback(async () => {
     try {
-      // getDisplayMedia with audio captures the tab's audio output
       const stream = await navigator.mediaDevices.getDisplayMedia({
-        video: true, // required by the API, we ignore the video track
-        audio: true, // this captures the tab's audio
+        video: true,
+        audio: true,
       });
 
-      // Stop video track immediately (we don't need it)
-      stream.getVideoTracks().forEach((track) => track.stop());
+      stream.getVideoTracks().forEach((t) => t.stop());
 
-      // Check if we actually got an audio track
       const audioTracks = stream.getAudioTracks();
       if (audioTracks.length === 0) {
         setError(
@@ -115,35 +111,29 @@ export function useAudioCapture(
         return;
       }
 
-      // Create a new stream with only audio
-      const audioStream = new MediaStream(audioTracks);
-      setupAudioPipeline(audioStream, "tab");
+      await startVAD(new MediaStream(audioTracks), "tab");
     } catch (err) {
-      const msg =
-        err instanceof Error ? err.message : "Tab audio capture denied";
-      setError(msg);
+      setError(
+        err instanceof Error ? err.message : "Tab audio capture denied"
+      );
     }
-  }, [setupAudioPipeline]);
+  }, [startVAD]);
 
   const stop = useCallback(() => {
-    if (processorRef.current) {
-      processorRef.current.disconnect();
-      processorRef.current = null;
-    }
-    if (contextRef.current) {
-      contextRef.current.close();
-      contextRef.current = null;
-    }
+    vadRef.current?.destroy();
+    vadRef.current = null;
     if (streamRef.current) {
       streamRef.current.getTracks().forEach((t) => t.stop());
       streamRef.current = null;
     }
     setIsCapturing(false);
+    setIsSpeaking(false);
     setAudioSource(null);
   }, []);
 
   return {
     isCapturing,
+    isSpeaking,
     audioSource,
     startMicrophone,
     startTabCapture,
