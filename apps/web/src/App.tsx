@@ -201,12 +201,24 @@ export default function App() {
 
           {/* Capture indicator */}
           {audio.isCapturing && (
-            <div className="flex items-center gap-2 text-xs text-success">
+            <div className="flex items-center gap-2 text-xs">
               <div className="relative">
-                <div className="w-2 h-2 rounded-full bg-success" />
-                <div className="absolute inset-0 w-2 h-2 rounded-full bg-success animate-pulse-ring" />
+                <div
+                  className={`w-2 h-2 rounded-full ${
+                    audio.isSpeaking ? "bg-accent" : "bg-success"
+                  }`}
+                />
+                {audio.isSpeaking && (
+                  <div className="absolute inset-0 w-2 h-2 rounded-full bg-accent animate-pulse-ring" />
+                )}
               </div>
-              {audio.audioSource === "tab" ? "Capture audio onglet" : "Capture micro"}
+              <span className={audio.isSpeaking ? "text-accent" : "text-success"}>
+                {audio.isSpeaking
+                  ? "Parole détectée"
+                  : audio.audioSource === "tab"
+                    ? "Capture audio onglet"
+                    : "Capture micro"}
+              </span>
             </div>
           )}
 
