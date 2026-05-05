@@ -4,12 +4,15 @@
   "scripts": {
     "dev:web": "pnpm --filter @voxhelp/web dev",
     "dev:backend": "pnpm --filter @voxhelp/backend dev",
-    "dev": "pnpm run --parallel dev:web dev:backend",
+    "dev": "concurrently \"pnpm dev:backend\" \"pnpm dev:web\"",
     "build": "pnpm --filter @voxhelp/shared build && pnpm run --parallel build:web build:backend",
     "build:web": "pnpm --filter @voxhelp/web build",
     "build:backend": "pnpm --filter @voxhelp/backend build"
   },
   "engines": {
     "node": ">=20"
+  },
+  "devDependencies": {
+    "concurrently": "^9.2.1"
   }
 }

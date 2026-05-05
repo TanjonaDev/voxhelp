@@ -5,16 +5,20 @@ import type {
   SessionConfig,
 } from "@voxhelp/shared";
 import { DeepgramSTT } from "./deepgram.js";
-import { GroqWhisperSTT } from "./groq-whisper.js";
-import { generateResponse } from "./llm.js";
+import { generateResponse, generateFromPrompt } from "./llm.js";
+import { buildSystemPrompt } from "./prompts.js";
 
 export class Session {
   private ws: WebSocket;
-  private stt: DeepgramSTT | GroqWhisperSTT | null = null;
+  private stt: DeepgramSTT | null = null;
   private config: SessionConfig | null = null;
   private conversationHistory: string[] = [];
   private isProcessingLLM = false;
   private pendingTranscript: string | null = null;
+  private transcriptBuffer: string[] = [];
+  private debounceTimer: ReturnType<typeof setTimeout> | null = null;
+  private readonly DEBOUNCE_MS = 1800;
+  private lastProcessedQuestion: string = "";
 
   constructor(ws: WebSocket) {
     this.ws = ws;
@@ -55,6 +59,9 @@ export class Session {
       case "audio:chunk":
         this.handleAudioChunk(message.data);
         break;
+      case "user:expand":
+        this.handleExpand();
+        break;
       case "ping":
         this.send({ type: "pong" });
         break;
@@ -65,41 +72,17 @@ export class Session {
     this.config = config;
     this.conversationHistory = [];
 
-    // Choose STT based on source language
-    const sourceLanguage = this.getSourceLanguage();
-    const needsWhisper = sourceLanguage === "mg"; // Malagasy needs Whisper
-
-    if (needsWhisper) {
-      this.stt = new GroqWhisperSTT(sourceLanguage, {
-        onFinal: (text) => this.handleFinalTranscript(text),
-        onError: (err) => this.send({ type: "session:error", error: err }),
-      });
-    } else {
-      this.stt = new DeepgramSTT(sourceLanguage, {
-        onPartial: (text) =>
-          this.send({ type: "transcript:partial", text }),
-        onFinal: (text) => this.handleFinalTranscript(text),
-        onError: (err) => this.send({ type: "session:error", error: err }),
-      });
-    }
+    this.stt = new DeepgramSTT(config.language, {
+      onPartial: (text) => this.send({ type: "transcript:partial", text }),
+      onFinal: (text) => this.handleFinalTranscript(text),
+      onError: (err) => this.send({ type: "session:error", error: err }),
+    });
 
     this.stt.connect();
 
     const sessionId = `session_${Date.now()}`;
     this.send({ type: "session:ready", sessionId });
-    console.log(
-      `[Session] Started: mode=${config.mode}, source=${sourceLanguage}, stt=${needsWhisper ? "groq-whisper" : "deepgram"}`
-    );
-  }
-
-  private getSourceLanguage(): string {
-    if (!this.config) return "fr";
-
-    if (this.config.mode === "translator") {
-      return this.config.sourceLanguage ?? "mg";
-    }
-    // Interview mode: detect from JD language or default to FR
-    return "fr";
+    console.log(`[Session] Started: language=${config.language}, stt=deepgram`);
   }
 
   private handleAudioChunk(base64Data: string): void {
@@ -113,19 +96,29 @@ export class Session {
 
     this.send({ type: "transcript:final", text });
     this.conversationHistory.push(text);
+    this.transcriptBuffer.push(text);
 
-    // If LLM is busy, queue the latest transcript
-    if (this.isProcessingLLM) {
-      this.pendingTranscript = text;
-      return;
-    }
+    if (this.debounceTimer) clearTimeout(this.debounceTimer);
 
-    this.processWithLLM(text);
+    this.debounceTimer = setTimeout(() => {
+      const fullQuestion = this.transcriptBuffer.join(" ");
+      this.transcriptBuffer = [];
+
+      if (fullQuestion.trim().length < 10) return;
+
+      if (this.isProcessingLLM) {
+        this.pendingTranscript = fullQuestion;
+        return;
+      }
+
+      this.processWithLLM(fullQuestion);
+    }, this.DEBOUNCE_MS);
   }
 
   private async processWithLLM(transcript: string): Promise<void> {
     if (!this.config) return;
 
+    this.lastProcessedQuestion = transcript;
     this.isProcessingLLM = true;
 
     await generateResponse(
@@ -133,7 +126,7 @@ export class Session {
       this.config,
       this.conversationHistory,
       {
-        onStart: () => this.send({ type: "suggestion:start" }),
+        onStart: () => this.send({ type: "suggestion:start", source: "assist" }),
         onChunk: (text) => this.send({ type: "suggestion:chunk", text }),
         onDone: (fullText) => {
           this.send({ type: "suggestion:done", fullText });
@@ -154,6 +147,24 @@ export class Session {
     );
   }
 
+  private async handleExpand(): Promise<void> {
+    if (!this.config || !this.lastProcessedQuestion) return;
+
+    const systemPrompt = buildSystemPrompt(this.config, true);
+    const history = this.conversationHistory.slice(-10).map((t) => `- ${t}`);
+    const contextSection = history.length > 0
+      ? `\n\nHISTORIQUE :\n${history.join("\n")}`
+      : "";
+    const userMessage = `${contextSection}\n\nQUESTION :\n"${this.lastProcessedQuestion}"`;
+
+    await generateFromPrompt(systemPrompt, userMessage, {
+      onStart: () => this.send({ type: "suggestion:start", source: "expand" }),
+      onChunk: (text) => this.send({ type: "suggestion:chunk", text }),
+      onDone: (fullText) => this.send({ type: "suggestion:done", fullText }),
+      onError: (error) => this.send({ type: "suggestion:error", error }),
+    });
+  }
+
   private send(message: ServerMessage): void {
     if (this.ws.readyState === this.ws.OPEN) {
       this.ws.send(JSON.stringify(message));
@@ -161,12 +172,18 @@ export class Session {
   }
 
   private cleanup(): void {
+    if (this.debounceTimer) {
+      clearTimeout(this.debounceTimer);
+      this.debounceTimer = null;
+    }
+    this.transcriptBuffer = [];
     if (this.stt) {
       this.stt.close();
       this.stt = null;
     }
     this.config = null;
     this.conversationHistory = [];
+    this.lastProcessedQuestion = "";
     console.log("[Session] Cleaned up");
   }
 }

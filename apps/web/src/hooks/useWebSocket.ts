@@ -6,6 +6,7 @@ import type {
   SessionConfig,
   TranscriptEntry,
   Suggestion,
+  SuggestionSource,
 } from "@voxhelp/shared";
 import { createMessageId, WS_PING_INTERVAL_MS } from "@voxhelp/shared";
 
@@ -14,19 +15,23 @@ interface UseWebSocketReturn {
   transcripts: TranscriptEntry[];
   currentPartial: string;
   suggestion: Suggestion | null;
+  suggestions: Suggestion[];
   startSession: (config: SessionConfig) => void;
   stopSession: () => void;
   sendAudio: (base64: string) => void;
+  requestExpand: () => void;
 }
 
 export function useWebSocket(url: string): UseWebSocketReturn {
   const wsRef = useRef<WebSocket | null>(null);
   const pingRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  const pendingSourceRef = useRef<SuggestionSource>("assist");
 
   const [status, setStatus] = useState<ConnectionStatus>("disconnected");
   const [transcripts, setTranscripts] = useState<TranscriptEntry[]>([]);
   const [currentPartial, setCurrentPartial] = useState("");
   const [suggestion, setSuggestion] = useState<Suggestion | null>(null);
+  const [suggestions, setSuggestions] = useState<Suggestion[]>([]);
 
   const connect = useCallback(() => {
     if (wsRef.current?.readyState === WebSocket.OPEN) return;
@@ -86,11 +91,13 @@ export function useWebSocket(url: string): UseWebSocketReturn {
         break;
 
       case "suggestion:start":
+        pendingSourceRef.current = msg.source ?? "assist";
         setSuggestion({
           id: createMessageId(),
           text: "",
           isStreaming: true,
           timestamp: Date.now(),
+          source: pendingSourceRef.current,
         });
         break;
 
@@ -101,9 +108,12 @@ export function useWebSocket(url: string): UseWebSocketReturn {
         break;
 
       case "suggestion:done":
-        setSuggestion((prev) =>
-          prev ? { ...prev, text: msg.fullText, isStreaming: false } : null
-        );
+        setSuggestion((prev) => {
+          if (!prev) return null;
+          const completed = { ...prev, text: msg.fullText, isStreaming: false };
+          setSuggestions((list) => [...list, completed]);
+          return null;
+        });
         break;
 
       case "suggestion:error":
@@ -128,6 +138,10 @@ export function useWebSocket(url: string): UseWebSocketReturn {
     send({ type: "audio:chunk", data: base64 });
   }, [send]);
 
+  const requestExpand = useCallback(() => {
+    send({ type: "user:expand" });
+  }, [send]);
+
   const startSession = useCallback(
     (config: SessionConfig) => {
       if (status !== "connected") {
@@ -143,6 +157,7 @@ export function useWebSocket(url: string): UseWebSocketReturn {
       }
       setTranscripts([]);
       setSuggestion(null);
+      setSuggestions([]);
       setCurrentPartial("");
       send({ type: "session:start", config });
     },
@@ -173,8 +188,10 @@ export function useWebSocket(url: string): UseWebSocketReturn {
     transcripts,
     currentPartial,
     suggestion,
+    suggestions,
     startSession,
     stopSession,
     sendAudio,
+    requestExpand,
   };
 }

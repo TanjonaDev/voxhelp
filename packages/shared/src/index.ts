@@ -2,18 +2,13 @@
 // Session & Mode types
 // ============================================
 
-export type SessionMode = "interview" | "translator";
-
-export type TranslatorLanguage = "mg" | "fr" | "en";
+export type InterviewLanguage = "fr" | "en" | "es" | "pt" | "zh";
 
 export interface SessionConfig {
-  mode: SessionMode;
-  // Interview mode
+  language: InterviewLanguage;
   jobDescription?: string;
   cvContent?: string;
-  // Translator mode
-  sourceLanguage?: TranslatorLanguage;
-  targetLanguage?: TranslatorLanguage;
+  techStack?: string;
 }
 
 // ============================================
@@ -24,6 +19,7 @@ export type ClientMessage =
   | { type: "session:start"; config: SessionConfig }
   | { type: "session:stop" }
   | { type: "audio:chunk"; data: string } // base64 encoded PCM
+  | { type: "user:expand" }
   | { type: "ping" };
 
 // ============================================
@@ -35,7 +31,7 @@ export type ServerMessage =
   | { type: "session:error"; error: string }
   | { type: "transcript:partial"; text: string; speaker?: string }
   | { type: "transcript:final"; text: string; speaker?: string }
-  | { type: "suggestion:start" }
+  | { type: "suggestion:start"; source?: SuggestionSource }
   | { type: "suggestion:chunk"; text: string } // streamed token
   | { type: "suggestion:done"; fullText: string }
   | { type: "suggestion:error"; error: string }
@@ -46,6 +42,8 @@ export type ServerMessage =
 // ============================================
 
 export type ConnectionStatus = "disconnected" | "connecting" | "connected" | "error";
+
+export type SuggestionSource = "assist" | "expand";
 
 export interface TranscriptEntry {
   id: string;
@@ -60,6 +58,7 @@ export interface Suggestion {
   text: string;
   isStreaming: boolean;
   timestamp: number;
+  source: SuggestionSource;
 }
 
 // ============================================

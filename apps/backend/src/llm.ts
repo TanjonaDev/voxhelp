@@ -19,7 +19,6 @@ export async function generateResponse(
 ): Promise<void> {
   const systemPrompt = buildSystemPrompt(config);
 
-  // Build context from recent conversation history
   const contextMessages = conversationHistory.slice(-10).map((t) => `- ${t}`);
   const contextSection =
     contextMessages.length > 0
@@ -28,6 +27,14 @@ export async function generateResponse(
 
   const userMessage = `${contextSection}\n\nNOUVEAU (l'interlocuteur vient de dire) :\n"${transcript}"`;
 
+  await generateFromPrompt(systemPrompt, userMessage, callbacks);
+}
+
+export async function generateFromPrompt(
+  systemPrompt: string,
+  userMessage: string,
+  callbacks: StreamCallbacks
+): Promise<void> {
   try {
     callbacks.onStart();
 
