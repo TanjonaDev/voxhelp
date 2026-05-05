@@ -1,4 +1,4 @@
-import { useCallback, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { MicVAD } from "@ricky0123/vad-web";
 
 type AudioSource = "microphone" | "tab";
@@ -37,9 +37,25 @@ export function useAudioCapture(
 
   const vadRef = useRef<Awaited<ReturnType<typeof MicVAD.new>> | null>(null);
   const streamRef = useRef<MediaStream | null>(null);
+  const isStartingRef = useRef(false);
+  const onAudioChunkRef = useRef(onAudioChunk);
+  onAudioChunkRef.current = onAudioChunk;
 
   const startVAD = useCallback(
     async (stream: MediaStream, source: AudioSource) => {
+      if (isStartingRef.current) {
+        stream.getTracks().forEach((t) => t.stop());
+        return;
+      }
+      if (vadRef.current) {
+        vadRef.current.destroy();
+        vadRef.current = null;
+      }
+      if (streamRef.current) {
+        streamRef.current.getTracks().forEach((t) => t.stop());
+        streamRef.current = null;
+      }
+      isStartingRef.current = true;
       try {
         const vad = await MicVAD.new({
           getStream: async () => stream,
@@ -53,7 +69,7 @@ export function useAudioCapture(
           redemptionMs: 400,
           onFrameProcessed: (probs, frame) => {
             if (probs.isSpeech > 0.5) {
-              onAudioChunk(float32ToBase64(frame));
+              onAudioChunkRef.current(float32ToBase64(frame));
             }
           },
           onSpeechStart: () => setIsSpeaking(true),
@@ -71,9 +87,11 @@ export function useAudioCapture(
           err instanceof Error ? err.message : "VAD initialization failed";
         setError(msg);
         stream.getTracks().forEach((t) => t.stop());
+      } finally {
+        isStartingRef.current = false;
       }
     },
-    [onAudioChunk]
+    []
   );
 
   const startMicrophone = useCallback(async () => {
@@ -130,6 +148,8 @@ export function useAudioCapture(
     setIsSpeaking(false);
     setAudioSource(null);
   }, []);
+
+  useEffect(() => stop, [stop]);
 
   return {
     isCapturing,
