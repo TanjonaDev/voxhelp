@@ -1,0 +1,17 @@
+{
+  "name": "@voxhelp/audio",
+  "version": "0.0.1",
+  "private": true,
+  "type": "module",
+  "main": "./src/index.ts",
+  "types": "./src/index.ts",
+  "scripts": {
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "@ricky0123/vad-web": "^0.0.30"
+  },
+  "devDependencies": {
+    "typescript": "^5.7.0"
+  }
+}
