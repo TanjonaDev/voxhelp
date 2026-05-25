@@ -2,36 +2,104 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import type {
   ClientMessage,
   ServerMessage,
-  ConnectionStatus,
   SessionConfig,
   TranscriptEntry,
-  Suggestion,
-  SuggestionSource,
+  TechTranslation,
 } from "@voxhelp/shared";
-import { createMessageId, WS_PING_INTERVAL_MS } from "@voxhelp/shared";
+import { createId, WS_PING_INTERVAL_MS } from "@voxhelp/shared";
+
+type ConnectionStatus = "disconnected" | "connecting" | "connected" | "error";
+
+interface AssistMessage {
+  id: string;
+  text: string;
+  timestamp: number;
+}
 
 interface UseWebSocketReturn {
   status: ConnectionStatus;
   transcripts: TranscriptEntry[];
   currentPartial: string;
-  suggestion: Suggestion | null;
-  suggestions: Suggestion[];
+  techTranslations: TechTranslation[];
+  currentAssist: { text: string; isStreaming: boolean } | null;
+  assists: AssistMessage[];
   startSession: (config: SessionConfig) => void;
   stopSession: () => void;
   sendAudio: (base64: string) => void;
-  requestExpand: () => void;
+  markQuestionAsked: (questionId: string) => void;
+  scoreCriterion: (criterionId: string, score: number) => void;
+  resetState: () => void;
 }
 
 export function useWebSocket(url: string): UseWebSocketReturn {
   const wsRef = useRef<WebSocket | null>(null);
   const pingRef = useRef<ReturnType<typeof setInterval> | null>(null);
-  const pendingSourceRef = useRef<SuggestionSource>("assist");
 
   const [status, setStatus] = useState<ConnectionStatus>("disconnected");
   const [transcripts, setTranscripts] = useState<TranscriptEntry[]>([]);
   const [currentPartial, setCurrentPartial] = useState("");
-  const [suggestion, setSuggestion] = useState<Suggestion | null>(null);
-  const [suggestions, setSuggestions] = useState<Suggestion[]>([]);
+  const [techTranslations, setTechTranslations] = useState<TechTranslation[]>([]);
+  const [currentAssist, setCurrentAssist] = useState<{ text: string; isStreaming: boolean } | null>(null);
+  const [assists, setAssists] = useState<AssistMessage[]>([]);
+
+  const send = useCallback((msg: ClientMessage) => {
+    if (wsRef.current?.readyState === WebSocket.OPEN) {
+      wsRef.current.send(JSON.stringify(msg));
+    }
+  }, []);
+
+  const handleMessage = useCallback((msg: ServerMessage) => {
+    switch (msg.type) {
+      case "session:ready":
+        break;
+
+      case "session:error":
+        console.error("[WS] Session error:", msg.error);
+        break;
+
+      case "transcript:partial":
+        setCurrentPartial(msg.text);
+        break;
+
+      case "transcript:final":
+        setCurrentPartial("");
+        setTranscripts((prev) => [
+          ...prev,
+          { id: createId(), text: msg.text, timestamp: Date.now() },
+        ]);
+        break;
+
+      case "tech:translation":
+        setTechTranslations((prev) => [msg.translation, ...prev].slice(0, 5));
+        break;
+
+      case "assist:start":
+        setCurrentAssist({ text: "", isStreaming: true });
+        break;
+
+      case "assist:chunk":
+        setCurrentAssist((prev) =>
+          prev ? { ...prev, text: prev.text + msg.text } : null
+        );
+        break;
+
+      case "assist:done":
+        setCurrentAssist(null);
+        setAssists((prev) => [
+          ...prev,
+          { id: createId(), text: msg.fullText, timestamp: Date.now() },
+        ]);
+        break;
+
+      case "assist:error":
+        setCurrentAssist(null);
+        console.error("[WS] Assist error:", msg.error);
+        break;
+
+      case "pong":
+        break;
+    }
+  }, []);
 
   const connect = useCallback(() => {
     if (wsRef.current?.readyState === WebSocket.OPEN) return;
@@ -42,7 +110,6 @@ export function useWebSocket(url: string): UseWebSocketReturn {
 
     ws.onopen = () => {
       setStatus("connected");
-      // Start ping interval
       pingRef.current = setInterval(() => {
         send({ type: "ping" });
       }, WS_PING_INTERVAL_MS);
@@ -59,139 +126,94 @@ export function useWebSocket(url: string): UseWebSocketReturn {
 
     ws.onclose = () => {
       setStatus("disconnected");
-      cleanup();
+      if (pingRef.current) {
+        clearInterval(pingRef.current);
+        pingRef.current = null;
+      }
     };
 
     ws.onerror = () => {
       setStatus("error");
     };
-  }, [url]);
-
-  const handleMessage = useCallback((msg: ServerMessage) => {
-    switch (msg.type) {
-      case "session:ready":
-        break;
-
-      case "transcript:partial":
-        setCurrentPartial(msg.text);
-        break;
-
-      case "transcript:final":
-        setCurrentPartial("");
-        setTranscripts((prev) => [
-          ...prev,
-          {
-            id: createMessageId(),
-            text: msg.text,
-            speaker: msg.speaker,
-            timestamp: Date.now(),
-            isFinal: true,
-          },
-        ]);
-        break;
-
-      case "suggestion:start":
-        pendingSourceRef.current = msg.source ?? "assist";
-        setSuggestion({
-          id: createMessageId(),
-          text: "",
-          isStreaming: true,
-          timestamp: Date.now(),
-          source: pendingSourceRef.current,
-        });
-        break;
-
-      case "suggestion:chunk":
-        setSuggestion((prev) =>
-          prev ? { ...prev, text: prev.text + msg.text } : null
-        );
-        break;
-
-      case "suggestion:done":
-        setSuggestion((prev) => {
-          if (!prev) return null;
-          const completed = { ...prev, text: msg.fullText, isStreaming: false };
-          setSuggestions((list) => [...list, completed]);
-          return null;
-        });
-        break;
-
-      case "suggestion:error":
-        setSuggestion((prev) =>
-          prev ? { ...prev, text: `Erreur: ${msg.error}`, isStreaming: false } : null
-        );
-        break;
-
-      case "session:error":
-        console.error("[WS] Session error:", msg.error);
-        break;
-    }
-  }, []);
-
-  const send = useCallback((msg: ClientMessage) => {
-    if (wsRef.current?.readyState === WebSocket.OPEN) {
-      wsRef.current.send(JSON.stringify(msg));
-    }
-  }, []);
-
-  const sendAudio = useCallback((base64: string) => {
-    send({ type: "audio:chunk", data: base64 });
-  }, [send]);
-
-  const requestExpand = useCallback(() => {
-    send({ type: "user:expand" });
-  }, [send]);
+  }, [url, send, handleMessage]);
 
   const startSession = useCallback(
     (config: SessionConfig) => {
-      if (status !== "connected") {
-        connect();
-        // Wait for connection then start
-        const checkInterval = setInterval(() => {
-          if (wsRef.current?.readyState === WebSocket.OPEN) {
-            clearInterval(checkInterval);
-            send({ type: "session:start", config });
-          }
-        }, 100);
+      setTranscripts([]);
+      setCurrentPartial("");
+      setTechTranslations([]);
+      setCurrentAssist(null);
+      setAssists([]);
+
+      if (wsRef.current?.readyState === WebSocket.OPEN) {
+        send({ type: "session:start", config });
         return;
       }
-      setTranscripts([]);
-      setSuggestion(null);
-      setSuggestions([]);
-      setCurrentPartial("");
-      send({ type: "session:start", config });
+
+      connect();
+      const checkInterval = setInterval(() => {
+        if (wsRef.current?.readyState === WebSocket.OPEN) {
+          clearInterval(checkInterval);
+          send({ type: "session:start", config });
+        }
+      }, 100);
     },
-    [status, connect, send]
+    [connect, send]
   );
 
   const stopSession = useCallback(() => {
     send({ type: "session:stop" });
   }, [send]);
 
-  const cleanup = useCallback(() => {
-    if (pingRef.current) {
-      clearInterval(pingRef.current);
-      pingRef.current = null;
-    }
+  const sendAudio = useCallback(
+    (base64: string) => {
+      send({ type: "audio:chunk", data: base64 });
+    },
+    [send]
+  );
+
+  const markQuestionAsked = useCallback(
+    (questionId: string) => {
+      send({ type: "question:mark-asked", questionId });
+    },
+    [send]
+  );
+
+  const scoreCriterion = useCallback(
+    (criterionId: string, score: number) => {
+      send({ type: "criterion:score", criterionId, score });
+    },
+    [send]
+  );
+
+  const resetState = useCallback(() => {
+    setTranscripts([]);
+    setCurrentPartial("");
+    setTechTranslations([]);
+    setCurrentAssist(null);
+    setAssists([]);
   }, []);
 
   useEffect(() => {
     connect();
     return () => {
-      cleanup();
+      if (pingRef.current) clearInterval(pingRef.current);
       wsRef.current?.close();
     };
-  }, [connect, cleanup]);
+  }, [connect]);
 
   return {
     status,
     transcripts,
     currentPartial,
-    suggestion,
-    suggestions,
+    techTranslations,
+    currentAssist,
+    assists,
     startSession,
     stopSession,
     sendAudio,
-    requestExpand,
+    markQuestionAsked,
+    scoreCriterion,
+    resetState,
   };
 }

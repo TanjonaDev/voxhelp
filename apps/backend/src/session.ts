@@ -3,22 +3,26 @@ import type {
   ClientMessage,
   ServerMessage,
   SessionConfig,
+  GeneratedQuestion,
+  ScorecardCriterion,
+  TechTranslation,
 } from "@voxhelp/shared";
 import { DeepgramSTT } from "./deepgram.js";
-import { generateResponse, generateFromPrompt } from "./llm.js";
-import { buildSystemPrompt } from "./prompts.js";
+import { generateFromPrompt, callClaudeJSON } from "./llm.js";
+import { buildLiveAssistPrompt } from "./prompts/live-assist.js";
+import { buildTechTranslatePrompt } from "./prompts/tech-translate.js";
 
 export class Session {
   private ws: WebSocket;
   private stt: DeepgramSTT | null = null;
   private config: SessionConfig | null = null;
-  private conversationHistory: string[] = [];
-  private isProcessingLLM = false;
-  private pendingTranscript: string | null = null;
+  private questions: GeneratedQuestion[] = [];
+  private scorecard: ScorecardCriterion[] = [];
   private transcriptBuffer: string[] = [];
   private debounceTimer: ReturnType<typeof setTimeout> | null = null;
+  private isProcessingAssist = false;
+  private pendingTranscript: string | null = null;
   private readonly DEBOUNCE_MS = 1800;
-  private lastProcessedQuestion: string = "";
 
   constructor(ws: WebSocket) {
     this.ws = ws;
@@ -31,17 +35,13 @@ export class Session {
         const message: ClientMessage = JSON.parse(data.toString());
         this.handleMessage(message);
       } catch {
-        // Might be binary audio data
         if (Buffer.isBuffer(data) && this.stt) {
           this.stt.sendAudio(data);
         }
       }
     });
 
-    this.ws.on("close", () => {
-      this.cleanup();
-    });
-
+    this.ws.on("close", () => this.cleanup());
     this.ws.on("error", (err) => {
       console.error("[Session] WS error:", err.message);
       this.cleanup();
@@ -59,8 +59,11 @@ export class Session {
       case "audio:chunk":
         this.handleAudioChunk(message.data);
         break;
-      case "user:expand":
-        this.handleExpand();
+      case "question:mark-asked":
+        this.toggleQuestion(message.questionId);
+        break;
+      case "criterion:score":
+        this.updateScore(message.criterionId, message.score);
         break;
       case "ping":
         this.send({ type: "pong" });
@@ -70,7 +73,9 @@ export class Session {
 
   private startSession(config: SessionConfig): void {
     this.config = config;
-    this.conversationHistory = [];
+    this.questions = config.questions ? [...config.questions] : [];
+    this.scorecard = config.scorecard ? [...config.scorecard] : [];
+    this.transcriptBuffer = [];
 
     this.stt = new DeepgramSTT(config.language, {
       onPartial: (text) => this.send({ type: "transcript:partial", text }),
@@ -82,7 +87,7 @@ export class Session {
 
     const sessionId = `session_${Date.now()}`;
     this.send({ type: "session:ready", sessionId });
-    console.log(`[Session] Started: language=${config.language}, stt=deepgram`);
+    console.log(`[Session] Started: language=${config.language}, candidate=${config.candidateName}`);
   }
 
   private handleAudioChunk(base64Data: string): void {
@@ -95,74 +100,88 @@ export class Session {
     if (!text.trim()) return;
 
     this.send({ type: "transcript:final", text });
-    this.conversationHistory.push(text);
     this.transcriptBuffer.push(text);
 
     if (this.debounceTimer) clearTimeout(this.debounceTimer);
 
     this.debounceTimer = setTimeout(() => {
-      const fullQuestion = this.transcriptBuffer.join(" ");
+      const fullText = this.transcriptBuffer.join(" ");
       this.transcriptBuffer = [];
 
-      if (fullQuestion.trim().length < 10) return;
+      if (fullText.trim().length < 10) return;
 
-      if (this.isProcessingLLM) {
-        this.pendingTranscript = fullQuestion;
+      if (this.isProcessingAssist) {
+        this.pendingTranscript = fullText;
         return;
       }
 
-      this.processWithLLM(fullQuestion);
+      this.processTranscript(fullText);
     }, this.DEBOUNCE_MS);
   }
 
-  private async processWithLLM(transcript: string): Promise<void> {
+  private async processTranscript(transcript: string): Promise<void> {
     if (!this.config) return;
 
-    this.lastProcessedQuestion = transcript;
-    this.isProcessingLLM = true;
+    this.isProcessingAssist = true;
 
-    await generateResponse(
-      transcript,
-      this.config,
-      this.conversationHistory,
+    await Promise.all([
+      this.runTechTranslation(transcript),
+      this.runAssist(transcript),
+    ]);
+
+    this.isProcessingAssist = false;
+
+    if (this.pendingTranscript) {
+      const pending = this.pendingTranscript;
+      this.pendingTranscript = null;
+      this.processTranscript(pending);
+    }
+  }
+
+  private async runTechTranslation(transcript: string): Promise<void> {
+    try {
+      const systemPrompt = buildTechTranslatePrompt();
+      const result = await callClaudeJSON<{ translations: TechTranslation[] }>(
+        systemPrompt,
+        `TRANSCRIPTION:\n"${transcript}"`
+      );
+      for (const translation of result.translations) {
+        this.send({ type: "tech:translation", translation });
+      }
+    } catch (err) {
+      console.error("[Session] Tech translation error:", err instanceof Error ? err.message : err);
+    }
+  }
+
+  private async runAssist(transcript: string): Promise<void> {
+    if (!this.config) return;
+
+    const systemPrompt = buildLiveAssistPrompt(
+      this.config.jobDescription,
+      this.questions,
+      this.scorecard
+    );
+
+    await generateFromPrompt(
+      systemPrompt,
+      `Ce qui vient d'être dit :\n"${transcript}"`,
       {
-        onStart: () => this.send({ type: "suggestion:start", source: "assist" }),
-        onChunk: (text) => this.send({ type: "suggestion:chunk", text }),
-        onDone: (fullText) => {
-          this.send({ type: "suggestion:done", fullText });
-          this.isProcessingLLM = false;
-
-          // Process any queued transcript
-          if (this.pendingTranscript) {
-            const pending = this.pendingTranscript;
-            this.pendingTranscript = null;
-            this.processWithLLM(pending);
-          }
-        },
-        onError: (error) => {
-          this.send({ type: "suggestion:error", error });
-          this.isProcessingLLM = false;
-        },
+        onStart: () => this.send({ type: "assist:start" }),
+        onChunk: (text) => this.send({ type: "assist:chunk", text }),
+        onDone: (fullText) => this.send({ type: "assist:done", fullText }),
+        onError: (error) => this.send({ type: "assist:error", error }),
       }
     );
   }
 
-  private async handleExpand(): Promise<void> {
-    if (!this.config || !this.lastProcessedQuestion) return;
+  private toggleQuestion(questionId: string): void {
+    const q = this.questions.find((q) => q.id === questionId);
+    if (q) q.isAsked = !q.isAsked;
+  }
 
-    const systemPrompt = buildSystemPrompt(this.config, true);
-    const history = this.conversationHistory.slice(-10).map((t) => `- ${t}`);
-    const contextSection = history.length > 0
-      ? `\n\nHISTORIQUE :\n${history.join("\n")}`
-      : "";
-    const userMessage = `${contextSection}\n\nQUESTION :\n"${this.lastProcessedQuestion}"`;
-
-    await generateFromPrompt(systemPrompt, userMessage, {
-      onStart: () => this.send({ type: "suggestion:start", source: "expand" }),
-      onChunk: (text) => this.send({ type: "suggestion:chunk", text }),
-      onDone: (fullText) => this.send({ type: "suggestion:done", fullText }),
-      onError: (error) => this.send({ type: "suggestion:error", error }),
-    });
+  private updateScore(criterionId: string, score: number): void {
+    const c = this.scorecard.find((c) => c.id === criterionId);
+    if (c) c.score = score;
   }
 
   private send(message: ServerMessage): void {
@@ -182,8 +201,8 @@ export class Session {
       this.stt = null;
     }
     this.config = null;
-    this.conversationHistory = [];
-    this.lastProcessedQuestion = "";
+    this.questions = [];
+    this.scorecard = [];
     console.log("[Session] Cleaned up");
   }
 }

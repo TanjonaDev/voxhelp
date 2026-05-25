@@ -4,24 +4,24 @@ export default {
   theme: {
     extend: {
       fontFamily: {
-        sans: ['"DM Sans"', "system-ui", "sans-serif"],
+        sans: ["Outfit", "system-ui", "sans-serif"],
         mono: ['"JetBrains Mono"', "monospace"],
       },
       colors: {
         surface: {
-          0: "#0a0a0f",
-          1: "#12121a",
-          2: "#1a1a25",
-          3: "#242432",
+          0: "#F6F7FB",
+          1: "#FFFFFF",
+          2: "#F6F7FB",
+          3: "#DFE1EA",
         },
         accent: {
-          DEFAULT: "#6c5ce7",
-          light: "#a29bfe",
-          dim: "#4834d4",
+          DEFAULT: "#3D5AFE",
+          light: "#7B8FFF",
+          dim: "#3451e0",
         },
-        success: "#00b894",
-        warning: "#fdcb6e",
-        danger: "#e17055",
+        success: "#0FAA6C",
+        warning: "#E8850A",
+        danger: "#DC3545",
       },
     },
   },

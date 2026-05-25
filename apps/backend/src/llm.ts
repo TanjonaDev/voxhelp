@@ -1,6 +1,4 @@
 import Anthropic from "@anthropic-ai/sdk";
-import type { SessionConfig } from "@voxhelp/shared";
-import { buildSystemPrompt } from "./prompts.js";
 
 const anthropic = new Anthropic();
 
@@ -9,25 +7,6 @@ interface StreamCallbacks {
   onChunk: (text: string) => void;
   onDone: (fullText: string) => void;
   onError: (error: string) => void;
-}
-
-export async function generateResponse(
-  transcript: string,
-  config: SessionConfig,
-  conversationHistory: string[],
-  callbacks: StreamCallbacks
-): Promise<void> {
-  const systemPrompt = buildSystemPrompt(config);
-
-  const contextMessages = conversationHistory.slice(-10).map((t) => `- ${t}`);
-  const contextSection =
-    contextMessages.length > 0
-      ? `\n\nHISTORIQUE RÉCENT DE LA CONVERSATION :\n${contextMessages.join("\n")}`
-      : "";
-
-  const userMessage = `${contextSection}\n\nNOUVEAU (l'interlocuteur vient de dire) :\n"${transcript}"`;
-
-  await generateFromPrompt(systemPrompt, userMessage, callbacks);
 }
 
 export async function generateFromPrompt(
@@ -62,4 +41,21 @@ export async function generateFromPrompt(
     const message = error instanceof Error ? error.message : "Unknown LLM error";
     callbacks.onError(message);
   }
+}
+
+export async function callClaudeJSON<T>(
+  systemPrompt: string,
+  userMessage: string
+): Promise<T> {
+  const message = await anthropic.messages.create({
+    model: "claude-sonnet-4-20250514",
+    max_tokens: 4096,
+    system: systemPrompt,
+    messages: [{ role: "user", content: userMessage }],
+  });
+
+  const content = message.content[0];
+  if (content.type !== "text") throw new Error("Unexpected response type from Claude");
+
+  return JSON.parse(content.text) as T;
 }
