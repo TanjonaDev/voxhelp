@@ -2,12 +2,12 @@
 
 ## Projet
 
-VoxHelp est un assistant IA temps réel pour appels vidéo. Deux modes : traducteur live (malgache→français) et souffleur d'entretien technique. Web app Phase 1, Electron Phase 2.
+VoxHelp est un copilote d'entretien technique en temps réel. Demo track : flux Prep → Live → Report, sans auth, tout en mémoire.
 
 ## Structure
 
 Monorepo pnpm workspaces :
-- `packages/shared/` — types TypeScript partagés (messages WebSocket, config)
+- `packages/shared/` — types TypeScript partagés (messages WebSocket, types domaine)
 - `apps/backend/` — serveur Fastify + WebSocket + STT + LLM
 - `apps/web/` — frontend React + Vite + Tailwind
 
@@ -42,8 +42,8 @@ pnpm --filter @voxhelp/shared add <package>
 - **Langage** : TypeScript strict, ESM (`"type": "module"`)
 - **Frontend** : React 19, Vite 6, Tailwind CSS 3.4
 - **Backend** : Fastify 5, @fastify/websocket
-- **STT** : Deepgram Nova-3 (FR/EN streaming), Groq Whisper large-v3-turbo (malgache, chunks)
-- **LLM** : Claude Sonnet 4 via @anthropic-ai/sdk (streaming)
+- **STT** : Deepgram Nova-3 streaming (PCM 16kHz mono)
+- **LLM** : Claude Sonnet 4 via @anthropic-ai/sdk (streaming + JSON)
 
 ## Conventions
 
@@ -57,49 +57,42 @@ pnpm --filter @voxhelp/shared add <package>
 ## Variables d'environnement
 
 Fichier `apps/backend/.env` (copier `.env.example`) :
-- `DEEPGRAM_API_KEY` — STT français/anglais
-- `GROQ_API_KEY` — STT malgache (Whisper)
-- `ANTHROPIC_API_KEY` — Claude Sonnet
+- `DEEPGRAM_API_KEY` — STT streaming
+- `ANTHROPIC_API_KEY` — Claude Sonnet (assist + JSON)
 - `PORT` — port backend (default 3001)
 - `CORS_ORIGIN` — origin frontend (default http://localhost:5173)
 
 ## Architecture clé
 
-Le flux temps réel :
-1. Frontend capture l'audio de l'onglet (tab capture) → PCM 16kHz mono → base64
-2. Envoi via WebSocket au backend toutes les ~250ms
-3. Backend route vers Deepgram (streaming FR/EN) ou Groq Whisper (chunks malgache)
-4. Transcription finale → Claude Sonnet en streaming (traduction ou suggestion)
-5. Tokens streamés au frontend → affichage progressif
+Flux demo complet :
+
+**Prep** : saisie job description → `POST /api/analyze-job` → Claude JSON → questions + scorecard affichés
+
+**Live** :
+1. Frontend capture l'audio de l'onglet → PCM 16kHz mono base64 (ScriptProcessorNode + RMS VAD)
+2. `audio:chunk` via WebSocket → Deepgram streaming STT
+3. `transcript:final` → Claude streaming assist + Claude JSON tech-translate en parallèle
+4. Résultats poussés au frontend : `assist:chunk`, `tech:translation`
+5. Recruiter coche questions (`question:mark-asked`) et note critères (`criterion:score`)
+
+**Report** : `POST /api/generate-report` → Claude JSON → rapport structuré avec recommandation
 
 ## Fichiers importants
 
-- `packages/shared/src/index.ts` — Contrat WebSocket (tous les types de messages)
-- `apps/backend/src/session.ts` — Orchestrateur central (STT + LLM par connexion)
-- `apps/backend/src/prompts.ts` — System prompts (traducteur + entretien)
-- `apps/web/src/App.tsx` — UI complète
-- `apps/web/src/hooks/useAudioCapture.ts` — Capture audio navigateur
-- `SPEC.md` — Spécification technique détaillée avec roadmap
-
-## Ce qui est fait
-
-- Monorepo setup complet
-- Types WebSocket partagés
-- Backend Fastify + WebSocket
-- Session manager avec routing STT (Deepgram / Groq)
-- Intégration Deepgram streaming
-- Intégration Groq Whisper chunks
-- Claude Sonnet streaming
-- Prompts traducteur + entretien
-- Frontend React avec hooks audio/WS
-- UI complète (sidebar config + flux live)
-- Tout compile en TypeScript strict
+- `packages/shared/src/index.ts` — Tous les types (ClientMessage, ServerMessage, domaine)
+- `apps/backend/src/session.ts` — Orchestrateur par connexion WebSocket
+- `apps/backend/src/llm.ts` — `generateFromPrompt` (streaming) + `callClaudeJSON<T>` (JSON)
+- `apps/backend/src/routes.ts` — Routes REST (`/api/analyze-job`, `/api/generate-report`)
+- `apps/backend/src/prompts/` — Prompts métier (job-analysis, live-assist, tech-translate, report)
+- `apps/web/src/App.tsx` — Router 3 étapes (prep/live/report)
+- `apps/web/src/hooks/useAudioCapture.ts` — Capture audio (ScriptProcessorNode + amplitude VAD)
+- `apps/web/src/hooks/useWebSocket.ts` — Gestion WS + état session
+- `apps/web/src/hooks/useApi.ts` — Appels REST (analyzeJob, generateReport)
 
 ## Prochaines priorités
 
-1. Tester le STT malgache (Groq Whisper) — valider la qualité
-2. Ajouter VAD (Voice Activity Detection) côté client
+1. Débugger la capture audio onglet (Google Meet) — vérifier RMS, sampleRate réel, routing audio OS
+2. Tester le flux end-to-end complet (Prep → Live → Report)
 3. Migrer ScriptProcessorNode → AudioWorklet
 4. Reconnexion WebSocket automatique
-5. Auth (Supabase) + billing (Stripe)
-6. Electron wrapper (Phase 2)
+5. Auth (Supabase) + billing (Stripe) — Phase 2

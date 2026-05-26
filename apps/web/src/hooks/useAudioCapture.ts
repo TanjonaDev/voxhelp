@@ -1,5 +1,4 @@
 import { useCallback, useEffect, useRef, useState } from "react";
-import { MicVAD } from "@ricky0123/vad-web";
 
 type AudioSource = "microphone" | "tab";
 
@@ -13,18 +12,28 @@ interface UseAudioCaptureReturn {
   error: string | null;
 }
 
-function float32ToBase64(float32: Float32Array): string {
-  const int16 = new Int16Array(float32.length);
-  for (let i = 0; i < float32.length; i++) {
-    const s = Math.max(-1, Math.min(1, float32[i]));
+const TARGET_SAMPLE_RATE = 16000;
+// Power-of-2 buffer ≈ 250ms at 16kHz
+const PROCESSOR_BUFFER_SIZE = 4096;
+const SPEAKING_THRESHOLD = 0.005;
+const SILENCE_DEBOUNCE_MS = 500;
+
+function float32ToPcm16Base64(samples: Float32Array): string {
+  const int16 = new Int16Array(samples.length);
+  for (let i = 0; i < samples.length; i++) {
+    const s = Math.max(-1, Math.min(1, samples[i]));
     int16[i] = s < 0 ? s * 0x8000 : s * 0x7fff;
   }
-  const uint8 = new Uint8Array(int16.buffer);
-  let binary = "";
-  for (let i = 0; i < uint8.length; i++) {
-    binary += String.fromCharCode(uint8[i]);
-  }
-  return btoa(binary);
+  const bytes = new Uint8Array(int16.buffer);
+  let bin = "";
+  for (let i = 0; i < bytes.length; i++) bin += String.fromCharCode(bytes[i]);
+  return btoa(bin);
+}
+
+function getRMS(buf: Float32Array): number {
+  let sum = 0;
+  for (let i = 0; i < buf.length; i++) sum += buf[i] * buf[i];
+  return Math.sqrt(sum / buf.length);
 }
 
 export function useAudioCapture(
@@ -35,82 +44,88 @@ export function useAudioCapture(
   const [audioSource, setAudioSource] = useState<AudioSource | null>(null);
   const [error, setError] = useState<string | null>(null);
 
-  const vadRef = useRef<Awaited<ReturnType<typeof MicVAD.new>> | null>(null);
+  const ctxRef = useRef<AudioContext | null>(null);
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const processorRef = useRef<any>(null);
   const streamRef = useRef<MediaStream | null>(null);
-  const isStartingRef = useRef(false);
-  const onAudioChunkRef = useRef(onAudioChunk);
-  onAudioChunkRef.current = onAudioChunk;
+  const silenceTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const onChunkRef = useRef(onAudioChunk);
+  onChunkRef.current = onAudioChunk;
 
-  const startVAD = useCallback(
-    async (stream: MediaStream, source: AudioSource) => {
-      if (isStartingRef.current) {
-        stream.getTracks().forEach((t) => t.stop());
-        return;
-      }
-      if (vadRef.current) {
-        vadRef.current.destroy();
-        vadRef.current = null;
-      }
-      if (streamRef.current) {
-        streamRef.current.getTracks().forEach((t) => t.stop());
-        streamRef.current = null;
-      }
-      isStartingRef.current = true;
-      try {
-        const vad = await MicVAD.new({
-          getStream: async () => stream,
-          baseAssetPath: "/",
-          onnxWASMBasePath:
-            "https://cdn.jsdelivr.net/npm/onnxruntime-web@1.25.1/dist/",
-          model: "v5",
-          positiveSpeechThreshold: 0.5,
-          negativeSpeechThreshold: 0.35,
-          preSpeechPadMs: 200,
-          redemptionMs: 400,
-          onFrameProcessed: (probs, frame) => {
-            if (probs.isSpeech > 0.5) {
-              onAudioChunkRef.current(float32ToBase64(frame));
-            }
-          },
-          onSpeechStart: () => setIsSpeaking(true),
-          onSpeechEnd: (_audio: Float32Array) => setIsSpeaking(false),
-          onVADMisfire: () => setIsSpeaking(false),
-        });
+  const startCapture = useCallback(async (stream: MediaStream, source: AudioSource) => {
+    // --- debug: what did the browser actually give us? ---
+    const tracks = stream.getAudioTracks();
+    console.log("[AudioCapture] tracks:", tracks.map((t) => ({
+      label: t.label,
+      settings: t.getSettings(),
+    })));
 
-        vadRef.current = vad;
-        streamRef.current = stream;
-        setAudioSource(source);
-        setIsCapturing(true);
-        setError(null);
-      } catch (err) {
-        const msg =
-          err instanceof Error ? err.message : "VAD initialization failed";
-        setError(msg);
-        stream.getTracks().forEach((t) => t.stop());
-      } finally {
-        isStartingRef.current = false;
+    const ctx = new AudioContext({ sampleRate: TARGET_SAMPLE_RATE });
+    await ctx.resume();
+    console.log("[AudioCapture] context sampleRate:", ctx.sampleRate);
+
+    const src = ctx.createMediaStreamSource(stream);
+
+    // eslint-disable-next-line @typescript-eslint/no-deprecated
+    const processor = ctx.createScriptProcessor(PROCESSOR_BUFFER_SIZE, 1, 1);
+    let frameCount = 0;
+
+    // eslint-disable-next-line @typescript-eslint/no-deprecated
+    processor.onaudioprocess = (e: AudioProcessingEvent) => {
+      // eslint-disable-next-line @typescript-eslint/no-deprecated
+      const frame = e.inputBuffer.getChannelData(0);
+      const rms = getRMS(frame);
+
+      // Log first 10 frames so we can see if audio flows at all
+      if (frameCount < 10) {
+        console.log(`[AudioCapture] frame #${frameCount} rms=${rms.toFixed(4)}`);
+        frameCount++;
       }
-    },
-    []
-  );
+
+      if (rms > SPEAKING_THRESHOLD) {
+        if (silenceTimerRef.current) {
+          clearTimeout(silenceTimerRef.current);
+          silenceTimerRef.current = null;
+        }
+        setIsSpeaking(true);
+        onChunkRef.current(float32ToPcm16Base64(new Float32Array(frame)));
+      } else {
+        if (!silenceTimerRef.current) {
+          silenceTimerRef.current = setTimeout(() => {
+            setIsSpeaking(false);
+            silenceTimerRef.current = null;
+          }, SILENCE_DEBOUNCE_MS);
+        }
+      }
+    };
+
+    src.connect(processor);
+    // ScriptProcessorNode must be connected to destination to fire
+    processor.connect(ctx.destination);
+
+    ctxRef.current = ctx;
+    processorRef.current = processor;
+    streamRef.current = stream;
+    setAudioSource(source);
+    setIsCapturing(true);
+    setError(null);
+  }, []);
 
   const startMicrophone = useCallback(async () => {
     try {
       const stream = await navigator.mediaDevices.getUserMedia({
         audio: {
-          sampleRate: 16000,
+          sampleRate: TARGET_SAMPLE_RATE,
           channelCount: 1,
           echoCancellation: true,
           noiseSuppression: true,
         },
       });
-      await startVAD(stream, "microphone");
+      await startCapture(stream, "microphone");
     } catch (err) {
-      setError(
-        err instanceof Error ? err.message : "Microphone access denied"
-      );
+      setError(err instanceof Error ? err.message : "Microphone access denied");
     }
-  }, [startVAD]);
+  }, [startCapture]);
 
   const startTabCapture = useCallback(async () => {
     try {
@@ -118,32 +133,31 @@ export function useAudioCapture(
         video: true,
         audio: true,
       });
-
       stream.getVideoTracks().forEach((t) => t.stop());
 
       const audioTracks = stream.getAudioTracks();
+      console.log("[AudioCapture] tab audio tracks:", audioTracks.length);
       if (audioTracks.length === 0) {
         setError(
-          "Aucun audio capturé. Assure-toi de cocher 'Partager l'audio' et de sélectionner l'onglet de ton appel."
+          "Aucun audio détecté. Dans le sélecteur Chrome, choisis l'onglet et coche 'Partager l'audio du système'."
         );
         return;
       }
 
-      await startVAD(new MediaStream(audioTracks), "tab");
+      await startCapture(new MediaStream(audioTracks), "tab");
     } catch (err) {
-      setError(
-        err instanceof Error ? err.message : "Tab audio capture denied"
-      );
+      setError(err instanceof Error ? err.message : "Tab capture refusé ou annulé");
     }
-  }, [startVAD]);
+  }, [startCapture]);
 
   const stop = useCallback(() => {
-    vadRef.current?.destroy();
-    vadRef.current = null;
-    if (streamRef.current) {
-      streamRef.current.getTracks().forEach((t) => t.stop());
-      streamRef.current = null;
-    }
+    if (silenceTimerRef.current) clearTimeout(silenceTimerRef.current);
+    processorRef.current?.disconnect();
+    ctxRef.current?.close();
+    streamRef.current?.getTracks().forEach((t) => t.stop());
+    processorRef.current = null;
+    ctxRef.current = null;
+    streamRef.current = null;
     setIsCapturing(false);
     setIsSpeaking(false);
     setAudioSource(null);
@@ -151,13 +165,5 @@ export function useAudioCapture(
 
   useEffect(() => stop, [stop]);
 
-  return {
-    isCapturing,
-    isSpeaking,
-    audioSource,
-    startMicrophone,
-    startTabCapture,
-    stop,
-    error,
-  };
+  return { isCapturing, isSpeaking, audioSource, startMicrophone, startTabCapture, stop, error };
 }
