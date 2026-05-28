@@ -1,7 +1,7 @@
 import type { WebSocket } from "ws";
 import type { ClientMessage, ServerMessage, SessionConfig, TechTranslation } from "@voxhelp/shared";
 import { DeepgramSTT } from "./deepgram.js";
-import { generateFromPrompt, callClaudeJSON } from "./llm.js";
+import { generateFromPrompt, callClaudeJSON, correctTranscript } from "./llm.js";
 import { buildLiveAssistPrompt } from "./prompts/live-assist.js";
 import { buildTechTranslatePrompt } from "./prompts/tech-translate.js";
 
@@ -62,7 +62,7 @@ export class Session {
 
     this.stt = new DeepgramSTT(config.language, {
       onPartial: (text) => this.send({ type: "transcript:partial", text }),
-      onFinal: (text) => this.handleFinalTranscript(text),
+      onFinal: (text) => void this.handleFinalTranscript(text),
       onError: (err) => this.send({ type: "session:error", error: err }),
     });
 
@@ -79,8 +79,11 @@ export class Session {
     this.stt.sendAudio(buffer);
   }
 
-  private handleFinalTranscript(text: string): void {
-    if (!text.trim()) return;
+  private async handleFinalTranscript(rawText: string): Promise<void> {
+    if (!rawText.trim()) return;
+
+    const text = await correctTranscript(rawText);
+    if (rawText !== text) console.log(`[Session] Corrected: "${rawText}" → "${text}"`);
 
     this.send({ type: "transcript:final", text });
     this.transcriptBuffer.push(text);

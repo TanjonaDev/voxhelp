@@ -43,6 +43,25 @@ export async function generateFromPrompt(
   }
 }
 
+export async function correctTranscript(rawText: string): Promise<string> {
+  try {
+    const message = await anthropic.messages.create({
+      model: "claude-haiku-4-5-20251001",
+      max_tokens: 512,
+      system: `Tu corriges les transcriptions audio d'entretiens techniques en français.
+Le STT transcrit parfois mal les termes techniques, anglicismes et noms de technos.
+Retourne UNIQUEMENT le texte corrigé, sans explication ni formatage.
+Ne change pas le sens ni la structure de la phrase. Si tu n'es pas sûr, garde l'original.
+Exemples de corrections : "pays publiques" → "APIs publiques", "foulstack" → "fullstack", "réacte" → "React".`,
+      messages: [{ role: "user", content: rawText }],
+    });
+    const content = message.content[0];
+    return content.type === "text" ? content.text.trim() : rawText;
+  } catch {
+    return rawText;
+  }
+}
+
 export async function callClaudeJSON<T>(
   systemPrompt: string,
   userMessage: string
