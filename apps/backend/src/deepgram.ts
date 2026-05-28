@@ -50,8 +50,6 @@ export class DeepgramSTT {
       encoding: "linear16",
     });
 
-    TECH_KEYWORDS.forEach((kw) => params.append("keywords", `${kw}:2`));
-
     const url = `wss://api.deepgram.com/v1/listen?${params}`;
 
     this.ws = new WebSocket(url, {
@@ -79,6 +77,8 @@ export class DeepgramSTT {
           } else {
             if (alt.transcript) this.callbacks.onPartial(alt.transcript);
           }
+        } else if (response.type === "Error") {
+          console.error("[Deepgram] Error response:", JSON.stringify(response));
         } else if (response.type === "UtteranceEnd") {
           if (this.finalBuffer.length > 0) {
             const full = this.finalBuffer.join(" ").trim();
