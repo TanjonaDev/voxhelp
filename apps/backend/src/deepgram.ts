@@ -11,6 +11,7 @@ export class DeepgramSTT {
   private ws: WebSocket | null = null;
   private callbacks: DeepgramCallbacks;
   private language: string;
+  private finalBuffer: string[] = [];
 
   constructor(language: string, callbacks: DeepgramCallbacks) {
     this.callbacks = callbacks;
@@ -52,12 +53,25 @@ export class DeepgramSTT {
 
         if (response.type === "Results") {
           const alt = response.channel?.alternatives?.[0];
-          if (!alt || !alt.transcript) return;
+          if (!alt) return;
 
           if (response.is_final) {
-            this.callbacks.onFinal(alt.transcript);
+            if (alt.transcript) this.finalBuffer.push(alt.transcript);
+
+            if (response.speech_final) {
+              const full = this.finalBuffer.join(" ").trim();
+              this.finalBuffer = [];
+              if (full) this.callbacks.onFinal(full);
+            }
           } else {
-            this.callbacks.onPartial(alt.transcript);
+            if (alt.transcript) this.callbacks.onPartial(alt.transcript);
+          }
+        } else if (response.type === "UtteranceEnd") {
+          // Flush any buffered segments if speech_final never fired
+          if (this.finalBuffer.length > 0) {
+            const full = this.finalBuffer.join(" ").trim();
+            this.finalBuffer = [];
+            if (full) this.callbacks.onFinal(full);
           }
         }
       } catch {

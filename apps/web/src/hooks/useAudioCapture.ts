@@ -13,9 +13,9 @@ interface UseAudioCaptureReturn {
 }
 
 const TARGET_SAMPLE_RATE = 16000;
-// Power-of-2 buffer ≈ 250ms at 16kHz
 const PROCESSOR_BUFFER_SIZE = 4096;
-const SPEAKING_THRESHOLD = 0.005;
+// RMS thresholds — used only for the isSpeaking UI indicator, NOT to gate audio
+const SPEAKING_THRESHOLD = 0.003;
 const SILENCE_DEBOUNCE_MS = 500;
 
 function float32ToPcm16Base64(samples: Float32Array): string {
@@ -53,42 +53,30 @@ export function useAudioCapture(
   onChunkRef.current = onAudioChunk;
 
   const startCapture = useCallback(async (stream: MediaStream, source: AudioSource) => {
-    // --- debug: what did the browser actually give us? ---
-    const tracks = stream.getAudioTracks();
-    console.log("[AudioCapture] tracks:", tracks.map((t) => ({
-      label: t.label,
-      settings: t.getSettings(),
-    })));
-
     const ctx = new AudioContext({ sampleRate: TARGET_SAMPLE_RATE });
     await ctx.resume();
-    console.log("[AudioCapture] context sampleRate:", ctx.sampleRate);
+    console.log("[AudioCapture] sampleRate:", ctx.sampleRate, "source:", source);
 
     const src = ctx.createMediaStreamSource(stream);
-
     // eslint-disable-next-line @typescript-eslint/no-deprecated
     const processor = ctx.createScriptProcessor(PROCESSOR_BUFFER_SIZE, 1, 1);
-    let frameCount = 0;
 
     // eslint-disable-next-line @typescript-eslint/no-deprecated
     processor.onaudioprocess = (e: AudioProcessingEvent) => {
       // eslint-disable-next-line @typescript-eslint/no-deprecated
       const frame = e.inputBuffer.getChannelData(0);
+
+      // Always send audio — Deepgram's own VAD handles silence server-side
+      onChunkRef.current(float32ToPcm16Base64(new Float32Array(frame)));
+
+      // RMS used only to drive the isSpeaking UI indicator
       const rms = getRMS(frame);
-
-      // Log first 10 frames so we can see if audio flows at all
-      if (frameCount < 10) {
-        console.log(`[AudioCapture] frame #${frameCount} rms=${rms.toFixed(4)}`);
-        frameCount++;
-      }
-
       if (rms > SPEAKING_THRESHOLD) {
         if (silenceTimerRef.current) {
           clearTimeout(silenceTimerRef.current);
           silenceTimerRef.current = null;
         }
         setIsSpeaking(true);
-        onChunkRef.current(float32ToPcm16Base64(new Float32Array(frame)));
       } else {
         if (!silenceTimerRef.current) {
           silenceTimerRef.current = setTimeout(() => {
@@ -136,10 +124,9 @@ export function useAudioCapture(
       stream.getVideoTracks().forEach((t) => t.stop());
 
       const audioTracks = stream.getAudioTracks();
-      console.log("[AudioCapture] tab audio tracks:", audioTracks.length);
       if (audioTracks.length === 0) {
         setError(
-          "Aucun audio détecté. Dans le sélecteur Chrome, choisis l'onglet et coche 'Partager l'audio du système'."
+          "Aucun audio détecté. Choisis l'onglet et coche 'Partager l'audio du système'."
         );
         return;
       }
