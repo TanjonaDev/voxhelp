@@ -1,11 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from "react";
-import type {
-  ClientMessage,
-  ServerMessage,
-  SessionConfig,
-  TranscriptEntry,
-  TechTranslation,
-} from "@voxhelp/shared";
+import type { ClientMessage, ServerMessage, SessionConfig, TranscriptEntry, TechTranslation } from "@voxhelp/shared";
 import { createId, WS_PING_INTERVAL_MS } from "@voxhelp/shared";
 
 type ConnectionStatus = "disconnected" | "connecting" | "connected" | "error";
@@ -26,9 +20,6 @@ interface UseWebSocketReturn {
   startSession: (config: SessionConfig) => void;
   stopSession: () => void;
   sendAudio: (base64: string) => void;
-  markQuestionAsked: (questionId: string) => void;
-  scoreCriterion: (criterionId: string, score: number) => void;
-  resetState: () => void;
 }
 
 export function useWebSocket(url: string): UseWebSocketReturn {
@@ -52,15 +43,12 @@ export function useWebSocket(url: string): UseWebSocketReturn {
     switch (msg.type) {
       case "session:ready":
         break;
-
       case "session:error":
         console.error("[WS] Session error:", msg.error);
         break;
-
       case "transcript:partial":
         setCurrentPartial(msg.text);
         break;
-
       case "transcript:final":
         setCurrentPartial("");
         setTranscripts((prev) => [
@@ -68,21 +56,17 @@ export function useWebSocket(url: string): UseWebSocketReturn {
           { id: createId(), text: msg.text, timestamp: Date.now() },
         ]);
         break;
-
       case "tech:translation":
         setTechTranslations((prev) => [msg.translation, ...prev].slice(0, 5));
         break;
-
       case "assist:start":
         setCurrentAssist({ text: "", isStreaming: true });
         break;
-
       case "assist:chunk":
         setCurrentAssist((prev) =>
           prev ? { ...prev, text: prev.text + msg.text } : null
         );
         break;
-
       case "assist:done":
         setCurrentAssist(null);
         setAssists((prev) => [
@@ -90,12 +74,10 @@ export function useWebSocket(url: string): UseWebSocketReturn {
           { id: createId(), text: msg.fullText, timestamp: Date.now() },
         ]);
         break;
-
       case "assist:error":
         setCurrentAssist(null);
         console.error("[WS] Assist error:", msg.error);
         break;
-
       case "pong":
         break;
     }
@@ -132,9 +114,7 @@ export function useWebSocket(url: string): UseWebSocketReturn {
       }
     };
 
-    ws.onerror = () => {
-      setStatus("error");
-    };
+    ws.onerror = () => setStatus("error");
   }, [url, send, handleMessage]);
 
   const startSession = useCallback(
@@ -151,9 +131,9 @@ export function useWebSocket(url: string): UseWebSocketReturn {
       }
 
       connect();
-      const checkInterval = setInterval(() => {
+      const check = setInterval(() => {
         if (wsRef.current?.readyState === WebSocket.OPEN) {
-          clearInterval(checkInterval);
+          clearInterval(check);
           send({ type: "session:start", config });
         }
       }, 100);
@@ -172,28 +152,6 @@ export function useWebSocket(url: string): UseWebSocketReturn {
     [send]
   );
 
-  const markQuestionAsked = useCallback(
-    (questionId: string) => {
-      send({ type: "question:mark-asked", questionId });
-    },
-    [send]
-  );
-
-  const scoreCriterion = useCallback(
-    (criterionId: string, score: number) => {
-      send({ type: "criterion:score", criterionId, score });
-    },
-    [send]
-  );
-
-  const resetState = useCallback(() => {
-    setTranscripts([]);
-    setCurrentPartial("");
-    setTechTranslations([]);
-    setCurrentAssist(null);
-    setAssists([]);
-  }, []);
-
   useEffect(() => {
     connect();
     return () => {
@@ -202,18 +160,5 @@ export function useWebSocket(url: string): UseWebSocketReturn {
     };
   }, [connect]);
 
-  return {
-    status,
-    transcripts,
-    currentPartial,
-    techTranslations,
-    currentAssist,
-    assists,
-    startSession,
-    stopSession,
-    sendAudio,
-    markQuestionAsked,
-    scoreCriterion,
-    resetState,
-  };
+  return { status, transcripts, currentPartial, techTranslations, currentAssist, assists, startSession, stopSession, sendAudio };
 }

@@ -1,12 +1,5 @@
 import type { WebSocket } from "ws";
-import type {
-  ClientMessage,
-  ServerMessage,
-  SessionConfig,
-  GeneratedQuestion,
-  ScorecardCriterion,
-  TechTranslation,
-} from "@voxhelp/shared";
+import type { ClientMessage, ServerMessage, SessionConfig, TechTranslation } from "@voxhelp/shared";
 import { DeepgramSTT } from "./deepgram.js";
 import { generateFromPrompt, callClaudeJSON } from "./llm.js";
 import { buildLiveAssistPrompt } from "./prompts/live-assist.js";
@@ -16,11 +9,9 @@ export class Session {
   private ws: WebSocket;
   private stt: DeepgramSTT | null = null;
   private config: SessionConfig | null = null;
-  private questions: GeneratedQuestion[] = [];
-  private scorecard: ScorecardCriterion[] = [];
   private transcriptBuffer: string[] = [];
   private debounceTimer: ReturnType<typeof setTimeout> | null = null;
-  private isProcessingAssist = false;
+  private isProcessing = false;
   private pendingTranscript: string | null = null;
   private readonly DEBOUNCE_MS = 1800;
 
@@ -59,12 +50,6 @@ export class Session {
       case "audio:chunk":
         this.handleAudioChunk(message.data);
         break;
-      case "question:mark-asked":
-        this.toggleQuestion(message.questionId);
-        break;
-      case "criterion:score":
-        this.updateScore(message.criterionId, message.score);
-        break;
       case "ping":
         this.send({ type: "pong" });
         break;
@@ -73,8 +58,6 @@ export class Session {
 
   private startSession(config: SessionConfig): void {
     this.config = config;
-    this.questions = config.questions ? [...config.questions] : [];
-    this.scorecard = config.scorecard ? [...config.scorecard] : [];
     this.transcriptBuffer = [];
 
     this.stt = new DeepgramSTT(config.language, {
@@ -87,7 +70,7 @@ export class Session {
 
     const sessionId = `session_${Date.now()}`;
     this.send({ type: "session:ready", sessionId });
-    console.log(`[Session] Started: language=${config.language}, candidate=${config.candidateName}`);
+    console.log(`[Session] Started: language=${config.language}`);
   }
 
   private handleAudioChunk(base64Data: string): void {
@@ -110,7 +93,7 @@ export class Session {
 
       if (fullText.trim().length < 10) return;
 
-      if (this.isProcessingAssist) {
+      if (this.isProcessing) {
         this.pendingTranscript = fullText;
         return;
       }
@@ -120,16 +103,14 @@ export class Session {
   }
 
   private async processTranscript(transcript: string): Promise<void> {
-    if (!this.config) return;
-
-    this.isProcessingAssist = true;
+    this.isProcessing = true;
 
     await Promise.all([
       this.runTechTranslation(transcript),
       this.runAssist(transcript),
     ]);
 
-    this.isProcessingAssist = false;
+    this.isProcessing = false;
 
     if (this.pendingTranscript) {
       const pending = this.pendingTranscript;
@@ -140,9 +121,8 @@ export class Session {
 
   private async runTechTranslation(transcript: string): Promise<void> {
     try {
-      const systemPrompt = buildTechTranslatePrompt();
       const result = await callClaudeJSON<{ translations: TechTranslation[] }>(
-        systemPrompt,
+        buildTechTranslatePrompt(),
         `TRANSCRIPTION:\n"${transcript}"`
       );
       for (const translation of result.translations) {
@@ -154,16 +134,8 @@ export class Session {
   }
 
   private async runAssist(transcript: string): Promise<void> {
-    if (!this.config) return;
-
-    const systemPrompt = buildLiveAssistPrompt(
-      this.config.jobDescription,
-      this.questions,
-      this.scorecard
-    );
-
     await generateFromPrompt(
-      systemPrompt,
+      buildLiveAssistPrompt(),
       `Ce qui vient d'être dit :\n"${transcript}"`,
       {
         onStart: () => this.send({ type: "assist:start" }),
@@ -172,16 +144,6 @@ export class Session {
         onError: (error) => this.send({ type: "assist:error", error }),
       }
     );
-  }
-
-  private toggleQuestion(questionId: string): void {
-    const q = this.questions.find((q) => q.id === questionId);
-    if (q) q.isAsked = !q.isAsked;
-  }
-
-  private updateScore(criterionId: string, score: number): void {
-    const c = this.scorecard.find((c) => c.id === criterionId);
-    if (c) c.score = score;
   }
 
   private send(message: ServerMessage): void {
@@ -201,8 +163,6 @@ export class Session {
       this.stt = null;
     }
     this.config = null;
-    this.questions = [];
-    this.scorecard = [];
     console.log("[Session] Cleaned up");
   }
 }

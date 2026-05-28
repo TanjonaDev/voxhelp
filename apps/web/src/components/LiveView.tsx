@@ -1,14 +1,6 @@
 import { useEffect, useRef, useState } from "react";
-import type {
-  GeneratedQuestion,
-  ScorecardCriterion,
-  SessionConfig,
-  TranscriptEntry,
-  TechTranslation,
-} from "@voxhelp/shared";
+import type { TranscriptEntry, TechTranslation } from "@voxhelp/shared";
 import { TechTranslationCard } from "./TechTranslationCard";
-import { QuestionChecklist } from "./QuestionChecklist";
-import { ScorecardPanel } from "./ScorecardPanel";
 
 interface AssistMessage {
   id: string;
@@ -17,21 +9,16 @@ interface AssistMessage {
 }
 
 interface LiveViewProps {
-  config: SessionConfig;
   transcripts: TranscriptEntry[];
   currentPartial: string;
   techTranslations: TechTranslation[];
   currentAssist: { text: string; isStreaming: boolean } | null;
   assists: AssistMessage[];
-  questions: GeneratedQuestion[];
-  scorecard: ScorecardCriterion[];
   wsStatus: string;
   isCapturing: boolean;
   isSpeaking: boolean;
-  onToggleQuestion: (id: string) => void;
-  onScoreCriterion: (criterionId: string, score: number) => void;
   onStartAudio: () => Promise<void>;
-  onEndCall: () => void;
+  onStop: () => void;
 }
 
 function useElapsedTime(active: boolean) {
@@ -57,21 +44,16 @@ function useElapsedTime(active: boolean) {
 }
 
 export function LiveView({
-  config,
   transcripts,
   currentPartial,
   techTranslations,
   currentAssist,
   assists,
-  questions,
-  scorecard,
   wsStatus,
   isCapturing,
   isSpeaking,
-  onToggleQuestion,
-  onScoreCriterion,
   onStartAudio,
-  onEndCall,
+  onStop,
 }: LiveViewProps) {
   const transcriptEndRef = useRef<HTMLDivElement>(null);
   const assistEndRef = useRef<HTMLDivElement>(null);
@@ -93,23 +75,17 @@ export function LiveView({
 
   return (
     <div className="h-screen bg-[#F6F7FB] flex flex-col">
+      {/* Header */}
       <header className="bg-white border-b border-[#DFE1EA] px-6 py-3 flex items-center justify-between flex-shrink-0">
         <div className="flex items-center gap-3">
           <div className="w-7 h-7 rounded-lg bg-[#3D5AFE] flex items-center justify-center">
             <span className="text-white text-[10px] font-bold">VH</span>
           </div>
-          <div>
-            <span className="font-semibold text-[#1A1D26] text-sm" style={{ fontFamily: "'Outfit', sans-serif" }}>
-              {config.candidateName}
-            </span>
-            <span className="text-[#5A5F72] text-xs ml-2">· Call en cours</span>
-          </div>
+          <span className="font-semibold text-[#1A1D26] text-sm">VoxHelp</span>
         </div>
-        <div className="flex items-center gap-3">
-          <div className={`flex items-center gap-1.5 text-xs ${wsStatus === "connected" ? "text-[#0FAA6C]" : "text-[#5A5F72]"}`}>
-            <div className={`w-2 h-2 rounded-full ${wsStatus === "connected" ? "bg-[#0FAA6C]" : "bg-gray-300"}`} />
-            {wsStatus === "connected" ? "Connecté" : wsStatus}
-          </div>
+        <div className={`flex items-center gap-1.5 text-xs ${wsStatus === "connected" ? "text-[#0FAA6C]" : "text-[#5A5F72]"}`}>
+          <div className={`w-2 h-2 rounded-full ${wsStatus === "connected" ? "bg-[#0FAA6C]" : "bg-gray-300"}`} />
+          {wsStatus === "connected" ? "Connecté" : wsStatus}
         </div>
       </header>
 
@@ -118,15 +94,14 @@ export function LiveView({
         <div className="flex-1 flex flex-col border-r border-[#DFE1EA] overflow-hidden">
           <div className="px-4 py-2 bg-white border-b border-[#DFE1EA] flex items-center justify-between flex-shrink-0">
             <span className="text-xs font-semibold uppercase tracking-wider text-[#5A5F72]">Transcription</span>
-            {!audioStarted && (
+            {!audioStarted ? (
               <button
                 onClick={handleStart}
                 className="text-xs bg-[#3D5AFE] text-white px-3 py-1 rounded-lg hover:bg-[#3451e0] transition-colors"
               >
-                Démarrer l'audio
+                Démarrer l'écoute
               </button>
-            )}
-            {isCapturing && (
+            ) : (
               <div className="flex items-center gap-1.5 text-xs">
                 <div className={`w-2 h-2 rounded-full ${isSpeaking ? "bg-[#3D5AFE] animate-pulse" : "bg-[#0FAA6C]"}`} />
                 <span className={isSpeaking ? "text-[#3D5AFE]" : "text-[#0FAA6C]"}>
@@ -142,7 +117,7 @@ export function LiveView({
                 <div>
                   <div className="text-4xl mb-3">🎤</div>
                   <p className="text-sm">
-                    {audioStarted ? "En écoute..." : "Démarrez l'audio pour commencer"}
+                    {audioStarted ? "En écoute..." : "Démarrez l'écoute pour commencer"}
                   </p>
                 </div>
               </div>
@@ -171,70 +146,39 @@ export function LiveView({
           </div>
         </div>
 
-        {/* Right: AI Copilot + Checklist + Scorecard */}
+        {/* Right: Explanations */}
         <div className="w-80 flex flex-col overflow-hidden bg-white">
-          <div className="flex-1 overflow-y-auto">
-            {/* AI Assist Panel */}
-            <div className="p-4 border-b border-[#DFE1EA]">
-              <p className="text-[10px] font-semibold uppercase tracking-wider text-[#5A5F72] mb-3">
-                Copilote IA
-              </p>
-
-              {techTranslations.length > 0 && (
-                <div className="space-y-2 mb-3">
-                  {techTranslations.slice(0, 2).map((t, i) => (
-                    <TechTranslationCard key={`${t.term}-${i}`} translation={t} />
-                  ))}
-                </div>
-              )}
-
-              <div className="space-y-2">
-                {assists.slice(-3).map((a) => (
-                  <div key={a.id} className="bg-[#F6F7FB] border border-[#DFE1EA] rounded-xl p-3">
-                    <p className="text-[10px] font-semibold uppercase tracking-wider text-[#3D5AFE] mb-1">
-                      💡 Assist
-                    </p>
-                    <p className="text-xs text-[#1A1D26] leading-relaxed whitespace-pre-wrap">{a.text}</p>
-                  </div>
-                ))}
-                {currentAssist && (
-                  <div className="bg-[#F6F7FB] border border-[#3D5AFE]/30 rounded-xl p-3">
-                    <p className="text-[10px] font-semibold uppercase tracking-wider text-[#3D5AFE] mb-1">
-                      💡 Assist
-                    </p>
-                    <p className="text-xs text-[#1A1D26] leading-relaxed whitespace-pre-wrap cursor-blink">
-                      {currentAssist.text}
-                    </p>
-                  </div>
-                )}
-                {assists.length === 0 && !currentAssist && (
-                  <div className="text-xs text-[#5A5F72] text-center py-4">
-                    Les suggestions apparaîtront ici
-                  </div>
-                )}
-              </div>
-              <div ref={assistEndRef} />
-            </div>
-
-            {/* Questions */}
-            {questions.length > 0 && (
-              <div className="p-4 border-b border-[#DFE1EA]">
-                <p className="text-[10px] font-semibold uppercase tracking-wider text-[#5A5F72] mb-3">
-                  Questions ({questions.filter((q) => q.isAsked).length}/{questions.length} posées)
-                </p>
-                <QuestionChecklist questions={questions} onToggle={onToggleQuestion} />
+          <div className="px-4 py-2 border-b border-[#DFE1EA] flex-shrink-0">
+            <span className="text-xs font-semibold uppercase tracking-wider text-[#5A5F72]">Explications IA</span>
+          </div>
+          <div className="flex-1 overflow-y-auto p-4 space-y-3">
+            {techTranslations.length === 0 && assists.length === 0 && !currentAssist && (
+              <div className="text-xs text-[#5A5F72] text-center pt-8">
+                Les explications des termes techniques apparaîtront ici
               </div>
             )}
 
-            {/* Scorecard */}
-            {scorecard.length > 0 && (
-              <div className="p-4">
-                <p className="text-[10px] font-semibold uppercase tracking-wider text-[#5A5F72] mb-3">
-                  Scorecard
+            {techTranslations.map((t, i) => (
+              <TechTranslationCard key={`${t.term}-${i}`} translation={t} />
+            ))}
+
+            {assists.slice(-5).map((a) => (
+              <div key={a.id} className="bg-[#F6F7FB] border border-[#DFE1EA] rounded-xl p-3">
+                <p className="text-[10px] font-semibold uppercase tracking-wider text-[#3D5AFE] mb-1.5">Analyse</p>
+                <p className="text-xs text-[#1A1D26] leading-relaxed whitespace-pre-wrap">{a.text}</p>
+              </div>
+            ))}
+
+            {currentAssist && (
+              <div className="bg-[#F6F7FB] border border-[#3D5AFE]/30 rounded-xl p-3">
+                <p className="text-[10px] font-semibold uppercase tracking-wider text-[#3D5AFE] mb-1.5">Analyse</p>
+                <p className="text-xs text-[#1A1D26] leading-relaxed whitespace-pre-wrap cursor-blink">
+                  {currentAssist.text}
                 </p>
-                <ScorecardPanel scorecard={scorecard} onScore={onScoreCriterion} />
               </div>
             )}
+
+            <div ref={assistEndRef} />
           </div>
         </div>
       </div>
@@ -242,14 +186,16 @@ export function LiveView({
       {/* Bottom bar */}
       <div className="bg-white border-t border-[#DFE1EA] px-6 py-3 flex items-center justify-between flex-shrink-0">
         <div className="flex items-center gap-2 text-sm">
-          <div className="w-2 h-2 rounded-full bg-red-500 animate-pulse" />
-          <span className="text-[#1A1D26] font-medium">En cours · {elapsed}</span>
+          {isCapturing && <div className="w-2 h-2 rounded-full bg-red-500 animate-pulse" />}
+          <span className="text-[#1A1D26] font-medium">
+            {isCapturing ? `En cours · ${elapsed}` : "En attente"}
+          </span>
         </div>
         <button
-          onClick={onEndCall}
-          className="bg-red-500 text-white px-5 py-2 rounded-xl text-sm font-semibold hover:bg-red-600 transition-colors flex items-center gap-2"
+          onClick={onStop}
+          className="bg-red-500 text-white px-5 py-2 rounded-xl text-sm font-semibold hover:bg-red-600 transition-colors"
         >
-          ⏹ Terminer le call
+          ⏹ Arrêter
         </button>
       </div>
     </div>
