@@ -30,7 +30,7 @@ export class DeepgramSTT {
       language: this.language,
       smart_format: "true",
       interim_results: "true",
-      utterance_end_ms: "1500",
+      utterance_end_ms: "3000",
       vad_events: "true",
       sample_rate: String(AUDIO_SAMPLE_RATE),
       channels: "1",
@@ -57,17 +57,11 @@ export class DeepgramSTT {
 
           if (response.is_final) {
             if (alt.transcript) this.finalBuffer.push(alt.transcript);
-
-            if (response.speech_final) {
-              const full = this.finalBuffer.join(" ").trim();
-              this.finalBuffer = [];
-              if (full) this.callbacks.onFinal(full);
-            }
           } else {
             if (alt.transcript) this.callbacks.onPartial(alt.transcript);
           }
         } else if (response.type === "UtteranceEnd") {
-          // Flush any buffered segments if speech_final never fired
+          // Only flush after 3s of silence — avoids cutting mid-sentence
           if (this.finalBuffer.length > 0) {
             const full = this.finalBuffer.join(" ").trim();
             this.finalBuffer = [];
