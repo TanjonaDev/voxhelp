@@ -13,7 +13,7 @@ export class Session {
   private debounceTimer: ReturnType<typeof setTimeout> | null = null;
   private isProcessing = false;
   private pendingTranscript: string | null = null;
-  private readonly DEBOUNCE_MS = 1800;
+  private readonly DEBOUNCE_MS = 3500;
 
   constructor(ws: WebSocket) {
     this.ws = ws;

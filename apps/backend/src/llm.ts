@@ -56,7 +56,10 @@ Exemples de corrections : "pays publiques" → "APIs publiques", "foulstack" →
       messages: [{ role: "user", content: rawText }],
     });
     const content = message.content[0];
-    return content.type === "text" ? content.text.trim() : rawText;
+    if (content.type !== "text") return rawText;
+    const corrected = content.text.trim();
+    // If response is much longer than input, Haiku gave a meta-response instead of correcting
+    return corrected.length <= rawText.length * 3 ? corrected : rawText;
   } catch {
     return rawText;
   }
