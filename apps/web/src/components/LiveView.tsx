@@ -10,7 +10,7 @@ interface AssistMessage {
 
 interface LiveViewProps {
   transcripts: TranscriptEntry[];
-  currentPartial: string;
+  isBuffering: boolean;
   techTranslations: TechTranslation[];
   currentAssist: { text: string; isStreaming: boolean } | null;
   assists: AssistMessage[];
@@ -45,7 +45,7 @@ function useElapsedTime(active: boolean) {
 
 export function LiveView({
   transcripts,
-  currentPartial,
+  isBuffering,
   techTranslations,
   currentAssist,
   assists,
@@ -62,7 +62,7 @@ export function LiveView({
 
   useEffect(() => {
     transcriptEndRef.current?.scrollIntoView({ behavior: "smooth" });
-  }, [transcripts, currentPartial]);
+  }, [transcripts, isBuffering]);
 
   useEffect(() => {
     assistEndRef.current?.scrollIntoView({ behavior: "smooth" });
@@ -112,7 +112,7 @@ export function LiveView({
           </div>
 
           <div className="flex-1 overflow-y-auto p-4 space-y-3">
-            {transcripts.length === 0 && !currentPartial && (
+            {transcripts.length === 0 && !isBuffering && (
               <div className="flex items-center justify-center h-full text-center text-[#5A5F72]">
                 <div>
                   <div className="text-4xl mb-3">🎤</div>
@@ -132,13 +132,13 @@ export function LiveView({
                 </div>
               </div>
             ))}
-            {currentPartial && (
+            {isBuffering && (
               <div className="flex gap-3">
                 <div className="w-7 h-7 rounded-full bg-[#F6F7FB] border border-[#DFE1EA] flex items-center justify-center text-xs flex-shrink-0 mt-0.5">
                   🎤
                 </div>
-                <div className="bg-white border border-[#DFE1EA] rounded-xl px-4 py-2.5 text-sm text-[#5A5F72] italic opacity-70 shadow-sm max-w-[85%]">
-                  {currentPartial}...
+                <div className="bg-white border border-[#DFE1EA] rounded-xl px-4 py-2.5 text-sm text-[#5A5F72] italic opacity-70 shadow-sm max-w-[85%] animate-pulse">
+                  Transcription en cours...
                 </div>
               </div>
             )}

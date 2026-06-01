@@ -25,7 +25,7 @@ export default function App() {
   return (
     <LiveView
       transcripts={ws.transcripts}
-      currentPartial={ws.currentPartial}
+      isBuffering={ws.isBuffering}
       techTranslations={ws.techTranslations}
       currentAssist={ws.currentAssist}
       assists={ws.assists}
