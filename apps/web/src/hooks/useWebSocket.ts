@@ -14,6 +14,7 @@ interface UseWebSocketReturn {
   status: ConnectionStatus;
   transcripts: TranscriptEntry[];
   currentPartial: string;
+  isBuffering: boolean;
   techTranslations: TechTranslation[];
   currentAssist: { text: string; isStreaming: boolean } | null;
   assists: AssistMessage[];
@@ -29,6 +30,7 @@ export function useWebSocket(url: string): UseWebSocketReturn {
   const [status, setStatus] = useState<ConnectionStatus>("disconnected");
   const [transcripts, setTranscripts] = useState<TranscriptEntry[]>([]);
   const [currentPartial, setCurrentPartial] = useState("");
+  const [isBuffering, setIsBuffering] = useState(false);
   const [techTranslations, setTechTranslations] = useState<TechTranslation[]>([]);
   const [currentAssist, setCurrentAssist] = useState<{ text: string; isStreaming: boolean } | null>(null);
   const [assists, setAssists] = useState<AssistMessage[]>([]);
@@ -49,7 +51,11 @@ export function useWebSocket(url: string): UseWebSocketReturn {
       case "transcript:partial":
         setCurrentPartial(msg.text);
         break;
+      case "transcript:buffering":
+        setIsBuffering(true);
+        break;
       case "transcript:final":
+        setIsBuffering(false);
         setCurrentPartial("");
         setTranscripts((prev) => [
           ...prev,
@@ -121,6 +127,7 @@ export function useWebSocket(url: string): UseWebSocketReturn {
     (config: SessionConfig) => {
       setTranscripts([]);
       setCurrentPartial("");
+      setIsBuffering(false);
       setTechTranslations([]);
       setCurrentAssist(null);
       setAssists([]);
@@ -160,5 +167,5 @@ export function useWebSocket(url: string): UseWebSocketReturn {
     };
   }, [connect]);
 
-  return { status, transcripts, currentPartial, techTranslations, currentAssist, assists, startSession, stopSession, sendAudio };
+  return { status, transcripts, currentPartial, isBuffering, techTranslations, currentAssist, assists, startSession, stopSession, sendAudio };
 }
