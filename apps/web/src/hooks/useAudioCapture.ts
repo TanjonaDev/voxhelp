@@ -66,7 +66,7 @@ export function useAudioCapture(
       // eslint-disable-next-line @typescript-eslint/no-deprecated
       const frame = e.inputBuffer.getChannelData(0);
 
-      // Always send audio — Deepgram's own VAD handles silence server-side
+      // Always send audio — GroqSTT accumulates and applies RMS-based VAD server-side
       onChunkRef.current(float32ToPcm16Base64(new Float32Array(frame)));
 
       // RMS used only to drive the isSpeaking UI indicator

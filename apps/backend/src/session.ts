@@ -60,8 +60,10 @@ export class Session {
     this.config = config;
     this.transcriptBuffer = [];
 
+    this.stt?.close();
     this.stt = new GroqSTT(config.language, {
       onBuffering: () => this.send({ type: "transcript:buffering" }),
+      onIdle: () => this.send({ type: "transcript:idle" }),
       onFinal: (text) => void this.handleFinalTranscript(text),
       onError: (err) => this.send({ type: "session:error", error: err }),
     });

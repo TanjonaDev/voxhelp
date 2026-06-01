@@ -2,6 +2,7 @@ import { AUDIO_SAMPLE_RATE } from "@voxhelp/shared";
 
 interface GroqSTTCallbacks {
   onBuffering: () => void;
+  onIdle: () => void;
   onFinal: (text: string) => void;
   onError: (error: string) => void;
 }
@@ -90,7 +91,9 @@ export class GroqSTT {
 
   private async flush(): Promise<void> {
     if (this.totalBytes < MIN_BUFFER_BYTES || !this.isBufferingActive) {
+      const wasBuffering = this.isBufferingActive;
       this.reset();
+      if (wasBuffering) this.callbacks.onIdle();
       return;
     }
 
@@ -124,10 +127,13 @@ export class GroqSTT {
       const text = (await res.text()).trim();
       if (text && !this.closed) {
         this.callbacks.onFinal(text);
+      } else if (!this.closed) {
+        this.callbacks.onIdle();
       }
     } catch (err) {
       if (!this.closed) {
         this.callbacks.onError(err instanceof Error ? err.message : String(err));
+        this.callbacks.onIdle();
       }
     }
   }

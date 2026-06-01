@@ -46,6 +46,7 @@ export function useWebSocket(url: string): UseWebSocketReturn {
       case "session:ready":
         break;
       case "session:error":
+        setIsBuffering(false);
         console.error("[WS] Session error:", msg.error);
         break;
       case "transcript:partial":
@@ -53,6 +54,9 @@ export function useWebSocket(url: string): UseWebSocketReturn {
         break;
       case "transcript:buffering":
         setIsBuffering(true);
+        break;
+      case "transcript:idle":
+        setIsBuffering(false);
         break;
       case "transcript:final":
         setIsBuffering(false);
@@ -114,6 +118,7 @@ export function useWebSocket(url: string): UseWebSocketReturn {
 
     ws.onclose = () => {
       setStatus("disconnected");
+      setIsBuffering(false);
       if (pingRef.current) {
         clearInterval(pingRef.current);
         pingRef.current = null;

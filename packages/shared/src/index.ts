@@ -28,6 +28,7 @@ export type ServerMessage =
   | { type: "session:error"; error: string }
   | { type: "transcript:partial"; text: string }
   | { type: "transcript:buffering" }
+  | { type: "transcript:idle" }
   | { type: "transcript:final"; text: string }
   | { type: "tech:translation"; translation: TechTranslation }
   | { type: "assist:start" }
