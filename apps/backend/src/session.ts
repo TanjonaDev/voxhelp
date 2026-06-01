@@ -1,13 +1,13 @@
 import type { WebSocket } from "ws";
 import type { ClientMessage, ServerMessage, SessionConfig, TechTranslation } from "@voxhelp/shared";
-import { DeepgramSTT } from "./deepgram.js";
+import { GroqSTT } from "./groq-stt.js";
 import { generateFromPrompt, callClaudeJSON, correctTranscript } from "./llm.js";
 import { buildLiveAssistPrompt } from "./prompts/live-assist.js";
 import { buildTechTranslatePrompt } from "./prompts/tech-translate.js";
 
 export class Session {
   private ws: WebSocket;
-  private stt: DeepgramSTT | null = null;
+  private stt: GroqSTT | null = null;
   private config: SessionConfig | null = null;
   private transcriptBuffer: string[] = [];
   private debounceTimer: ReturnType<typeof setTimeout> | null = null;
@@ -60,13 +60,13 @@ export class Session {
     this.config = config;
     this.transcriptBuffer = [];
 
-    this.stt = new DeepgramSTT(config.language, {
-      onPartial: (text) => this.send({ type: "transcript:partial", text }),
+    this.stt = new GroqSTT(config.language, {
+      onBuffering: () => this.send({ type: "transcript:buffering" }),
       onFinal: (text) => void this.handleFinalTranscript(text),
       onError: (err) => this.send({ type: "session:error", error: err }),
     });
 
-    this.stt.connect();
+    this.stt.start();
 
     const sessionId = `session_${Date.now()}`;
     this.send({ type: "session:ready", sessionId });
