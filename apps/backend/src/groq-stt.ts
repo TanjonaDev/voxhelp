@@ -57,6 +57,7 @@ export class GroqSTT {
   }
 
   start(): void {
+    if (this.timer) return;
     this.timer = setInterval(() => this.tick(), TICK_INTERVAL_MS);
   }
 
@@ -88,7 +89,7 @@ export class GroqSTT {
   }
 
   private async flush(): Promise<void> {
-    if (this.totalBytes < MIN_BUFFER_BYTES) {
+    if (this.totalBytes < MIN_BUFFER_BYTES || !this.isBufferingActive) {
       this.reset();
       return;
     }
