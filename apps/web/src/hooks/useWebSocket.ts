@@ -1,23 +1,16 @@
 import { useCallback, useEffect, useRef, useState } from "react";
-import type { ClientMessage, ServerMessage, SessionConfig, TranscriptEntry, TechTranslation } from "@voxhelp/shared";
+import type { ClientMessage, ServerMessage, SessionConfig, TranscriptEntry, InsightCard } from "@voxhelp/shared";
 import { createId, WS_PING_INTERVAL_MS } from "@voxhelp/shared";
 
 type ConnectionStatus = "disconnected" | "connecting" | "connected" | "error";
-
-interface AssistMessage {
-  id: string;
-  text: string;
-  timestamp: number;
-}
 
 interface UseWebSocketReturn {
   status: ConnectionStatus;
   transcripts: TranscriptEntry[];
   currentPartial: string;
   isBuffering: boolean;
-  techTranslations: TechTranslation[];
-  currentAssist: { text: string; isStreaming: boolean } | null;
-  assists: AssistMessage[];
+  isAnalyzing: boolean;
+  insights: InsightCard[];
   startSession: (config: SessionConfig) => void;
   stopSession: () => void;
   sendAudio: (base64: string) => void;
@@ -31,9 +24,8 @@ export function useWebSocket(url: string): UseWebSocketReturn {
   const [transcripts, setTranscripts] = useState<TranscriptEntry[]>([]);
   const [currentPartial, setCurrentPartial] = useState("");
   const [isBuffering, setIsBuffering] = useState(false);
-  const [techTranslations, setTechTranslations] = useState<TechTranslation[]>([]);
-  const [currentAssist, setCurrentAssist] = useState<{ text: string; isStreaming: boolean } | null>(null);
-  const [assists, setAssists] = useState<AssistMessage[]>([]);
+  const [isAnalyzing, setIsAnalyzing] = useState(false);
+  const [insights, setInsights] = useState<InsightCard[]>([]);
 
   const send = useCallback((msg: ClientMessage) => {
     if (wsRef.current?.readyState === WebSocket.OPEN) {
@@ -47,6 +39,7 @@ export function useWebSocket(url: string): UseWebSocketReturn {
         break;
       case "session:error":
         setIsBuffering(false);
+        setIsAnalyzing(false);
         console.error("[WS] Session error:", msg.error);
         break;
       case "transcript:partial":
@@ -54,9 +47,11 @@ export function useWebSocket(url: string): UseWebSocketReturn {
         break;
       case "transcript:buffering":
         setIsBuffering(true);
+        setIsAnalyzing(true);
         break;
       case "transcript:idle":
         setIsBuffering(false);
+        setIsAnalyzing(false);
         break;
       case "transcript:final":
         setIsBuffering(false);
@@ -67,25 +62,19 @@ export function useWebSocket(url: string): UseWebSocketReturn {
         ]);
         break;
       case "tech:translation":
-        setTechTranslations((prev) => [msg.translation, ...prev].slice(0, 5));
         break;
       case "assist:start":
-        setCurrentAssist({ text: "", isStreaming: true });
         break;
       case "assist:chunk":
-        setCurrentAssist((prev) =>
-          prev ? { ...prev, text: prev.text + msg.text } : null
-        );
         break;
       case "assist:done":
-        setCurrentAssist(null);
-        setAssists((prev) => [
-          ...prev,
-          { id: createId(), text: msg.fullText, timestamp: Date.now() },
-        ]);
+        break;
+      case "assist:card":
+        setIsAnalyzing(false);
+        setInsights((prev) => [...prev, msg.card]);
         break;
       case "assist:error":
-        setCurrentAssist(null);
+        setIsAnalyzing(false);
         console.error("[WS] Assist error:", msg.error);
         break;
       case "pong":
@@ -119,6 +108,7 @@ export function useWebSocket(url: string): UseWebSocketReturn {
     ws.onclose = () => {
       setStatus("disconnected");
       setIsBuffering(false);
+      setIsAnalyzing(false);
       if (pingRef.current) {
         clearInterval(pingRef.current);
         pingRef.current = null;
@@ -133,9 +123,8 @@ export function useWebSocket(url: string): UseWebSocketReturn {
       setTranscripts([]);
       setCurrentPartial("");
       setIsBuffering(false);
-      setTechTranslations([]);
-      setCurrentAssist(null);
-      setAssists([]);
+      setIsAnalyzing(false);
+      setInsights([]);
 
       if (wsRef.current?.readyState === WebSocket.OPEN) {
         send({ type: "session:start", config });
@@ -172,5 +161,15 @@ export function useWebSocket(url: string): UseWebSocketReturn {
     };
   }, [connect]);
 
-  return { status, transcripts, currentPartial, isBuffering, techTranslations, currentAssist, assists, startSession, stopSession, sendAudio };
+  return {
+    status,
+    transcripts,
+    currentPartial,
+    isBuffering,
+    isAnalyzing,
+    insights,
+    startSession,
+    stopSession,
+    sendAudio,
+  };
 }
