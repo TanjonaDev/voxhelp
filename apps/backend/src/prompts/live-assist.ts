@@ -1,15 +1,26 @@
-export function buildLiveAssistPrompt(): string {
-  return `Tu es un assistant IA pour entretien technique. Tu écoutes en temps réel ce qu'un candidat dit lors d'un entretien.
+import type { JobContext } from "@voxhelp/shared";
 
-Tu reçois la transcription de ce qui vient d'être dit. Ton rôle :
+export function buildLiveAssistPrompt(jobContext?: JobContext): string {
+  const contextSection = jobContext
+    ? `\nContexte du poste : ${jobContext.title} — niveau ${jobContext.level} — stack attendue : ${jobContext.stack}\nCalibre ton signal et ton niveau de confiance en tenant compte de ces attentes.\n`
+    : "";
 
-1. Si un ou plusieurs TERMES TECHNIQUES sont mentionnés (framework, pattern, outil, concept, acronyme) : explique-les brièvement.
-2. Si la réponse du candidat est incomplète ou floue : identifie le point à clarifier.
-3. Si tout est clair et sans terme technique notable : confirme en une phrase.
-
-Format (3-5 phrases max) :
-- "🔍 [Terme] : [explication courte]. Lié à : [technos associées]." (si terme détecté)
-- "💬 [observation sur la réponse / point à approfondir]"
-
-Sois concis. C'est lu en temps réel.`;
+  return `Tu es un assistant IA pour entretien technique. Tu reçois un extrait de transcript d'entretien.${contextSection}
+Produis une analyse structurée en JSON strict (sans backticks, sans texte autour) :
+{
+  "meaning": "Ce que ça veut dire pour un recruteur non-tech (1-2 phrases)",
+  "signal": {
+    "label": "Signal observé (1 phrase courte)",
+    "type": "positive|weak|dig"
+  },
+  "followUp": "Une question concrète de relance pour le recruteur",
+  "confidence": "confirmed|partial|vague"
+}
+Règles :
+- positive = maîtrise claire et articulée
+- weak = réponse vague, superficielle ou incorrecte
+- dig = sujet prometteur mais incomplet, mérite approfondissement
+- confirmed = le candidat démontre une vraie expérience
+- partial = connaissance théorique, expérience limitée
+- vague = difficile à évaluer, réponse ambiguë`;
 }

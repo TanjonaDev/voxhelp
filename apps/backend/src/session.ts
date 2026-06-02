@@ -1,14 +1,14 @@
 import type { WebSocket } from "ws";
-import type { ClientMessage, ServerMessage, SessionConfig, TechTranslation } from "@voxhelp/shared";
+import type { ClientMessage, ServerMessage, SessionConfig, InsightCard, JobContext } from "@voxhelp/shared";
 import { GroqSTT } from "./groq-stt.js";
-import { generateFromPrompt, callClaudeJSON, correctTranscript } from "./llm.js";
+import { callClaudeJSON, correctTranscript } from "./llm.js";
 import { buildLiveAssistPrompt } from "./prompts/live-assist.js";
-import { buildTechTranslatePrompt } from "./prompts/tech-translate.js";
 
 export class Session {
   private ws: WebSocket;
   private stt: GroqSTT | null = null;
   private config: SessionConfig | null = null;
+  private jobContext: JobContext | undefined = undefined;
   private transcriptBuffer: string[] = [];
   private debounceTimer: ReturnType<typeof setTimeout> | null = null;
   private isProcessing = false;
@@ -58,6 +58,7 @@ export class Session {
 
   private startSession(config: SessionConfig): void {
     this.config = config;
+    this.jobContext = config.jobContext;
     this.transcriptBuffer = [];
 
     this.stt?.close();
@@ -72,7 +73,7 @@ export class Session {
 
     const sessionId = `session_${Date.now()}`;
     this.send({ type: "session:ready", sessionId });
-    console.log(`[Session] Started: language=${config.language}`);
+    console.log(`[Session] Started: language=${config.language}, jobContext=${config.jobContext ? config.jobContext.title : "none"}`);
   }
 
   private handleAudioChunk(base64Data: string): void {
@@ -110,10 +111,18 @@ export class Session {
   private async processTranscript(transcript: string): Promise<void> {
     this.isProcessing = true;
 
-    await Promise.all([
-      this.runTechTranslation(transcript),
-      this.runAssist(transcript),
-    ]);
+    try {
+      const card = await callClaudeJSON<InsightCard>(
+        buildLiveAssistPrompt(this.jobContext),
+        `Ce qui vient d'être dit :\n"${transcript}"`
+      );
+      this.send({ type: "assist:card", card });
+    } catch (err) {
+      this.send({
+        type: "assist:error",
+        error: err instanceof Error ? err.message : "Analysis error",
+      });
+    }
 
     this.isProcessing = false;
 
@@ -122,33 +131,6 @@ export class Session {
       this.pendingTranscript = null;
       this.processTranscript(pending);
     }
-  }
-
-  private async runTechTranslation(transcript: string): Promise<void> {
-    try {
-      const result = await callClaudeJSON<{ translations: TechTranslation[] }>(
-        buildTechTranslatePrompt(),
-        `TRANSCRIPTION:\n"${transcript}"`
-      );
-      for (const translation of result.translations) {
-        this.send({ type: "tech:translation", translation });
-      }
-    } catch (err) {
-      console.error("[Session] Tech translation error:", err instanceof Error ? err.message : err);
-    }
-  }
-
-  private async runAssist(transcript: string): Promise<void> {
-    await generateFromPrompt(
-      buildLiveAssistPrompt(),
-      `Ce qui vient d'être dit :\n"${transcript}"`,
-      {
-        onStart: () => this.send({ type: "assist:start" }),
-        onChunk: (text) => this.send({ type: "assist:chunk", text }),
-        onDone: (fullText) => this.send({ type: "assist:done", fullText }),
-        onError: (error) => this.send({ type: "assist:error", error }),
-      }
-    );
   }
 
   private send(message: ServerMessage): void {
@@ -168,6 +150,7 @@ export class Session {
       this.stt = null;
     }
     this.config = null;
+    this.jobContext = undefined;
     console.log("[Session] Cleaned up");
   }
 }
