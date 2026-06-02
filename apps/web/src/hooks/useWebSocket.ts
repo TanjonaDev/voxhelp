@@ -1,14 +1,11 @@
 import { useCallback, useEffect, useRef, useState } from "react";
-import type { ClientMessage, ServerMessage, SessionConfig, TranscriptEntry, InsightCard } from "@voxhelp/shared";
-import { createId, WS_PING_INTERVAL_MS } from "@voxhelp/shared";
+import type { ClientMessage, ServerMessage, SessionConfig, InsightCard } from "@voxhelp/shared";
+import { WS_PING_INTERVAL_MS } from "@voxhelp/shared";
 
 type ConnectionStatus = "disconnected" | "connecting" | "connected" | "error";
 
 interface UseWebSocketReturn {
   status: ConnectionStatus;
-  transcripts: TranscriptEntry[];
-  currentPartial: string;
-  isBuffering: boolean;
   isAnalyzing: boolean;
   insights: InsightCard[];
   startSession: (config: SessionConfig) => void;
@@ -21,9 +18,6 @@ export function useWebSocket(url: string): UseWebSocketReturn {
   const pingRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
   const [status, setStatus] = useState<ConnectionStatus>("disconnected");
-  const [transcripts, setTranscripts] = useState<TranscriptEntry[]>([]);
-  const [currentPartial, setCurrentPartial] = useState("");
-  const [isBuffering, setIsBuffering] = useState(false);
   const [isAnalyzing, setIsAnalyzing] = useState(false);
   const [insights, setInsights] = useState<InsightCard[]>([]);
 
@@ -38,36 +32,19 @@ export function useWebSocket(url: string): UseWebSocketReturn {
       case "session:ready":
         break;
       case "session:error":
-        setIsBuffering(false);
         setIsAnalyzing(false);
         console.error("[WS] Session error:", msg.error);
         break;
       case "transcript:partial":
-        setCurrentPartial(msg.text);
+        setIsAnalyzing(true);
         break;
       case "transcript:buffering":
-        setIsBuffering(true);
         setIsAnalyzing(true);
         break;
       case "transcript:idle":
-        setIsBuffering(false);
         setIsAnalyzing(false);
         break;
       case "transcript:final":
-        setIsBuffering(false);
-        setCurrentPartial("");
-        setTranscripts((prev) => [
-          ...prev,
-          { id: createId(), text: msg.text, timestamp: Date.now() },
-        ]);
-        break;
-      case "tech:translation":
-        break;
-      case "assist:start":
-        break;
-      case "assist:chunk":
-        break;
-      case "assist:done":
         break;
       case "assist:card":
         setIsAnalyzing(false);
@@ -107,7 +84,6 @@ export function useWebSocket(url: string): UseWebSocketReturn {
 
     ws.onclose = () => {
       setStatus("disconnected");
-      setIsBuffering(false);
       setIsAnalyzing(false);
       if (pingRef.current) {
         clearInterval(pingRef.current);
@@ -120,9 +96,6 @@ export function useWebSocket(url: string): UseWebSocketReturn {
 
   const startSession = useCallback(
     (config: SessionConfig) => {
-      setTranscripts([]);
-      setCurrentPartial("");
-      setIsBuffering(false);
       setIsAnalyzing(false);
       setInsights([]);
 
@@ -163,9 +136,6 @@ export function useWebSocket(url: string): UseWebSocketReturn {
 
   return {
     status,
-    transcripts,
-    currentPartial,
-    isBuffering,
     isAnalyzing,
     insights,
     startSession,

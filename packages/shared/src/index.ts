@@ -21,19 +21,6 @@ export interface InsightCard {
   confidence: "confirmed" | "partial" | "vague";
 }
 
-export interface TechTranslation {
-  term: string;
-  definition: string;
-  relatedTechs: string[];
-  criticality: "HIGH" | "MEDIUM" | "LOW";
-}
-
-export interface TranscriptEntry {
-  id: string;
-  text: string;
-  timestamp: number;
-}
-
 export type ClientMessage =
   | { type: "session:start"; config: SessionConfig }
   | { type: "session:stop" }
@@ -47,10 +34,6 @@ export type ServerMessage =
   | { type: "transcript:buffering" }
   | { type: "transcript:idle" }
   | { type: "transcript:final"; text: string }
-  | { type: "tech:translation"; translation: TechTranslation }
-  | { type: "assist:start" }
-  | { type: "assist:chunk"; text: string }
-  | { type: "assist:done"; fullText: string }
   | { type: "assist:card"; card: InsightCard }
   | { type: "assist:error"; error: string }
   | { type: "pong" };
