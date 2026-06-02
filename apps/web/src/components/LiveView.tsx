@@ -27,21 +27,21 @@ function InsightCardView({ card }: { card: InsightCard }) {
   const s = SIGNAL_STYLES[card.signal.type];
   const c = CONFIDENCE_LABELS[card.confidence];
   return (
-    <div className={`rounded-xl border ${s.border} ${s.bg} p-4 space-y-3`}>
-      <div className={`flex items-center gap-2 ${s.text} font-medium text-sm`}>
-        <div className={`w-2 h-2 rounded-full flex-shrink-0 ${s.dot}`} />
+    <div className={`rounded-lg border ${s.border} ${s.bg} p-3 space-y-2`}>
+      <div className={`flex items-center gap-1.5 ${s.text} font-medium text-xs`}>
+        <div className={`w-1.5 h-1.5 rounded-full flex-shrink-0 ${s.dot}`} />
         {card.signal.label}
       </div>
       <div>
-        <p className="text-[10px] font-semibold uppercase tracking-wider text-[#5A5F72] mb-1">Ce que ça veut dire</p>
-        <p className="text-sm text-[#1A1D26] leading-relaxed">{card.meaning}</p>
+        <p className="text-[9px] font-semibold uppercase tracking-wider text-[#5A5F72] mb-0.5">Ce que ça veut dire</p>
+        <p className="text-xs text-[#1A1D26] leading-snug">{card.meaning}</p>
       </div>
       <div>
-        <p className="text-[10px] font-semibold uppercase tracking-wider text-[#5A5F72] mb-1">Question de relance</p>
-        <p className="text-sm text-[#1A1D26] italic leading-relaxed">{card.followUp}</p>
+        <p className="text-[9px] font-semibold uppercase tracking-wider text-[#5A5F72] mb-0.5">Question de relance</p>
+        <p className="text-xs text-[#1A1D26] italic leading-snug">{card.followUp}</p>
       </div>
       <div className="flex justify-end">
-        <span className={`text-[10px] font-semibold px-2 py-0.5 rounded-full ${c.style}`}>{c.label}</span>
+        <span className={`text-[9px] font-semibold px-1.5 py-0.5 rounded-full ${c.style}`}>{c.label}</span>
       </div>
     </div>
   );
@@ -89,74 +89,97 @@ export function LiveView({ insights, isAnalyzing, wsStatus, isCapturing, isSpeak
 
   return (
     <div className="h-screen bg-[#F6F7FB] flex flex-col">
-      <header className="bg-white border-b border-[#DFE1EA] px-6 py-3 flex items-center justify-between flex-shrink-0">
-        <div className="flex items-center gap-3">
-          <div className="w-7 h-7 rounded-lg bg-[#3D5AFE] flex items-center justify-center">
-            <span className="text-white text-[10px] font-bold">VH</span>
+      {/* Header compact */}
+      <header className="bg-white border-b border-[#DFE1EA] px-3 py-2 flex items-center justify-between flex-shrink-0">
+        <div className="flex items-center gap-2">
+          <div className="w-6 h-6 rounded-md bg-[#3D5AFE] flex items-center justify-center">
+            <span className="text-white text-[9px] font-bold">VH</span>
           </div>
-          <span className="font-semibold text-[#1A1D26] text-sm">VoxHelp</span>
+          <span className="font-semibold text-[#1A1D26] text-xs">VoxHelp</span>
         </div>
-        <div className={`flex items-center gap-1.5 text-xs ${wsStatus === "connected" ? "text-[#0FAA6C]" : "text-[#5A5F72]"}`}>
-          <div className={`w-2 h-2 rounded-full ${wsStatus === "connected" ? "bg-[#0FAA6C]" : "bg-gray-300"}`} />
+        <div className={`flex items-center gap-1 text-[10px] ${wsStatus === "connected" ? "text-[#0FAA6C]" : "text-[#5A5F72]"}`}>
+          <div className={`w-1.5 h-1.5 rounded-full ${wsStatus === "connected" ? "bg-[#0FAA6C]" : "bg-gray-300"}`} />
           {wsStatus === "connected" ? "Connecté" : wsStatus}
         </div>
       </header>
 
       <div className="flex-1 flex flex-col overflow-hidden">
-        <div className="px-4 py-2 bg-white border-b border-[#DFE1EA] flex items-center justify-between flex-shrink-0">
-          <span className="text-xs font-semibold uppercase tracking-wider text-[#5A5F72]">Analyse temps réel</span>
+        {/* Sub-header */}
+        <div className="px-3 py-1.5 bg-white border-b border-[#DFE1EA] flex items-center justify-between flex-shrink-0">
+          <span className="text-[10px] font-semibold uppercase tracking-wider text-[#5A5F72]">Analyse</span>
           {!audioStarted ? (
-            <button onClick={handleStart} className="text-xs bg-[#3D5AFE] text-white px-3 py-1 rounded-lg hover:bg-[#3451e0] transition-colors">
+            <button onClick={handleStart} className="text-[10px] bg-[#3D5AFE] text-white px-2.5 py-1 rounded-md hover:bg-[#3451e0] transition-colors font-medium">
               Démarrer l'écoute
             </button>
           ) : (
-            <div className="flex items-center gap-1.5 text-xs">
-              <div className={`w-2 h-2 rounded-full ${isSpeaking ? "bg-[#3D5AFE] animate-pulse" : "bg-[#0FAA6C]"}`} />
+            <div className="flex items-center gap-1 text-[10px]">
+              <div className={`w-1.5 h-1.5 rounded-full ${isSpeaking ? "bg-[#3D5AFE] animate-pulse" : "bg-[#0FAA6C]"}`} />
               <span className={isSpeaking ? "text-[#3D5AFE]" : "text-[#0FAA6C]"}>{isSpeaking ? "Parole détectée" : "En écoute"}</span>
             </div>
           )}
         </div>
 
-        <div className="flex-1 overflow-y-auto p-4 space-y-3">
+        {/* Feed */}
+        <div className="flex-1 overflow-y-auto p-2 space-y-2">
+          {/* Pre-session form */}
           {!audioStarted && (
-            <div className="bg-white border border-[#DFE1EA] rounded-xl p-4 space-y-3">
-              <p className="text-xs font-semibold uppercase tracking-wider text-[#5A5F72]">Contexte du poste (optionnel)</p>
-              <input type="text" placeholder="Titre du poste — ex: Senior Frontend Developer" value={jobTitle} onChange={(e) => setJobTitle(e.target.value)} className="w-full text-sm border border-[#DFE1EA] rounded-lg px-3 py-2 focus:outline-none focus:border-[#3D5AFE] bg-[#F6F7FB] text-[#1A1D26] placeholder-[#5A5F72]" />
-              <select value={jobLevel} onChange={(e) => setJobLevel(e.target.value)} className="w-full text-sm border border-[#DFE1EA] rounded-lg px-3 py-2 focus:outline-none focus:border-[#3D5AFE] bg-[#F6F7FB] text-[#1A1D26]">
+            <div className="bg-white border border-[#DFE1EA] rounded-lg p-3 space-y-2">
+              <p className="text-[9px] font-semibold uppercase tracking-wider text-[#5A5F72]">Contexte du poste (optionnel)</p>
+              <input
+                type="text"
+                placeholder="Titre — ex: Senior Frontend Dev"
+                value={jobTitle}
+                onChange={(e) => setJobTitle(e.target.value)}
+                className="w-full text-xs border border-[#DFE1EA] rounded-md px-2 py-1.5 focus:outline-none focus:border-[#3D5AFE] bg-[#F6F7FB] text-[#1A1D26] placeholder-[#9BA3B2]"
+              />
+              <select
+                value={jobLevel}
+                onChange={(e) => setJobLevel(e.target.value)}
+                className="w-full text-xs border border-[#DFE1EA] rounded-md px-2 py-1.5 focus:outline-none focus:border-[#3D5AFE] bg-[#F6F7FB] text-[#1A1D26]"
+              >
                 <option value="">Niveau — non précisé</option>
                 <option value="Junior">Junior</option>
                 <option value="Intermédiaire">Intermédiaire</option>
                 <option value="Senior">Senior</option>
                 <option value="Lead">Lead</option>
               </select>
-              <input type="text" placeholder="Stack principale — ex: React, TypeScript, Node.js" value={jobStack} onChange={(e) => setJobStack(e.target.value)} className="w-full text-sm border border-[#DFE1EA] rounded-lg px-3 py-2 focus:outline-none focus:border-[#3D5AFE] bg-[#F6F7FB] text-[#1A1D26] placeholder-[#5A5F72]" />
+              <input
+                type="text"
+                placeholder="Stack — ex: React, TypeScript"
+                value={jobStack}
+                onChange={(e) => setJobStack(e.target.value)}
+                className="w-full text-xs border border-[#DFE1EA] rounded-md px-2 py-1.5 focus:outline-none focus:border-[#3D5AFE] bg-[#F6F7FB] text-[#1A1D26] placeholder-[#9BA3B2]"
+              />
             </div>
           )}
 
+          {/* Empty state */}
           {audioStarted && insights.length === 0 && !isAnalyzing && (
-            <div className="flex items-center justify-center h-full text-center text-[#5A5F72]">
+            <div className="flex items-center justify-center h-full text-center text-[#5A5F72] py-8">
               <div>
-                <div className="text-4xl mb-3">🎧</div>
-                <p className="text-sm">En écoute... Les analyses apparaîtront ici.</p>
+                <div className="text-2xl mb-2">🎧</div>
+                <p className="text-xs">En écoute...</p>
               </div>
             </div>
           )}
 
+          {/* Cards */}
           {insights.map((card, i) => (
             <InsightCardView key={i} card={card} />
           ))}
 
+          {/* Skeleton */}
           {isAnalyzing && (
-            <div className="rounded-xl border border-[#DFE1EA] bg-white p-4 space-y-3 animate-pulse">
-              <div className="h-4 bg-[#DFE1EA] rounded w-2/3" />
-              <div className="space-y-1.5">
-                <div className="h-3 bg-[#DFE1EA] rounded w-1/3" />
-                <div className="h-3 bg-[#DFE1EA] rounded w-full" />
-                <div className="h-3 bg-[#DFE1EA] rounded w-4/5" />
+            <div className="rounded-lg border border-[#DFE1EA] bg-white p-3 space-y-2 animate-pulse">
+              <div className="h-3 bg-[#DFE1EA] rounded w-2/3" />
+              <div className="space-y-1">
+                <div className="h-2.5 bg-[#DFE1EA] rounded w-1/3" />
+                <div className="h-2.5 bg-[#DFE1EA] rounded w-full" />
+                <div className="h-2.5 bg-[#DFE1EA] rounded w-4/5" />
               </div>
-              <div className="space-y-1.5">
-                <div className="h-3 bg-[#DFE1EA] rounded w-1/3" />
-                <div className="h-3 bg-[#DFE1EA] rounded w-3/4" />
+              <div className="space-y-1">
+                <div className="h-2.5 bg-[#DFE1EA] rounded w-1/3" />
+                <div className="h-2.5 bg-[#DFE1EA] rounded w-3/4" />
               </div>
             </div>
           )}
@@ -165,12 +188,13 @@ export function LiveView({ insights, isAnalyzing, wsStatus, isCapturing, isSpeak
         </div>
       </div>
 
-      <div className="bg-white border-t border-[#DFE1EA] px-6 py-3 flex items-center justify-between flex-shrink-0">
-        <div className="flex items-center gap-2 text-sm">
-          {isCapturing && <div className="w-2 h-2 rounded-full bg-red-500 animate-pulse" />}
-          <span className="text-[#1A1D26] font-medium">{isCapturing ? `En cours · ${elapsed}` : "En attente"}</span>
+      {/* Bottom bar compact */}
+      <div className="bg-white border-t border-[#DFE1EA] px-3 py-2 flex items-center justify-between flex-shrink-0">
+        <div className="flex items-center gap-1.5 text-xs">
+          {isCapturing && <div className="w-1.5 h-1.5 rounded-full bg-red-500 animate-pulse" />}
+          <span className="text-[#1A1D26] text-[10px] font-medium">{isCapturing ? `En cours · ${elapsed}` : "En attente"}</span>
         </div>
-        <button onClick={onStop} className="bg-red-500 text-white px-5 py-2 rounded-xl text-sm font-semibold hover:bg-red-600 transition-colors">
+        <button onClick={onStop} className="bg-red-500 text-white px-3 py-1 rounded-lg text-[10px] font-semibold hover:bg-red-600 transition-colors">
           ⏹ Arrêter
         </button>
       </div>
