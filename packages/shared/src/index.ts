@@ -1,7 +1,24 @@
 export type InterviewLanguage = "fr" | "en" | "es" | "pt" | "zh";
 
+export interface JobContext {
+  title: string;
+  level: string;
+  stack: string;
+}
+
 export interface SessionConfig {
   language: InterviewLanguage;
+  jobContext?: JobContext;
+}
+
+export interface InsightCard {
+  meaning: string;
+  signal: {
+    label: string;
+    type: "positive" | "weak" | "dig";
+  };
+  followUp: string;
+  confidence: "confirmed" | "partial" | "vague";
 }
 
 export interface TechTranslation {
@@ -34,6 +51,7 @@ export type ServerMessage =
   | { type: "assist:start" }
   | { type: "assist:chunk"; text: string }
   | { type: "assist:done"; fullText: string }
+  | { type: "assist:card"; card: InsightCard }
   | { type: "assist:error"; error: string }
   | { type: "pong" };
 
