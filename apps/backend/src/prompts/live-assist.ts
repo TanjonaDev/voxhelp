@@ -1,16 +1,21 @@
 import type { JobContext } from "@voxhelp/shared";
 
-export function buildLiveAssistPrompt(jobContext?: JobContext, history?: string[]): string {
+export function buildLiveAssistPrompt(jobContext?: JobContext, history?: string[], previousQuestions?: string[]): string {
   const contextSection = jobContext
     ? `\nContexte du poste : ${jobContext.title} — niveau ${jobContext.level} — stack attendue : ${jobContext.stack}\nCalibre ton signal et ton niveau de confiance en tenant compte de ces attentes.\n`
     : "";
 
   const historySection =
     history && history.length > 0
-      ? `\nÉchanges précédents dans cette session (pour éviter les répétitions) :\n${history.map((t, i) => `[${i + 1}] "${t}"`).join("\n")}\n`
+      ? `\nCe qui a été dit avant dans cette session :\n${history.map((t, i) => `[${i + 1}] "${t}"`).join("\n")}\n`
       : "";
 
-  return `Tu es un assistant IA pour entretien technique. Tu reçois un extrait de transcript d'entretien.${contextSection}${historySection}
+  const questionsSection =
+    previousQuestions && previousQuestions.length > 0
+      ? `\nQuestions déjà posées (NE PAS répéter ni reformuler) :\n${previousQuestions.map((q, i) => `[${i + 1}] ${q}`).join("\n")}\n`
+      : "";
+
+  return `Tu es un assistant IA pour entretien technique. Tu reçois un extrait de transcript d'entretien.${contextSection}${historySection}${questionsSection}
 Produis une analyse structurée en JSON strict (sans backticks, sans texte autour) :
 {
   "meaning": "Ce que ça veut dire pour un recruteur non-tech (1-2 phrases)",
@@ -28,6 +33,6 @@ Règles :
 - confirmed = le candidat démontre une vraie expérience
 - partial = connaissance théorique, expérience limitée
 - vague = difficile à évaluer, réponse ambiguë
-- Si le transcript actuel semble incomplet ou coupé en milieu de phrase, mets confidence à "vague" et propose une question ouverte plutôt que de conclure
-- Ne répète pas une question déjà posée dans les échanges précédents — construis sur ce qui a été dit`;
+- Si le transcript semble incomplet ou coupé mid-phrase : confidence "vague", followUp question ouverte
+- followUp doit progresser dans la conversation — ne jamais demander ce qui vient d'être expliqué ni reformuler une question déjà posée`;
 }

@@ -8,7 +8,7 @@ interface GroqSTTCallbacks {
 }
 
 const RMS_THRESHOLD = 0.005;
-const SILENCE_THRESHOLD_MS = 3500;
+const SILENCE_THRESHOLD_MS = 5000;
 const MAX_BUFFER_BYTES = AUDIO_SAMPLE_RATE * 2 * 20; // 20s PCM16 mono = 640 000 bytes
 const MIN_BUFFER_BYTES = AUDIO_SAMPLE_RATE * 2 * 0.5; // 0.5s = 16 000 bytes
 const TICK_INTERVAL_MS = 200;

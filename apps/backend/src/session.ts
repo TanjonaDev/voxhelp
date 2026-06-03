@@ -11,11 +11,12 @@ export class Session {
   private jobContext: JobContext | undefined = undefined;
   private transcriptBuffer: string[] = [];
   private conversationLog: string[] = [];
+  private questionLog: string[] = [];
   private readonly MAX_LOG_ENTRIES = 5;
   private debounceTimer: ReturnType<typeof setTimeout> | null = null;
   private isProcessing = false;
   private pendingTranscript: string | null = null;
-  private readonly DEBOUNCE_MS = 5000;
+  private readonly DEBOUNCE_MS = 3000;
 
   constructor(ws: WebSocket) {
     this.ws = ws;
@@ -115,15 +116,15 @@ export class Session {
     this.isProcessing = true;
 
     this.conversationLog.push(transcript);
-    if (this.conversationLog.length > this.MAX_LOG_ENTRIES) {
-      this.conversationLog.shift();
-    }
+    if (this.conversationLog.length > this.MAX_LOG_ENTRIES) this.conversationLog.shift();
 
     try {
       const card = await callClaudeJSON<InsightCard>(
-        buildLiveAssistPrompt(this.jobContext, this.conversationLog.slice(0, -1)),
+        buildLiveAssistPrompt(this.jobContext, this.conversationLog.slice(0, -1), this.questionLog),
         `Ce qui vient d'être dit :\n"${transcript}"`
       );
+      this.questionLog.push(card.followUp);
+      if (this.questionLog.length > this.MAX_LOG_ENTRIES) this.questionLog.shift();
       this.send({ type: "assist:card", card });
     } catch (err) {
       this.send({
@@ -154,6 +155,7 @@ export class Session {
     }
     this.transcriptBuffer = [];
     this.conversationLog = [];
+    this.questionLog = [];
     if (this.stt) {
       this.stt.close();
       this.stt = null;
