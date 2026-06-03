@@ -10,10 +10,12 @@ export class Session {
   private config: SessionConfig | null = null;
   private jobContext: JobContext | undefined = undefined;
   private transcriptBuffer: string[] = [];
+  private conversationLog: string[] = [];
+  private readonly MAX_LOG_ENTRIES = 5;
   private debounceTimer: ReturnType<typeof setTimeout> | null = null;
   private isProcessing = false;
   private pendingTranscript: string | null = null;
-  private readonly DEBOUNCE_MS = 3500;
+  private readonly DEBOUNCE_MS = 5000;
 
   constructor(ws: WebSocket) {
     this.ws = ws;
@@ -60,6 +62,7 @@ export class Session {
     this.config = config;
     this.jobContext = config.jobContext;
     this.transcriptBuffer = [];
+    this.conversationLog = [];
 
     this.stt?.close();
     this.stt = new GroqSTT(config.language, {
@@ -111,9 +114,14 @@ export class Session {
   private async processTranscript(transcript: string): Promise<void> {
     this.isProcessing = true;
 
+    this.conversationLog.push(transcript);
+    if (this.conversationLog.length > this.MAX_LOG_ENTRIES) {
+      this.conversationLog.shift();
+    }
+
     try {
       const card = await callClaudeJSON<InsightCard>(
-        buildLiveAssistPrompt(this.jobContext),
+        buildLiveAssistPrompt(this.jobContext, this.conversationLog.slice(0, -1)),
         `Ce qui vient d'être dit :\n"${transcript}"`
       );
       this.send({ type: "assist:card", card });
@@ -145,6 +153,7 @@ export class Session {
       this.debounceTimer = null;
     }
     this.transcriptBuffer = [];
+    this.conversationLog = [];
     if (this.stt) {
       this.stt.close();
       this.stt = null;
