@@ -101,7 +101,7 @@ export class Session {
       const fullText = this.transcriptBuffer.join(" ");
       this.transcriptBuffer = [];
 
-      if (fullText.trim().length < 10) return;
+      if (fullText.trim().split(/\s+/).length < 20) return;
 
       if (this.isProcessing) {
         this.pendingTranscript = fullText;
