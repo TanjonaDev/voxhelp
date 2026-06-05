@@ -11,6 +11,7 @@ interface UseWebSocketReturn {
   startSession: (config: SessionConfig) => void;
   stopSession: () => void;
   sendAudio: (base64: string) => void;
+  triggerAnalysis: () => void;
 }
 
 export function useWebSocket(url: string): UseWebSocketReturn {
@@ -126,6 +127,10 @@ export function useWebSocket(url: string): UseWebSocketReturn {
     [send]
   );
 
+  const triggerAnalysis = useCallback(() => {
+    send({ type: "trigger:analyze" });
+  }, [send]);
+
   useEffect(() => {
     connect();
     return () => {
@@ -141,5 +146,6 @@ export function useWebSocket(url: string): UseWebSocketReturn {
     startSession,
     stopSession,
     sendAudio,
+    triggerAnalysis,
   };
 }

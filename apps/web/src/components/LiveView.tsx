@@ -9,6 +9,7 @@ interface LiveViewProps {
   isSpeaking: boolean;
   onStartAudio: (jobContext?: JobContext) => Promise<void>;
   onStop: () => void;
+  onTriggerAnalysis: () => void;
 }
 
 const SIGNAL_STYLES = {
@@ -67,7 +68,7 @@ function useElapsedTime(active: boolean) {
   return `${mm}:${ss}`;
 }
 
-export function LiveView({ insights, isAnalyzing, wsStatus, isCapturing, isSpeaking, onStartAudio, onStop }: LiveViewProps) {
+export function LiveView({ insights, isAnalyzing, wsStatus, isCapturing, isSpeaking, onStartAudio, onStop, onTriggerAnalysis }: LiveViewProps) {
   const feedEndRef = useRef<HTMLDivElement>(null);
   const [audioStarted, setAudioStarted] = useState(false);
   const [jobTitle, setJobTitle] = useState("");
@@ -112,9 +113,17 @@ export function LiveView({ insights, isAnalyzing, wsStatus, isCapturing, isSpeak
               Démarrer l'écoute
             </button>
           ) : (
-            <div className="flex items-center gap-1 text-[10px]">
-              <div className={`w-1.5 h-1.5 rounded-full ${isSpeaking ? "bg-[#3D5AFE] animate-pulse" : "bg-[#0FAA6C]"}`} />
-              <span className={isSpeaking ? "text-[#3D5AFE]" : "text-[#0FAA6C]"}>{isSpeaking ? "Parole détectée" : "En écoute"}</span>
+            <div className="flex items-center gap-2">
+              <div className="flex items-center gap-1 text-[10px]">
+                <div className={`w-1.5 h-1.5 rounded-full ${isSpeaking ? "bg-[#3D5AFE] animate-pulse" : "bg-[#0FAA6C]"}`} />
+                <span className={isSpeaking ? "text-[#3D5AFE]" : "text-[#0FAA6C]"}>{isSpeaking ? "Parole détectée" : "En écoute"}</span>
+              </div>
+              <button
+                onClick={onTriggerAnalysis}
+                className="text-[10px] bg-[#3D5AFE] text-white px-2.5 py-1 rounded-md hover:bg-[#3451e0] transition-colors font-medium"
+              >
+                Analyser ↵
+              </button>
             </div>
           )}
         </div>
