@@ -56,6 +56,9 @@ export class Session {
       case "ping":
         this.send({ type: "pong" });
         break;
+      case "trigger:analyze":
+        this.triggerAnalysis();
+        break;
     }
   }
 
@@ -86,6 +89,21 @@ export class Session {
     this.stt.sendAudio(buffer);
   }
 
+  private triggerAnalysis(): void {
+    if (this.debounceTimer) {
+      clearTimeout(this.debounceTimer);
+      this.debounceTimer = null;
+    }
+    const fullText = this.transcriptBuffer.join(" ");
+    this.transcriptBuffer = [];
+    if (!fullText.trim()) return;
+    if (this.isProcessing) {
+      this.pendingTranscript = fullText;
+      return;
+    }
+    this.processTranscript(fullText);
+  }
+
   private async handleFinalTranscript(rawText: string): Promise<void> {
     if (!rawText.trim()) return;
 
@@ -101,7 +119,7 @@ export class Session {
       const fullText = this.transcriptBuffer.join(" ");
       this.transcriptBuffer = [];
 
-      if (fullText.trim().split(/\s+/).length < 20) return;
+      if (!fullText.trim()) return;
 
       if (this.isProcessing) {
         this.pendingTranscript = fullText;
