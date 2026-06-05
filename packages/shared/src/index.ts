@@ -25,6 +25,7 @@ export type ClientMessage =
   | { type: "session:start"; config: SessionConfig }
   | { type: "session:stop" }
   | { type: "audio:chunk"; data: string }
+  | { type: "trigger:analyze" }
   | { type: "ping" };
 
 export type ServerMessage =
