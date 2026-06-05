@@ -70,7 +70,7 @@ private triggerAnalysis(): void {
   }
   const fullText = this.transcriptBuffer.join(" ");
   this.transcriptBuffer = [];
-  if (fullText.trim().split(/\s+/).length < 20) return;
+  if (!fullText.trim()) return;
   if (this.isProcessing) {
     this.pendingTranscript = fullText;
     return;
@@ -82,7 +82,7 @@ private triggerAnalysis(): void {
 Comportement :
 - Annule le debounce en cours
 - Prend tout ce qui est dans `transcriptBuffer` et le vide
-- Si < 20 mots : ignoré silencieusement
+- Si buffer vide : ignoré silencieusement
 - Si `isProcessing` : mis en `pendingTranscript` (traité après l'analyse en cours)
 - Sinon : `processTranscript` immédiatement
 
@@ -132,10 +132,15 @@ Le bouton est visible dès que l'audio a démarré, même pendant `isAnalyzing` 
 />
 ```
 
+## Filtre auto-analyse
+
+Dans `session.ts`, le debounce actuel vérifie `< 20 mots` avant d'appeler `processTranscript`. Ce filtre est **supprimé** — remplacé par `!fullText.trim()` (buffer vide uniquement). L'analyse automatique se déclenche après tout silence ≥ 5s tant qu'il y a quelque chose à analyser.
+
+Le bouton manuel (`triggerAnalysis`) n'a aucun filtre de longueur.
+
 ## Ce qui ne change pas
 
 - Silence threshold : 5s
 - Debounce : 3s
-- Filtre 20 mots minimum
 - `conversationLog` / `questionLog` — inchangés
-- `MIN_BUFFER_BYTES` (0.5s) — conservé pour éviter les flush de bruit
+- `MIN_BUFFER_BYTES` (0.5s) — conservé dans GroqSTT pour éviter les flush de bruit
