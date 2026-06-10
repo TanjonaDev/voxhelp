@@ -32,7 +32,6 @@ export default function App() {
       isSpeaking={audio.isSpeaking}
       onStartAudio={handleStartAudio}
       onStop={handleStop}
-      onTriggerAnalysis={ws.triggerAnalysis}
     />
   );
 }

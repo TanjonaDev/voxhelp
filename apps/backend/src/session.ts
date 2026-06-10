@@ -17,7 +17,7 @@ export class Session {
   private isProcessing = false;
   private pendingTranscript: string | null = null;
   private immediateAnalysis = false;
-  private readonly DEBOUNCE_MS = 2000;
+  private readonly DEBOUNCE_MS = 1000;
 
   constructor(ws: WebSocket) {
     this.ws = ws;
