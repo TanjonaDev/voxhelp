@@ -1,7 +1,7 @@
 import type { WebSocket } from "ws";
 import type { ClientMessage, ServerMessage, SessionConfig, InsightCard, JobContext } from "@voxhelp/shared";
 import { GroqSTT } from "./groq-stt.js";
-import { callClaudeJSON, correctTranscript } from "./llm.js";
+import { callClaudeJSON } from "./llm.js";
 import { buildLiveAssistPrompt } from "./prompts/live-assist.js";
 
 export class Session {
@@ -17,7 +17,7 @@ export class Session {
   private isProcessing = false;
   private pendingTranscript: string | null = null;
   private immediateAnalysis = false;
-  private readonly DEBOUNCE_MS = 1000;
+  private readonly DEBOUNCE_MS = 300;
 
   constructor(ws: WebSocket) {
     this.ws = ws;
@@ -111,14 +111,11 @@ export class Session {
     void this.stt?.flush();
   }
 
-  private async handleFinalTranscript(rawText: string): Promise<void> {
+  private handleFinalTranscript(rawText: string): void {
     if (!rawText.trim()) return;
 
-    const text = await correctTranscript(rawText);
-    if (rawText !== text) console.log(`[Session] Corrected: "${rawText}" → "${text}"`);
-
-    this.send({ type: "transcript:final", text });
-    this.transcriptBuffer.push(text);
+    this.send({ type: "transcript:final", text: rawText });
+    this.transcriptBuffer.push(rawText);
 
     if (this.immediateAnalysis) {
       this.immediateAnalysis = false;
