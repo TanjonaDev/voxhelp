@@ -91,6 +91,7 @@ export class Session {
   }
 
   private triggerAnalysis(): void {
+    if (this.immediateAnalysis) return;
     if (this.debounceTimer) {
       clearTimeout(this.debounceTimer);
       this.debounceTimer = null;
@@ -106,7 +107,6 @@ export class Session {
       void this.stt?.flush();
       return;
     }
-    // Buffer empty — force Groq to transcribe pending audio, analyze on arrival
     this.immediateAnalysis = true;
     void this.stt?.flush();
   }

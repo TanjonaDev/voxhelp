@@ -120,9 +120,10 @@ export function LiveView({ insights, isAnalyzing, wsStatus, isCapturing, isSpeak
               </div>
               <button
                 onClick={onTriggerAnalysis}
-                className="text-[10px] bg-[#3D5AFE] text-white px-2.5 py-1 rounded-md hover:bg-[#3451e0] transition-colors font-medium"
+                disabled={isAnalyzing}
+                className="text-[10px] bg-[#3D5AFE] text-white px-2.5 py-1 rounded-md hover:bg-[#3451e0] transition-colors font-medium disabled:opacity-40 disabled:cursor-not-allowed"
               >
-                Analyser ↵
+                {isAnalyzing ? "Analyse..." : "Analyser ↵"}
               </button>
             </div>
           )}
