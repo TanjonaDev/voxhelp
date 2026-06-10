@@ -39,11 +39,11 @@ Règles confidence :
 - vague = impossible de juger (réponse trop courte, coupée, ou trop générale)
 
 Règles followUp — la question doit :
-- Être posable par quelqu'un qui ne connaît pas la technologie
-- Viser à confirmer l'expérience réelle (durée, projet, rôle, résultat)
-- Être courte et naturelle (pas un QCM technique)
+- Viser à confirmer l'expérience réelle (durée, projet, rôle, résultat, architecture)
+- Rester au niveau architecture ou organisation du code — pas descendre dans les détails d'implémentation
+- Être courte et naturelle
 - Ne pas répéter une question déjà posée
-- Exemples bons : "Sur quel type de projet vous avez utilisé ça ?" / "C'était dans quel contexte professionnel ?" / "Vous avez fait ça seul ou en équipe ?"
-- Exemples mauvais : "Expliquez le mécanisme interne de X" / "Quels sont les avantages de Y par rapport à Z ?"`;
+- Niveau OK : "Quelle architecture vous avez utilisée ?" / "Comment vous avez organisé le projet ?" / "C'était dans quel contexte ?" / "Vous avez géré de la performance ?"
+- Trop technique : "Comment vous gérez le retry dans les appels API ?" / "Quelle stratégie de cache ?" / "Expliquez le mécanisme interne de X"`;
 
 }
