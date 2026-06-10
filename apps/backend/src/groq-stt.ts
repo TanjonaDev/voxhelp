@@ -8,7 +8,7 @@ interface GroqSTTCallbacks {
 }
 
 const RMS_THRESHOLD = 0.005;
-const SILENCE_THRESHOLD_MS = 5000;
+const SILENCE_THRESHOLD_MS = 2000;
 const MIN_BUFFER_BYTES = AUDIO_SAMPLE_RATE * 2 * 0.5; // 0.5s = 16 000 bytes
 const TICK_INTERVAL_MS = 200;
 
@@ -84,7 +84,7 @@ export class GroqSTT {
     }
   }
 
-  private async flush(): Promise<void> {
+  async flush(): Promise<void> {
     if (this.totalBytes < MIN_BUFFER_BYTES || !this.isBufferingActive) {
       const wasBuffering = this.isBufferingActive;
       this.reset();

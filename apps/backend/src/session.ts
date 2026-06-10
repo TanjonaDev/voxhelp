@@ -16,7 +16,8 @@ export class Session {
   private debounceTimer: ReturnType<typeof setTimeout> | null = null;
   private isProcessing = false;
   private pendingTranscript: string | null = null;
-  private readonly DEBOUNCE_MS = 3000;
+  private immediateAnalysis = false;
+  private readonly DEBOUNCE_MS = 2000;
 
   constructor(ws: WebSocket) {
     this.ws = ws;
@@ -94,14 +95,20 @@ export class Session {
       clearTimeout(this.debounceTimer);
       this.debounceTimer = null;
     }
-    const fullText = this.transcriptBuffer.join(" ");
-    this.transcriptBuffer = [];
-    if (!fullText.trim()) return;
-    if (this.isProcessing) {
-      this.pendingTranscript = fullText;
+    const existing = this.transcriptBuffer.join(" ").trim();
+    if (existing) {
+      this.transcriptBuffer = [];
+      if (this.isProcessing) {
+        this.pendingTranscript = existing;
+      } else {
+        this.processTranscript(existing);
+      }
+      void this.stt?.flush();
       return;
     }
-    this.processTranscript(fullText);
+    // Buffer empty — force Groq to transcribe pending audio, analyze on arrival
+    this.immediateAnalysis = true;
+    void this.stt?.flush();
   }
 
   private async handleFinalTranscript(rawText: string): Promise<void> {
@@ -112,6 +119,18 @@ export class Session {
 
     this.send({ type: "transcript:final", text });
     this.transcriptBuffer.push(text);
+
+    if (this.immediateAnalysis) {
+      this.immediateAnalysis = false;
+      if (this.debounceTimer) { clearTimeout(this.debounceTimer); this.debounceTimer = null; }
+      const fullText = this.transcriptBuffer.join(" ");
+      this.transcriptBuffer = [];
+      if (fullText.trim()) {
+        if (this.isProcessing) { this.pendingTranscript = fullText; }
+        else { this.processTranscript(fullText); }
+      }
+      return;
+    }
 
     if (this.debounceTimer) clearTimeout(this.debounceTimer);
 
