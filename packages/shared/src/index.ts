@@ -15,10 +15,17 @@ export interface InsightCard {
   meaning: string;
   signal: {
     label: string;
-    type: "positive" | "weak" | "dig";
   };
   followUp: string;
   confidence: "confirmed" | "partial" | "vague";
+}
+
+export interface CandidateReport {
+  overall: string;
+  strengths: string[];
+  gaps: string[];
+  recommendation: "hire" | "maybe" | "pass";
+  recommendationReason: string;
 }
 
 export type ClientMessage =
@@ -26,6 +33,7 @@ export type ClientMessage =
   | { type: "session:stop" }
   | { type: "audio:chunk"; data: string }
   | { type: "trigger:analyze" }
+  | { type: "session:summarize" }
   | { type: "ping" };
 
 export type ServerMessage =
@@ -37,6 +45,7 @@ export type ServerMessage =
   | { type: "transcript:final"; text: string }
   | { type: "assist:card"; card: InsightCard }
   | { type: "assist:error"; error: string }
+  | { type: "analysis:final"; report: CandidateReport }
   | { type: "pong" };
 
 export const AUDIO_SAMPLE_RATE = 16000;

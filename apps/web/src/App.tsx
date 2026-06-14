@@ -27,11 +27,14 @@ export default function App() {
     <LiveView
       insights={ws.insights}
       isAnalyzing={ws.isAnalyzing}
+      isSummarizing={ws.isSummarizing}
+      finalReport={ws.finalReport}
       wsStatus={ws.status}
       isCapturing={audio.isCapturing}
       isSpeaking={audio.isSpeaking}
       onStartAudio={handleStartAudio}
       onStop={handleStop}
+      onSummarize={ws.summarize}
     />
   );
 }

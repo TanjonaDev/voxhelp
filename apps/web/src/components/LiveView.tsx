@@ -1,31 +1,36 @@
 import { useState, useEffect, useRef } from "react";
-import type { InsightCard, JobContext } from "@voxhelp/shared";
+import type { InsightCard, CandidateReport, JobContext } from "@voxhelp/shared";
 
 interface LiveViewProps {
   insights: InsightCard[];
   isAnalyzing: boolean;
+  isSummarizing: boolean;
+  finalReport: CandidateReport | null;
   wsStatus: string;
   isCapturing: boolean;
   isSpeaking: boolean;
   onStartAudio: (jobContext?: JobContext) => Promise<void>;
   onStop: () => void;
+  onSummarize: () => void;
 }
 
-const SIGNAL_STYLES = {
-  positive: { border: "border-[#0FAA6C]/30", bg: "bg-[#0FAA6C]/5", dot: "bg-[#0FAA6C]", text: "text-[#0FAA6C]" },
-  weak: { border: "border-[#FF6B35]/30", bg: "bg-[#FF6B35]/5", dot: "bg-[#FF6B35]", text: "text-[#FF6B35]" },
-  dig: { border: "border-[#3D5AFE]/30", bg: "bg-[#3D5AFE]/5", dot: "bg-[#3D5AFE]", text: "text-[#3D5AFE]" },
-};
-
-const CONFIDENCE_LABELS = {
-  confirmed: { label: "Confirmé", style: "text-[#0FAA6C] bg-[#0FAA6C]/10" },
-  partial: { label: "Partiel", style: "text-[#FF6B35] bg-[#FF6B35]/10" },
-  vague: { label: "Flou", style: "text-[#5A5F72] bg-[#5A5F72]/10" },
+const CONFIDENCE_STYLES = {
+  confirmed: {
+    border: "border-[#0FAA6C]/30", bg: "bg-[#0FAA6C]/5", dot: "bg-[#0FAA6C]", text: "text-[#0FAA6C]",
+    label: "Confirmé", badge: "text-[#0FAA6C] bg-[#0FAA6C]/10",
+  },
+  partial: {
+    border: "border-[#FF6B35]/30", bg: "bg-[#FF6B35]/5", dot: "bg-[#FF6B35]", text: "text-[#FF6B35]",
+    label: "Partiel", badge: "text-[#FF6B35] bg-[#FF6B35]/10",
+  },
+  vague: {
+    border: "border-[#5A5F72]/30", bg: "bg-[#5A5F72]/5", dot: "bg-[#5A5F72]", text: "text-[#5A5F72]",
+    label: "Flou", badge: "text-[#5A5F72] bg-[#5A5F72]/10",
+  },
 };
 
 function InsightCardView({ card }: { card: InsightCard }) {
-  const s = SIGNAL_STYLES[card.signal.type];
-  const c = CONFIDENCE_LABELS[card.confidence];
+  const s = CONFIDENCE_STYLES[card.confidence];
   return (
     <div className={`rounded-lg border ${s.border} ${s.bg} p-3 space-y-2`}>
       <div className={`flex items-center gap-1.5 ${s.text} font-medium text-xs`}>
@@ -41,8 +46,52 @@ function InsightCardView({ card }: { card: InsightCard }) {
         <p className="text-xs text-[#1A1D26] italic leading-snug">{card.followUp}</p>
       </div>
       <div className="flex justify-end">
-        <span className={`text-[9px] font-semibold px-1.5 py-0.5 rounded-full ${c.style}`}>{c.label}</span>
+        <span className={`text-[9px] font-semibold px-1.5 py-0.5 rounded-full ${s.badge}`}>{s.label}</span>
       </div>
+    </div>
+  );
+}
+
+const RECOMMENDATION_STYLES = {
+  hire: { label: "Recommandé", style: "bg-[#0FAA6C]/10 text-[#0FAA6C] border-[#0FAA6C]/30" },
+  maybe: { label: "À revoir", style: "bg-[#FF6B35]/10 text-[#FF6B35] border-[#FF6B35]/30" },
+  pass: { label: "Non retenu", style: "bg-[#5A5F72]/10 text-[#5A5F72] border-[#5A5F72]/30" },
+};
+
+function FinalReportView({ report }: { report: CandidateReport }) {
+  const r = RECOMMENDATION_STYLES[report.recommendation];
+  return (
+    <div className="bg-white border border-[#DFE1EA] rounded-lg p-3 space-y-3">
+      <div className="flex items-center justify-between">
+        <p className="text-[10px] font-semibold uppercase tracking-wider text-[#5A5F72]">Bilan candidat</p>
+        <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full border ${r.style}`}>{r.label}</span>
+      </div>
+      <p className="text-xs text-[#1A1D26] leading-snug">{report.overall}</p>
+      {report.strengths.length > 0 && (
+        <div>
+          <p className="text-[9px] font-semibold uppercase tracking-wider text-[#0FAA6C] mb-1">Points forts</p>
+          <ul className="space-y-0.5">
+            {report.strengths.map((s, i) => (
+              <li key={i} className="text-xs text-[#1A1D26] flex gap-1.5">
+                <span className="text-[#0FAA6C] flex-shrink-0">+</span>{s}
+              </li>
+            ))}
+          </ul>
+        </div>
+      )}
+      {report.gaps.length > 0 && (
+        <div>
+          <p className="text-[9px] font-semibold uppercase tracking-wider text-[#FF6B35] mb-1">Points à creuser</p>
+          <ul className="space-y-0.5">
+            {report.gaps.map((g, i) => (
+              <li key={i} className="text-xs text-[#1A1D26] flex gap-1.5">
+                <span className="text-[#FF6B35] flex-shrink-0">?</span>{g}
+              </li>
+            ))}
+          </ul>
+        </div>
+      )}
+      <p className="text-[10px] text-[#5A5F72] italic border-t border-[#DFE1EA] pt-2">{report.recommendationReason}</p>
     </div>
   );
 }
@@ -67,7 +116,7 @@ function useElapsedTime(active: boolean) {
   return `${mm}:${ss}`;
 }
 
-export function LiveView({ insights, isAnalyzing, wsStatus, isCapturing, isSpeaking, onStartAudio, onStop }: LiveViewProps) {
+export function LiveView({ insights, isAnalyzing, isSummarizing, finalReport, wsStatus, isCapturing, isSpeaking, onStartAudio, onStop, onSummarize }: LiveViewProps) {
   const feedEndRef = useRef<HTMLDivElement>(null);
   const [audioStarted, setAudioStarted] = useState(false);
   const [jobTitle, setJobTitle] = useState("");
@@ -169,6 +218,20 @@ export function LiveView({ insights, isAnalyzing, wsStatus, isCapturing, isSpeak
           {insights.map((card, i) => (
             <InsightCardView key={i} card={card} />
           ))}
+
+          {/* Summarize button */}
+          {audioStarted && insights.length > 0 && !finalReport && (
+            <button
+              onClick={onSummarize}
+              disabled={isSummarizing}
+              className="w-full text-[10px] font-semibold border border-[#3D5AFE]/40 text-[#3D5AFE] rounded-lg py-2 hover:bg-[#3D5AFE]/5 transition-colors disabled:opacity-50"
+            >
+              {isSummarizing ? "Génération du bilan..." : "Générer le bilan candidat"}
+            </button>
+          )}
+
+          {/* Final report */}
+          {finalReport && <FinalReportView report={finalReport} />}
 
           {/* Skeleton */}
           {isAnalyzing && (

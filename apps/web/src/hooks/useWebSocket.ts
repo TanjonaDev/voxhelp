@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from "react";
-import type { ClientMessage, ServerMessage, SessionConfig, InsightCard } from "@voxhelp/shared";
+import type { ClientMessage, ServerMessage, SessionConfig, InsightCard, CandidateReport } from "@voxhelp/shared";
 import { WS_PING_INTERVAL_MS } from "@voxhelp/shared";
 
 type ConnectionStatus = "disconnected" | "connecting" | "connected" | "error";
@@ -7,11 +7,14 @@ type ConnectionStatus = "disconnected" | "connecting" | "connected" | "error";
 interface UseWebSocketReturn {
   status: ConnectionStatus;
   isAnalyzing: boolean;
+  isSummarizing: boolean;
   insights: InsightCard[];
+  finalReport: CandidateReport | null;
   startSession: (config: SessionConfig) => void;
   stopSession: () => void;
   sendAudio: (base64: string) => void;
   triggerAnalysis: () => void;
+  summarize: () => void;
 }
 
 export function useWebSocket(url: string): UseWebSocketReturn {
@@ -20,7 +23,9 @@ export function useWebSocket(url: string): UseWebSocketReturn {
 
   const [status, setStatus] = useState<ConnectionStatus>("disconnected");
   const [isAnalyzing, setIsAnalyzing] = useState(false);
+  const [isSummarizing, setIsSummarizing] = useState(false);
   const [insights, setInsights] = useState<InsightCard[]>([]);
+  const [finalReport, setFinalReport] = useState<CandidateReport | null>(null);
 
   const send = useCallback((msg: ClientMessage) => {
     if (wsRef.current?.readyState === WebSocket.OPEN) {
@@ -34,6 +39,7 @@ export function useWebSocket(url: string): UseWebSocketReturn {
         break;
       case "session:error":
         setIsAnalyzing(false);
+        setIsSummarizing(false);
         console.error("[WS] Session error:", msg.error);
         break;
       case "transcript:partial":
@@ -54,6 +60,10 @@ export function useWebSocket(url: string): UseWebSocketReturn {
       case "assist:error":
         setIsAnalyzing(false);
         console.error("[WS] Assist error:", msg.error);
+        break;
+      case "analysis:final":
+        setIsSummarizing(false);
+        setFinalReport(msg.report);
         break;
       case "pong":
         break;
@@ -86,6 +96,7 @@ export function useWebSocket(url: string): UseWebSocketReturn {
     ws.onclose = () => {
       setStatus("disconnected");
       setIsAnalyzing(false);
+      setIsSummarizing(false);
       if (pingRef.current) {
         clearInterval(pingRef.current);
         pingRef.current = null;
@@ -98,7 +109,9 @@ export function useWebSocket(url: string): UseWebSocketReturn {
   const startSession = useCallback(
     (config: SessionConfig) => {
       setIsAnalyzing(false);
+      setIsSummarizing(false);
       setInsights([]);
+      setFinalReport(null);
 
       if (wsRef.current?.readyState === WebSocket.OPEN) {
         send({ type: "session:start", config });
@@ -131,6 +144,11 @@ export function useWebSocket(url: string): UseWebSocketReturn {
     send({ type: "trigger:analyze" });
   }, [send]);
 
+  const summarize = useCallback(() => {
+    setIsSummarizing(true);
+    send({ type: "session:summarize" });
+  }, [send]);
+
   useEffect(() => {
     connect();
     return () => {
@@ -142,10 +160,13 @@ export function useWebSocket(url: string): UseWebSocketReturn {
   return {
     status,
     isAnalyzing,
+    isSummarizing,
     insights,
+    finalReport,
     startSession,
     stopSession,
     sendAudio,
     triggerAnalysis,
+    summarize,
   };
 }

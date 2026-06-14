@@ -1,8 +1,9 @@
 import type { WebSocket } from "ws";
-import type { ClientMessage, ServerMessage, SessionConfig, InsightCard, JobContext } from "@voxhelp/shared";
+import type { ClientMessage, ServerMessage, SessionConfig, InsightCard, CandidateReport, JobContext } from "@voxhelp/shared";
 import { GroqSTT } from "./groq-stt.js";
 import { callClaudeJSON } from "./llm.js";
 import { buildLiveAssistPrompt } from "./prompts/live-assist.js";
+import { buildFinalAnalysisPrompt } from "./prompts/final-analysis.js";
 
 export class Session {
   private ws: WebSocket;
@@ -12,7 +13,9 @@ export class Session {
   private transcriptBuffer: string[] = [];
   private conversationLog: string[] = [];
   private questionLog: string[] = [];
+  private cardLog: InsightCard[] = [];
   private readonly MAX_LOG_ENTRIES = 5;
+  private readonly MAX_CARD_LOG = 20;
   private debounceTimer: ReturnType<typeof setTimeout> | null = null;
   private isProcessing = false;
   private pendingTranscript: string | null = null;
@@ -60,6 +63,9 @@ export class Session {
       case "trigger:analyze":
         this.triggerAnalysis();
         break;
+      case "session:summarize":
+        void this.generateFinalReport();
+        break;
     }
   }
 
@@ -78,6 +84,7 @@ export class Session {
     });
 
     this.stt.start();
+    this.cardLog = [];
 
     const sessionId = `session_${Date.now()}`;
     this.send({ type: "session:ready", sessionId });
@@ -154,11 +161,13 @@ export class Session {
 
     try {
       const card = await callClaudeJSON<InsightCard>(
-        buildLiveAssistPrompt(this.jobContext, this.conversationLog.slice(0, -1), this.questionLog),
+        buildLiveAssistPrompt(this.jobContext, this.conversationLog.slice(0, -1), this.questionLog, this.cardLog),
         `Ce qui vient d'être dit :\n"${transcript}"`
       );
       this.questionLog.push(card.followUp);
       if (this.questionLog.length > this.MAX_LOG_ENTRIES) this.questionLog.shift();
+      this.cardLog.push(card);
+      if (this.cardLog.length > this.MAX_CARD_LOG) this.cardLog.shift();
       this.send({ type: "assist:card", card });
     } catch (err) {
       this.send({
@@ -176,6 +185,21 @@ export class Session {
     }
   }
 
+  private async generateFinalReport(): Promise<void> {
+    try {
+      const report = await callClaudeJSON<CandidateReport>(
+        buildFinalAnalysisPrompt(this.jobContext, this.cardLog),
+        "Génère le bilan final du candidat."
+      );
+      this.send({ type: "analysis:final", report });
+    } catch (err) {
+      this.send({
+        type: "session:error",
+        error: err instanceof Error ? err.message : "Final analysis error",
+      });
+    }
+  }
+
   private send(message: ServerMessage): void {
     if (this.ws.readyState === this.ws.OPEN) {
       this.ws.send(JSON.stringify(message));
@@ -190,6 +214,7 @@ export class Session {
     this.transcriptBuffer = [];
     this.conversationLog = [];
     this.questionLog = [];
+    this.cardLog = [];
     if (this.stt) {
       this.stt.close();
       this.stt = null;
