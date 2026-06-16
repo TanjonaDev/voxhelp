@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from "react";
-import type { ClientMessage, ServerMessage, SessionConfig, InsightCard, CandidateReport } from "@voxhelp/shared";
+import type { ClientMessage, ServerMessage, SessionConfig, Insight, CandidateReport } from "@voxhelp/shared";
 import { WS_PING_INTERVAL_MS } from "@voxhelp/shared";
 
 type ConnectionStatus = "disconnected" | "connecting" | "connected" | "error";
@@ -8,7 +8,7 @@ interface UseWebSocketReturn {
   status: ConnectionStatus;
   isAnalyzing: boolean;
   isSummarizing: boolean;
-  insights: InsightCard[];
+  insights: Insight[];
   finalReport: CandidateReport | null;
   startSession: (config: SessionConfig) => void;
   stopSession: () => void;
@@ -24,7 +24,7 @@ export function useWebSocket(url: string): UseWebSocketReturn {
   const [status, setStatus] = useState<ConnectionStatus>("disconnected");
   const [isAnalyzing, setIsAnalyzing] = useState(false);
   const [isSummarizing, setIsSummarizing] = useState(false);
-  const [insights, setInsights] = useState<InsightCard[]>([]);
+  const [insights, setInsights] = useState<Insight[]>([]);
   const [finalReport, setFinalReport] = useState<CandidateReport | null>(null);
 
   const send = useCallback((msg: ClientMessage) => {
