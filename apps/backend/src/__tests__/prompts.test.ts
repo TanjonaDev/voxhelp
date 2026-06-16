@@ -1,20 +1,26 @@
 import { describe, it, expect } from "vitest";
 import { buildLiveAssistPrompt } from "../prompts/live-assist.js";
 import { buildFinalAnalysisPrompt } from "../prompts/final-analysis.js";
-import type { InsightCard } from "@voxhelp/shared";
+import type { Insight } from "@voxhelp/shared";
 
-const confirmedCard: InsightCard = {
-  meaning: "Expérience terrain solide en React",
-  signal: { label: "Expert confirmé" },
-  followUp: "Dans quel contexte avez-vous utilisé React ?",
+const confirmedCard: Insight = {
+  id: "test-1",
+  t: "01:00",
+  cat: "strength",
   confidence: "confirmed",
+  title: "Expérience terrain solide en React",
+  body: "Le candidat a démontré une utilisation concrète de React en production.",
+  relance: "Dans quel contexte avez-vous utilisé React ?",
 };
 
-const vagueCard: InsightCard = {
-  meaning: "Réponse trop générale, sans exemple",
-  signal: { label: "Manque de concret" },
-  followUp: "Pouvez-vous donner un exemple précis ?",
-  confidence: "vague",
+const vagueCard: Insight = {
+  id: "test-2",
+  t: "02:00",
+  cat: "risk",
+  confidence: "low",
+  title: "Manque de concret",
+  body: "Réponse trop générale, sans exemple précis.",
+  relance: "Pouvez-vous donner un exemple précis ?",
 };
 
 describe("buildLiveAssistPrompt", () => {
@@ -36,10 +42,9 @@ describe("buildLiveAssistPrompt", () => {
     expect(prompt).toContain("NE PAS répéter");
   });
 
-  it("includes previous InsightCards for context continuity", () => {
+  it("includes previous Insights for context continuity", () => {
     const prompt = buildLiveAssistPrompt(undefined, [], [], [confirmedCard]);
     expect(prompt).toContain("CONFIRMED");
-    expect(prompt).toContain("Expert confirmé");
     expect(prompt).toContain("Expérience terrain solide en React");
   });
 
@@ -62,12 +67,12 @@ describe("buildFinalAnalysisPrompt", () => {
     expect(prompt).toContain("Node.js");
   });
 
-  it("includes all card signals and confidence levels", () => {
+  it("includes all card titles and confidence levels", () => {
     const prompt = buildFinalAnalysisPrompt(undefined, [confirmedCard, vagueCard]);
-    expect(prompt).toContain("Expert confirmé");
+    expect(prompt).toContain("Expérience terrain solide en React");
     expect(prompt).toContain("Manque de concret");
     expect(prompt).toContain("CONFIRMED");
-    expect(prompt).toContain("VAGUE");
+    expect(prompt).toContain("LOW");
   });
 
   it("mentions when no analysis is available", () => {

@@ -1,6 +1,6 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import WebSocket from "ws";
-import type { InsightCard, CandidateReport, ServerMessage } from "@voxhelp/shared";
+import type { CandidateReport, ServerMessage } from "@voxhelp/shared";
 import { createTestServer, type TestServer } from "./helpers/server.js";
 
 interface STTCallbacks {
@@ -62,11 +62,13 @@ function connectAndStart(port: number): Promise<WebSocket> {
   });
 }
 
-const sampleCard: InsightCard = {
-  meaning: "Le candidat montre une vraie expérience React en production",
-  signal: { label: "Expérience terrain confirmée" },
-  followUp: "Dans quel type de projet avez-vous utilisé React ?",
-  confidence: "confirmed",
+// InsightPayload — what callClaudeJSON returns (no id, no t)
+const samplePayload = {
+  cat: "strength" as const,
+  confidence: "confirmed" as const,
+  title: "Expérience terrain confirmée en React",
+  body: "Le candidat montre une vraie expérience React en production.",
+  relance: "Dans quel type de projet avez-vous utilisé React ?",
 };
 
 const sampleReport: CandidateReport = {
@@ -94,22 +96,25 @@ describe("Session WebSocket integration", () => {
   });
 
   it("sends assist:card when a transcript arrives", async () => {
-    mockLlm.callClaudeJSON.mockResolvedValueOnce(sampleCard);
+    mockLlm.callClaudeJSON.mockResolvedValueOnce(samplePayload);
 
     stt.callbacks!.onFinal("J'utilise React depuis 3 ans en production");
 
     const msg = (await waitForMessage(ws, "assist:card")) as Extract<ServerMessage, { type: "assist:card" }>;
 
-    expect(msg.card.meaning).toBe(sampleCard.meaning);
+    expect(msg.card.title).toBe(samplePayload.title);
     expect(msg.card.confidence).toBe("confirmed");
-    expect(msg.card.signal.label).toBe("Expérience terrain confirmée");
-    expect(msg.card.followUp).toBeTruthy();
+    expect(msg.card.cat).toBe("strength");
+    expect(msg.card.relance).toBeTruthy();
+    // id and t are injected by session
+    expect(msg.card.id).toBeTruthy();
+    expect(msg.card.t).toMatch(/^\d{2}:\d{2}$/);
   });
 
   it("includes previous card context in the prompt for the second analysis", async () => {
     mockLlm.callClaudeJSON
-      .mockResolvedValueOnce(sampleCard)
-      .mockResolvedValueOnce({ ...sampleCard, meaning: "Deuxième analyse" });
+      .mockResolvedValueOnce(samplePayload)
+      .mockResolvedValueOnce({ ...samplePayload, title: "Deuxième analyse" });
 
     stt.callbacks!.onFinal("Premier transcript");
     await waitForMessage(ws, "assist:card");
@@ -119,14 +124,14 @@ describe("Session WebSocket integration", () => {
 
     const secondPrompt = mockLlm.callClaudeJSON.mock.calls[1][0] as string;
     expect(secondPrompt).toContain("CONFIRMED");
-    expect(secondPrompt).toContain("Expérience terrain confirmée");
+    expect(secondPrompt).toContain("Expérience terrain confirmée en React");
     expect(secondPrompt).toContain("Analyses déjà effectuées");
   });
 
   it("does not repeat follow-up questions in subsequent analyses", async () => {
     mockLlm.callClaudeJSON
-      .mockResolvedValueOnce(sampleCard)
-      .mockResolvedValueOnce({ ...sampleCard, followUp: "Autre question ?" });
+      .mockResolvedValueOnce(samplePayload)
+      .mockResolvedValueOnce({ ...samplePayload, relance: "Autre question ?" });
 
     stt.callbacks!.onFinal("Premier transcript");
     await waitForMessage(ws, "assist:card");
@@ -141,7 +146,7 @@ describe("Session WebSocket integration", () => {
 
   it("sends analysis:final in response to session:summarize", async () => {
     mockLlm.callClaudeJSON
-      .mockResolvedValueOnce(sampleCard)
+      .mockResolvedValueOnce(samplePayload)
       .mockResolvedValueOnce(sampleReport);
 
     stt.callbacks!.onFinal("Le candidat présente son expérience");
@@ -159,7 +164,7 @@ describe("Session WebSocket integration", () => {
 
   it("includes accumulated cards in the final analysis prompt", async () => {
     mockLlm.callClaudeJSON
-      .mockResolvedValueOnce(sampleCard)
+      .mockResolvedValueOnce(samplePayload)
       .mockResolvedValueOnce(sampleReport);
 
     stt.callbacks!.onFinal("Premier transcript");
@@ -170,7 +175,7 @@ describe("Session WebSocket integration", () => {
 
     const finalPrompt = mockLlm.callClaudeJSON.mock.calls[1][0] as string;
     expect(finalPrompt).toContain("CONFIRMED");
-    expect(finalPrompt).toContain("Expérience terrain confirmée");
+    expect(finalPrompt).toContain("Expérience terrain confirmée en React");
     expect(finalPrompt).toContain("bilan final");
   });
 });

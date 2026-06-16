@@ -1,9 +1,15 @@
 import type { WebSocket } from "ws";
-import type { ClientMessage, ServerMessage, SessionConfig, InsightCard, CandidateReport, JobContext } from "@voxhelp/shared";
+import type {
+  ClientMessage, ServerMessage, SessionConfig,
+  Insight, CandidateReport, JobContext,
+} from "@voxhelp/shared";
+import { createId } from "@voxhelp/shared";
 import { GroqSTT } from "./groq-stt.js";
 import { callClaudeJSON } from "./llm.js";
 import { buildLiveAssistPrompt } from "./prompts/live-assist.js";
 import { buildFinalAnalysisPrompt } from "./prompts/final-analysis.js";
+
+type InsightPayload = Omit<Insight, "id" | "t">;
 
 export class Session {
   private ws: WebSocket;
@@ -12,8 +18,9 @@ export class Session {
   private jobContext: JobContext | undefined = undefined;
   private transcriptBuffer: string[] = [];
   private conversationLog: string[] = [];
-  private questionLog: string[] = [];
-  private cardLog: InsightCard[] = [];
+  private relanceLog: string[] = [];
+  private cardLog: Insight[] = [];
+  private sessionStartMs = 0;
   private readonly MAX_LOG_ENTRIES = 5;
   private readonly MAX_CARD_LOG = 20;
   private debounceTimer: ReturnType<typeof setTimeout> | null = null;
@@ -74,6 +81,9 @@ export class Session {
     this.jobContext = config.jobContext;
     this.transcriptBuffer = [];
     this.conversationLog = [];
+    this.relanceLog = [];
+    this.cardLog = [];
+    this.sessionStartMs = Date.now();
 
     this.stt?.close();
     this.stt = new GroqSTT(config.language, {
@@ -84,7 +94,6 @@ export class Session {
     });
 
     this.stt.start();
-    this.cardLog = [];
 
     const sessionId = `session_${Date.now()}`;
     this.send({ type: "session:ready", sessionId });
@@ -153,6 +162,13 @@ export class Session {
     }, this.DEBOUNCE_MS);
   }
 
+  private elapsedTime(): string {
+    const elapsedSec = Math.floor((Date.now() - this.sessionStartMs) / 1000);
+    const mm = String(Math.floor(elapsedSec / 60)).padStart(2, "0");
+    const ss = String(elapsedSec % 60).padStart(2, "0");
+    return `${mm}:${ss}`;
+  }
+
   private async processTranscript(transcript: string): Promise<void> {
     this.isProcessing = true;
 
@@ -160,14 +176,24 @@ export class Session {
     if (this.conversationLog.length > this.MAX_LOG_ENTRIES) this.conversationLog.shift();
 
     try {
-      const card = await callClaudeJSON<InsightCard>(
-        buildLiveAssistPrompt(this.jobContext, this.conversationLog.slice(0, -1), this.questionLog, this.cardLog),
+      const payload = await callClaudeJSON<InsightPayload>(
+        buildLiveAssistPrompt(this.jobContext, this.conversationLog.slice(0, -1), this.relanceLog, this.cardLog),
         `Ce qui vient d'être dit :\n"${transcript}"`
       );
-      this.questionLog.push(card.followUp);
-      if (this.questionLog.length > this.MAX_LOG_ENTRIES) this.questionLog.shift();
+
+      const card: Insight = {
+        ...payload,
+        id: createId(),
+        t: this.elapsedTime(),
+      };
+
+      if (card.relance) {
+        this.relanceLog.push(card.relance);
+        if (this.relanceLog.length > this.MAX_LOG_ENTRIES) this.relanceLog.shift();
+      }
       this.cardLog.push(card);
       if (this.cardLog.length > this.MAX_CARD_LOG) this.cardLog.shift();
+
       this.send({ type: "assist:card", card });
     } catch (err) {
       this.send({
@@ -213,8 +239,9 @@ export class Session {
     }
     this.transcriptBuffer = [];
     this.conversationLog = [];
-    this.questionLog = [];
+    this.relanceLog = [];
     this.cardLog = [];
+    this.sessionStartMs = 0;
     if (this.stt) {
       this.stt.close();
       this.stt = null;
