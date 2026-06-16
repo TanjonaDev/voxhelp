@@ -1,13 +1,13 @@
-import type { JobContext, InsightCard } from "@voxhelp/shared";
+import type { JobContext, Insight } from "@voxhelp/shared";
 
-export function buildFinalAnalysisPrompt(jobContext?: JobContext, cards?: InsightCard[]): string {
+export function buildFinalAnalysisPrompt(jobContext?: JobContext, cards?: Insight[]): string {
   const contextSection = jobContext
     ? `\nPoste visé : ${jobContext.title} — niveau ${jobContext.level} — stack attendue : ${jobContext.stack}\n`
     : "";
 
   const cardsSection =
     cards && cards.length > 0
-      ? `\nAnalyses réalisées pendant l'entretien :\n${cards.map((c, i) => `[${i + 1}] ${c.confidence.toUpperCase()} — "${c.signal.label}"\n     → ${c.meaning}`).join("\n")}\n`
+      ? `\nAnalyses réalisées pendant l'entretien :\n${cards.map((c, i) => `[${i + 1}] ${c.confidence.toUpperCase()} [${c.cat}] — "${c.title}"\n     → ${c.body}`).join("\n")}\n`
       : "\nAucune analyse disponible.\n";
 
   return `Tu es un assistant de recrutement. Un recruteur RH vient de terminer un entretien technique avec un candidat développeur.${contextSection}${cardsSection}
@@ -21,7 +21,7 @@ Génère un bilan final du candidat en JSON strict (sans backticks, sans texte a
 }
 
 Règles :
-- Baseque sur les signaux observés, pas sur des suppositions
+- Basé uniquement sur les signaux observés, pas sur des suppositions
 - hire = expérience terrain clairement démontrée, cohérent avec le niveau attendu
 - maybe = profil intéressant mais incomplet ou niveau incertain
 - pass = trop vague, trop théorique, ou clairement sous le niveau attendu
