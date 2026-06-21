@@ -8,7 +8,7 @@ interface GroqSTTCallbacks {
 }
 
 const RMS_THRESHOLD = 0.005;
-const SILENCE_THRESHOLD_MS = 1000;
+const SILENCE_THRESHOLD_MS = 1800;
 const MIN_BUFFER_BYTES = AUDIO_SAMPLE_RATE * 2 * 0.5; // 0.5s = 16 000 bytes
 const TICK_INTERVAL_MS = 200;
 
@@ -44,6 +44,7 @@ function calcRms(buf: Buffer): number {
 export class GroqSTT {
   private callbacks: GroqSTTCallbacks;
   private language: string;
+  private sttPrompt: string;
   private chunks: Buffer[] = [];
   private totalBytes = 0;
   private lastSoundAt = 0;
@@ -51,9 +52,10 @@ export class GroqSTT {
   private timer: ReturnType<typeof setInterval> | null = null;
   private closed = false;
 
-  constructor(language: string, callbacks: GroqSTTCallbacks) {
+  constructor(language: string, callbacks: GroqSTTCallbacks, sttPrompt?: string) {
     this.language = language;
     this.callbacks = callbacks;
+    this.sttPrompt = sttPrompt ?? "";
   }
 
   start(): void {
@@ -108,6 +110,9 @@ export class GroqSTT {
       form.append("model", "whisper-large-v3-turbo");
       form.append("language", this.language);
       form.append("response_format", "text");
+      if (this.sttPrompt) {
+        form.append("prompt", this.sttPrompt);
+      }
 
       const res = await fetch("https://api.groq.com/openai/v1/audio/transcriptions", {
         method: "POST",

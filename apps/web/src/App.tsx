@@ -1,6 +1,6 @@
 import { useWebSocket } from "./hooks/useWebSocket";
 import { useAudioCapture } from "./hooks/useAudioCapture";
-import { LiveView } from "./components/LiveView";
+import { OverlayPanel } from "./components/OverlayPanel";
 import type { JobContext } from "@voxhelp/shared";
 
 const WS_URL = `ws://${window.location.hostname}:3001/ws`;
@@ -24,7 +24,7 @@ export default function App() {
   };
 
   return (
-    <LiveView
+    <OverlayPanel
       insights={ws.insights}
       isAnalyzing={ws.isAnalyzing}
       isSummarizing={ws.isSummarizing}
@@ -32,9 +32,13 @@ export default function App() {
       wsStatus={ws.status}
       isCapturing={audio.isCapturing}
       isSpeaking={audio.isSpeaking}
+      lastTranscript={ws.lastTranscript}
       onStartAudio={handleStartAudio}
       onStop={handleStop}
       onSummarize={ws.summarize}
+      onAskQuestion={ws.askQuestion}
+      lastError={ws.lastError}
+      onClearError={ws.clearError}
     />
   );
 }

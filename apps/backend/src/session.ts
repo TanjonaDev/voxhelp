@@ -5,7 +5,7 @@ import type {
 } from "@voxhelp/shared";
 import { createId } from "@voxhelp/shared";
 import { GroqSTT } from "./groq-stt.js";
-import { callClaudeJSON } from "./llm.js";
+import { callClaudeJSON, correctTranscript } from "./llm.js";
 import { buildLiveAssistPrompt } from "./prompts/live-assist.js";
 import { buildFinalAnalysisPrompt } from "./prompts/final-analysis.js";
 
@@ -21,13 +21,13 @@ export class Session {
   private relanceLog: string[] = [];
   private cardLog: Insight[] = [];
   private sessionStartMs = 0;
-  private readonly MAX_LOG_ENTRIES = 5;
-  private readonly MAX_CARD_LOG = 20;
+  private readonly MAX_LOG_ENTRIES = 15;
+  private readonly MAX_CARD_LOG = 30;
   private debounceTimer: ReturnType<typeof setTimeout> | null = null;
   private isProcessing = false;
   private pendingTranscript: string | null = null;
   private immediateAnalysis = false;
-  private readonly DEBOUNCE_MS = 300;
+  private readonly DEBOUNCE_MS = 1500;
 
   constructor(ws: WebSocket) {
     this.ws = ws;
@@ -73,6 +73,9 @@ export class Session {
       case "session:summarize":
         void this.generateFinalReport();
         break;
+      case "ask:question":
+        void this.handleAskQuestion(message.text);
+        break;
     }
   }
 
@@ -86,18 +89,35 @@ export class Session {
     this.sessionStartMs = Date.now();
 
     this.stt?.close();
+    const sttPrompt = this.buildSttPrompt(config.jobContext);
     this.stt = new GroqSTT(config.language, {
       onBuffering: () => this.send({ type: "transcript:buffering" }),
       onIdle: () => this.send({ type: "transcript:idle" }),
       onFinal: (text) => void this.handleFinalTranscript(text),
       onError: (err) => this.send({ type: "session:error", error: err }),
-    });
+    }, sttPrompt);
 
     this.stt.start();
 
     const sessionId = `session_${Date.now()}`;
     this.send({ type: "session:ready", sessionId });
     console.log(`[Session] Started: language=${config.language}, jobContext=${config.jobContext ? config.jobContext.title : "none"}`);
+  }
+
+  private buildSttPrompt(jobContext?: JobContext): string {
+    const parts = [
+      "Entretien technique de recrutement en français.",
+      "Termes courants : JavaScript, TypeScript, React, Node.js, API, REST, GraphQL, Docker, Kubernetes, CI/CD, Git, GitHub, AWS, Azure, GCP, SQL, NoSQL, MongoDB, PostgreSQL, Redis, microservices, serverless, frontend, backend, fullstack, framework, middleware, DevOps, agile, Scrum, sprint, pull request, code review, refactoring, design pattern, architecture, scalabilité, déploiement, production, staging, endpoint, webhook, SDK, CLI, IDE.",
+    ];
+
+    if (jobContext?.stack) {
+      parts.push(`Stack du poste : ${jobContext.stack}.`);
+    }
+    if (jobContext?.title) {
+      parts.push(`Poste : ${jobContext.title}.`);
+    }
+
+    return parts.join(" ");
   }
 
   private handleAudioChunk(base64Data: string): void {
@@ -127,11 +147,16 @@ export class Session {
     void this.stt?.flush();
   }
 
-  private handleFinalTranscript(rawText: string): void {
+  private async handleFinalTranscript(rawText: string): Promise<void> {
     if (!rawText.trim()) return;
 
-    this.send({ type: "transcript:final", text: rawText });
-    this.transcriptBuffer.push(rawText);
+    const sttContext = this.jobContext
+      ? `${this.jobContext.title || ""} ${this.jobContext.stack || ""}`.trim()
+      : undefined;
+    const text = await correctTranscript(rawText, sttContext);
+
+    this.send({ type: "transcript:final", text });
+    this.transcriptBuffer.push(text);
 
     if (this.immediateAnalysis) {
       this.immediateAnalysis = false;
@@ -177,7 +202,7 @@ export class Session {
 
     try {
       const payload = await callClaudeJSON<InsightPayload>(
-        buildLiveAssistPrompt(this.jobContext, this.conversationLog.slice(0, -1), this.relanceLog, this.cardLog),
+        buildLiveAssistPrompt(this.jobContext, this.conversationLog, this.relanceLog, this.cardLog),
         `Ce qui vient d'être dit :\n"${transcript}"`
       );
 
@@ -208,6 +233,71 @@ export class Session {
       const pending = this.pendingTranscript;
       this.pendingTranscript = null;
       this.processTranscript(pending);
+    }
+  }
+
+  private buildAskPrompt(): string {
+    const parts: string[] = [
+      `Tu es VoxHelp, un copilote d'entretien technique pour recruteurs.
+Le recruteur te pose une question. Réponds de manière concise et utile.
+Retourne UNIQUEMENT un objet JSON (pas de markdown, pas de backticks) avec les champs :
+{ "cat", "confidence", "title", "body", "relance?" }
+- cat: "translation" | "jargon" | "strength" | "risk" | "level" — choisis la plus pertinente
+- confidence: "confirmed" | "partial" | "low"
+- title: titre court (max 10 mots)
+- body: explication (2-4 phrases)
+- relance: suggestion de question de suivi (optionnel)`,
+    ];
+
+    if (this.jobContext) {
+      parts.push(
+        `Poste : ${this.jobContext.title || "non précisé"}, Niveau : ${this.jobContext.level || "non précisé"}, Stack : ${this.jobContext.stack || "non précisée"}`
+      );
+    }
+
+    if (this.conversationLog.length > 0) {
+      parts.push(`Transcription récente :\n${this.conversationLog.map((t) => `"${t}"`).join("\n")}`);
+    }
+
+    if (this.cardLog.length > 0) {
+      parts.push(
+        `Analyses précédentes :\n${this.cardLog
+          .slice(-5)
+          .map((c) => `[${c.cat}] ${c.title}: ${c.body}`)
+          .join("\n")}`
+      );
+    }
+
+    return parts.join("\n\n");
+  }
+
+  private async handleAskQuestion(question: string): Promise<void> {
+    this.send({ type: "transcript:buffering" });
+    try {
+      const payload = await callClaudeJSON<InsightPayload>(
+        this.buildAskPrompt(),
+        question
+      );
+
+      const card: Insight = {
+        ...payload,
+        id: createId(),
+        t: this.sessionStartMs ? this.elapsedTime() : "00:00",
+      };
+
+      if (card.relance) {
+        this.relanceLog.push(card.relance);
+        if (this.relanceLog.length > this.MAX_LOG_ENTRIES) this.relanceLog.shift();
+      }
+      this.cardLog.push(card);
+      if (this.cardLog.length > this.MAX_CARD_LOG) this.cardLog.shift();
+
+      this.send({ type: "assist:card", card });
+    } catch (err) {
+      this.send({
+        type: "assist:error",
+        error: err instanceof Error ? err.message : "Ask error",
+      });
     }
   }
 

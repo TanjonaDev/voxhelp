@@ -10,11 +10,15 @@ interface UseWebSocketReturn {
   isSummarizing: boolean;
   insights: Insight[];
   finalReport: CandidateReport | null;
+  lastTranscript: string;
+  lastError: string | null;
   startSession: (config: SessionConfig) => void;
   stopSession: () => void;
   sendAudio: (base64: string) => void;
   triggerAnalysis: () => void;
   summarize: () => void;
+  askQuestion: (text: string) => void;
+  clearError: () => void;
 }
 
 export function useWebSocket(url: string): UseWebSocketReturn {
@@ -26,6 +30,8 @@ export function useWebSocket(url: string): UseWebSocketReturn {
   const [isSummarizing, setIsSummarizing] = useState(false);
   const [insights, setInsights] = useState<Insight[]>([]);
   const [finalReport, setFinalReport] = useState<CandidateReport | null>(null);
+  const [lastTranscript, setLastTranscript] = useState("");
+  const [lastError, setLastError] = useState<string | null>(null);
 
   const send = useCallback((msg: ClientMessage) => {
     if (wsRef.current?.readyState === WebSocket.OPEN) {
@@ -40,6 +46,7 @@ export function useWebSocket(url: string): UseWebSocketReturn {
       case "session:error":
         setIsAnalyzing(false);
         setIsSummarizing(false);
+        setLastError(msg.error);
         console.error("[WS] Session error:", msg.error);
         break;
       case "transcript:partial":
@@ -52,6 +59,7 @@ export function useWebSocket(url: string): UseWebSocketReturn {
         setIsAnalyzing(false);
         break;
       case "transcript:final":
+        setLastTranscript(msg.text);
         break;
       case "assist:card":
         setIsAnalyzing(false);
@@ -59,6 +67,7 @@ export function useWebSocket(url: string): UseWebSocketReturn {
         break;
       case "assist:error":
         setIsAnalyzing(false);
+        setLastError(msg.error);
         console.error("[WS] Assist error:", msg.error);
         break;
       case "analysis:final":
@@ -112,6 +121,7 @@ export function useWebSocket(url: string): UseWebSocketReturn {
       setIsSummarizing(false);
       setInsights([]);
       setFinalReport(null);
+      setLastTranscript("");
 
       if (wsRef.current?.readyState === WebSocket.OPEN) {
         send({ type: "session:start", config });
@@ -149,6 +159,17 @@ export function useWebSocket(url: string): UseWebSocketReturn {
     send({ type: "session:summarize" });
   }, [send]);
 
+  const clearError = useCallback(() => {
+    setLastError(null);
+  }, []);
+
+  const askQuestion = useCallback(
+    (text: string) => {
+      send({ type: "ask:question", text });
+    },
+    [send]
+  );
+
   useEffect(() => {
     connect();
     return () => {
@@ -163,10 +184,14 @@ export function useWebSocket(url: string): UseWebSocketReturn {
     isSummarizing,
     insights,
     finalReport,
+    lastTranscript,
+    lastError,
     startSession,
     stopSession,
     sendAudio,
     triggerAnalysis,
     summarize,
+    askQuestion,
+    clearError,
   };
 }

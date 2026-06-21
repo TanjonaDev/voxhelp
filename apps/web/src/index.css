@@ -2,43 +2,128 @@
 @tailwind components;
 @tailwind utilities;
 
+:root {
+  /* Glass surfaces */
+  --panel: hsl(222 28% 9% / 0.52);
+  --card: hsl(0 0% 100% / 0.045);
+  --card-hi: hsl(0 0% 100% / 0.075);
+  --card-lift: hsl(0 0% 100% / 0.10);
+  --stroke: hsl(0 0% 100% / 0.10);
+  --stroke-2: hsl(0 0% 100% / 0.16);
+
+  /* Text */
+  --text: hsl(0 0% 100% / 0.95);
+  --text-2: hsl(0 0% 100% / 0.62);
+  --text-3: hsl(0 0% 100% / 0.40);
+
+  /* Accent colors (oklch) */
+  --indigo: oklch(0.70 0.14 268);
+  --violet: oklch(0.70 0.16 300);
+  --cyan:   oklch(0.75 0.12 212);
+  --good:   oklch(0.76 0.15 158);
+  --warn:   oklch(0.81 0.13 80);
+  --risk:   oklch(0.72 0.16 25);
+  --accent: var(--indigo);
+
+  /* Soft variants (16% alpha) */
+  --indigo-soft: oklch(0.70 0.14 268 / 0.16);
+  --violet-soft: oklch(0.70 0.16 300 / 0.16);
+  --cyan-soft:   oklch(0.75 0.12 212 / 0.16);
+  --good-soft:   oklch(0.76 0.15 158 / 0.16);
+  --warn-soft:   oklch(0.81 0.13 80  / 0.16);
+  --risk-soft:   oklch(0.72 0.16 25  / 0.16);
+  --accent-soft: var(--indigo-soft);
+
+  /* Shadows */
+  --shadow-panel:
+    0 0 0 1px hsl(0 0% 100% / .10) inset,
+    0 1px 0 hsl(0 0% 100% / .08) inset,
+    0 24px 70px -12px hsl(230 40% 4% / .7),
+    0 8px 28px -8px hsl(230 40% 4% / .55);
+  --shadow-card:
+    0 1px 0 hsl(0 0% 100% / .06) inset,
+    0 8px 24px -10px hsl(230 40% 4% / .5);
+
+  /* Geometry */
+  --radius-panel: 26px;
+  --radius-card: 18px;
+
+  /* Typography */
+  --font: 'Onest', system-ui, sans-serif;
+  --mono: 'JetBrains Mono', monospace;
+}
+
 @layer base {
   body {
-    @apply font-sans text-[#1A1D26] bg-[#F6F7FB] antialiased;
+    font-family: var(--font);
+    background: #0d0f18;
+    color: var(--text);
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
   }
 
   * {
     scrollbar-width: thin;
-    scrollbar-color: #DFE1EA transparent;
+    scrollbar-color: hsl(0 0% 100% / 0.12) transparent;
   }
 }
 
-@keyframes pulse-ring {
-  0% { transform: scale(0.8); opacity: 1; }
-  100% { transform: scale(2); opacity: 0; }
+/* -- VoxHelp keyframes -- */
+
+@keyframes vh-thought-in {
+  from {
+    opacity: 0;
+    transform: translateY(8px) scale(0.98);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
 }
 
-.animate-pulse-ring {
-  animation: pulse-ring 1.5s cubic-bezier(0.215, 0.61, 0.355, 1) infinite;
+@keyframes vh-glow-fade {
+  0%   { opacity: 0.5; }
+  100% { opacity: 0; }
 }
 
-@keyframes blink {
-  0%, 100% { opacity: 1; }
-  50% { opacity: 0; }
+@keyframes vh-bar {
+  0%, 100% { transform: scaleY(0.35); }
+  50%       { transform: scaleY(1); }
 }
 
-.cursor-blink::after {
-  content: "▊";
-  animation: blink 0.8s step-end infinite;
-  color: #3D5AFE;
-  margin-left: 2px;
+@keyframes vh-spin {
+  from { transform: rotate(0deg); }
+  to   { transform: rotate(360deg); }
 }
 
-@keyframes fade-in {
-  from { opacity: 0; transform: translateY(4px); }
-  to { opacity: 1; transform: translateY(0); }
+@keyframes vh-pulse {
+  0%, 100% { opacity: 1; transform: scale(1); }
+  50%       { opacity: 0.45; transform: scale(0.82); }
 }
 
-.animate-fade-in {
-  animation: fade-in 0.25s ease-out;
+@keyframes vh-float {
+  0%, 100% { transform: translateX(-50%) translateY(0px); }
+  50%       { transform: translateX(-50%) translateY(-3px); }
+}
+
+@keyframes vh-shimmer {
+  to { background-position: 200% 0; }
+}
+
+@keyframes vh-caption-in {
+  from {
+    opacity: 0;
+    transform: translateY(3px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    animation: none !important;
+    transition: none !important;
+  }
 }

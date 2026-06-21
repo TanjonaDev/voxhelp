@@ -37,6 +37,7 @@ export type ClientMessage =
   | { type: "audio:chunk"; data: string }
   | { type: "trigger:analyze" }
   | { type: "session:summarize" }
+  | { type: "ask:question"; text: string }
   | { type: "ping" };
 
 export type ServerMessage =
