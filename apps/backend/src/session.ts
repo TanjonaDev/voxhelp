@@ -4,7 +4,7 @@ import type {
   Insight, CandidateReport, JobContext,
 } from "@voxhelp/shared";
 import { createId } from "@voxhelp/shared";
-import { GroqSTT } from "./groq-stt.js";
+import { FluxSTT } from "./deepgram-flux.js";
 import { callClaudeJSON, correctTranscript } from "./llm.js";
 import { buildLiveAssistPrompt } from "./prompts/live-assist.js";
 import { buildFinalAnalysisPrompt } from "./prompts/final-analysis.js";
@@ -13,7 +13,7 @@ type InsightPayload = Omit<Insight, "id" | "t">;
 
 export class Session {
   private ws: WebSocket;
-  private stt: GroqSTT | null = null;
+  private stt: FluxSTT | null = null;
   private config: SessionConfig | null = null;
   private jobContext: JobContext | undefined = undefined;
   private transcriptBuffer: string[] = [];
@@ -26,7 +26,6 @@ export class Session {
   private debounceTimer: ReturnType<typeof setTimeout> | null = null;
   private isProcessing = false;
   private pendingTranscript: string | null = null;
-  private immediateAnalysis = false;
   private readonly DEBOUNCE_MS = 1500;
 
   constructor(ws: WebSocket) {
@@ -89,35 +88,17 @@ export class Session {
     this.sessionStartMs = Date.now();
 
     this.stt?.close();
-    const sttPrompt = this.buildSttPrompt(config.jobContext);
-    this.stt = new GroqSTT(config.language, {
-      onBuffering: () => this.send({ type: "transcript:buffering" }),
-      onIdle: () => this.send({ type: "transcript:idle" }),
-      onFinal: (text) => void this.handleFinalTranscript(text),
+    this.stt = new FluxSTT(config.language, {
+      onTranscript: (text) => void this.handleFinalTranscript(text),
+      onListening: () => console.log("[Session] Deepgram Flux connected"),
       onError: (err) => this.send({ type: "session:error", error: err }),
-    }, sttPrompt);
+    });
 
-    this.stt.start();
+    void this.stt.start();
 
     const sessionId = `session_${Date.now()}`;
     this.send({ type: "session:ready", sessionId });
     console.log(`[Session] Started: language=${config.language}, jobContext=${config.jobContext ? config.jobContext.title : "none"}`);
-  }
-
-  private buildSttPrompt(jobContext?: JobContext): string {
-    const parts = [
-      "Entretien technique de recrutement en français.",
-      "Termes courants : JavaScript, TypeScript, React, Node.js, API, REST, GraphQL, Docker, Kubernetes, CI/CD, Git, GitHub, AWS, Azure, GCP, SQL, NoSQL, MongoDB, PostgreSQL, Redis, microservices, serverless, frontend, backend, fullstack, framework, middleware, DevOps, agile, Scrum, sprint, pull request, code review, refactoring, design pattern, architecture, scalabilité, déploiement, production, staging, endpoint, webhook, SDK, CLI, IDE.",
-    ];
-
-    if (jobContext?.stack) {
-      parts.push(`Stack du poste : ${jobContext.stack}.`);
-    }
-    if (jobContext?.title) {
-      parts.push(`Poste : ${jobContext.title}.`);
-    }
-
-    return parts.join(" ");
   }
 
   private handleAudioChunk(base64Data: string): void {
@@ -127,7 +108,6 @@ export class Session {
   }
 
   private triggerAnalysis(): void {
-    if (this.immediateAnalysis) return;
     if (this.debounceTimer) {
       clearTimeout(this.debounceTimer);
       this.debounceTimer = null;
@@ -140,11 +120,7 @@ export class Session {
       } else {
         this.processTranscript(existing);
       }
-      void this.stt?.flush();
-      return;
     }
-    this.immediateAnalysis = true;
-    void this.stt?.flush();
   }
 
   private async handleFinalTranscript(rawText: string): Promise<void> {
@@ -157,18 +133,6 @@ export class Session {
 
     this.send({ type: "transcript:final", text });
     this.transcriptBuffer.push(text);
-
-    if (this.immediateAnalysis) {
-      this.immediateAnalysis = false;
-      if (this.debounceTimer) { clearTimeout(this.debounceTimer); this.debounceTimer = null; }
-      const fullText = this.transcriptBuffer.join(" ");
-      this.transcriptBuffer = [];
-      if (fullText.trim()) {
-        if (this.isProcessing) { this.pendingTranscript = fullText; }
-        else { this.processTranscript(fullText); }
-      }
-      return;
-    }
 
     if (this.debounceTimer) clearTimeout(this.debounceTimer);
 
@@ -196,6 +160,7 @@ export class Session {
 
   private async processTranscript(transcript: string): Promise<void> {
     this.isProcessing = true;
+    this.send({ type: "transcript:buffering" });
 
     this.conversationLog.push(transcript);
     if (this.conversationLog.length > this.MAX_LOG_ENTRIES) this.conversationLog.shift();
@@ -228,6 +193,7 @@ export class Session {
     }
 
     this.isProcessing = false;
+    this.send({ type: "transcript:idle" });
 
     if (this.pendingTranscript) {
       const pending = this.pendingTranscript;

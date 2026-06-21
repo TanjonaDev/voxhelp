@@ -42,8 +42,8 @@ pnpm --filter @voxhelp/shared add <package>
 - **Langage** : TypeScript strict, ESM (`"type": "module"`)
 - **Frontend** : React 19, Vite 6, Tailwind CSS 3.4
 - **Backend** : Fastify 5, @fastify/websocket
-- **STT** : Deepgram Nova-3 streaming (PCM 16kHz mono)
-- **LLM** : Claude Sonnet 4 via @anthropic-ai/sdk (streaming + JSON)
+- **STT** : Deepgram Flux Multilingual streaming v2 (PCM 16kHz mono) + correction Haiku
+- **LLM** : Claude Sonnet 4.6 via @anthropic-ai/sdk (JSON)
 
 ## Conventions
 
@@ -70,8 +70,8 @@ Flux demo complet :
 
 **Live** :
 1. Frontend capture l'audio de l'onglet → PCM 16kHz mono base64 (ScriptProcessorNode + RMS VAD)
-2. `audio:chunk` via WebSocket → Deepgram streaming STT
-3. `transcript:final` → Claude streaming assist + Claude JSON tech-translate en parallèle
+2. `audio:chunk` via WebSocket → Deepgram Flux v2 streaming STT (end-of-turn detection intégré)
+3. `transcript:final` → correction Haiku → Claude JSON live-assist
 4. Résultats poussés au frontend : `assist:chunk`, `tech:translation`
 5. Recruiter coche questions (`question:mark-asked`) et note critères (`criterion:score`)
 
