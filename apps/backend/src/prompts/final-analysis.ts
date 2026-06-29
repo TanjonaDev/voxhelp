@@ -7,7 +7,7 @@ export function buildFinalAnalysisPrompt(jobContext?: JobContext, cards?: Insigh
 
   const cardsSection =
     cards && cards.length > 0
-      ? `\nAnalyses réalisées pendant l'entretien :\n${cards.map((c, i) => `[${i + 1}] ${c.confidence.toUpperCase()} [${c.cat}] — "${c.title}"\n     → ${c.body}`).join("\n")}\n`
+      ? `\nAnalyses réalisées pendant l'entretien :\n${cards.map((c, i) => `[${i + 1}] ${c.evidence.toUpperCase()} [${c.cat}] — "${c.title}"\n     → ${c.body}`).join("\n")}\n`
       : "\nAucune analyse disponible.\n";
 
   return `Tu es un assistant de recrutement. Un recruteur RH vient de terminer un entretien technique avec un candidat développeur.${contextSection}${cardsSection}

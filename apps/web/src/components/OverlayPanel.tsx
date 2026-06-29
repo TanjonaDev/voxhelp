@@ -1,6 +1,7 @@
 import { useState, useEffect, useRef } from "react";
 import type { Insight, CandidateReport, JobContext } from "@voxhelp/shared";
 import { VIcon, VHMark, LiveWave, Confidence, CategoryTag, GhostBtn } from "./ui.js";
+import type { PartialCard } from "../lib/parseAssistStream.js";
 
 type WsStatus = "disconnected" | "connecting" | "connected" | "error";
 type CopilotStatus = "listening" | "speaking" | "analyzing";
@@ -303,6 +304,114 @@ function LiveCaption({ caption, speaking }: { caption: string; speaking: boolean
 }
 
 // ---------------------------------------------------------------------------
+// StreamingCardView — carte en cours de génération
+// ---------------------------------------------------------------------------
+function StreamingCardView({ card }: { card: PartialCard }) {
+  const catColorMap: Record<string, string> = {
+    translation: "var(--indigo)",
+    jargon: "var(--violet)",
+    strength: "var(--good)",
+    attention: "var(--risk)",
+  };
+  const colorVar = card.cat ? catColorMap[card.cat] ?? "var(--text-3)" : "var(--text-3)";
+
+  return (
+    <div
+      style={{
+        position: "relative",
+        borderRadius: "var(--radius-card)",
+        padding: "13px 14px",
+        background: "var(--card)",
+        boxShadow: "0 0 0 1px var(--stroke) inset, var(--shadow-card)",
+        overflow: "hidden",
+        animation: "vh-thought-in 0.55s cubic-bezier(.2,.8,.2,1) both",
+      }}
+    >
+      {/* accent rail */}
+      <span
+        style={{
+          position: "absolute",
+          left: 0,
+          top: 12,
+          bottom: 12,
+          width: 3,
+          borderRadius: 99,
+          background: colorVar,
+          opacity: 0.85,
+          transition: "background 0.3s",
+        }}
+      />
+
+      {/* top row */}
+      <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 9 }}>
+        {card.cat ? (
+          <CategoryTag cat={card.cat} />
+        ) : (
+          <div style={{ height: 22, width: 120, borderRadius: 6, background: "var(--stroke-2)" }} />
+        )}
+        <span style={{ flex: 1 }} />
+        <span style={{ fontFamily: "var(--mono)", fontSize: 10.5, color: "var(--text-3)" }}>{card.t}</span>
+      </div>
+
+      {/* title */}
+      {card.title ? (
+        <h3
+          style={{
+            margin: "0 0 7px",
+            fontSize: 14.5,
+            fontWeight: 600,
+            lineHeight: 1.32,
+            letterSpacing: "-0.005em",
+            color: "var(--text)",
+          }}
+        >
+          {card.title}
+        </h3>
+      ) : (
+        <div style={{ height: 16, width: "70%", borderRadius: 5, background: "var(--stroke-2)", marginBottom: 7 }} />
+      )}
+
+      {/* body */}
+      <div>
+        <div
+          style={{
+            fontSize: 9.5,
+            fontWeight: 700,
+            letterSpacing: "0.09em",
+            textTransform: "uppercase",
+            color: "var(--text-3)",
+            marginBottom: 4,
+          }}
+        >
+          Ce que ça veut dire
+        </div>
+        {card.body ? (
+          <p style={{ margin: 0, fontSize: 13, lineHeight: 1.5, color: "var(--text-2)" }}>
+            {card.body}
+            <span
+              style={{
+                display: "inline-block",
+                width: 2,
+                height: 13,
+                background: "var(--accent)",
+                marginLeft: 2,
+                verticalAlign: "middle",
+                animation: "vh-pulse 1s infinite",
+              }}
+            />
+          </p>
+        ) : (
+          <div style={{ display: "flex", flexDirection: "column", gap: 5 }}>
+            <div style={{ height: 10, borderRadius: 5, background: "var(--stroke)", width: "100%" }} />
+            <div style={{ height: 10, borderRadius: 5, background: "var(--stroke)", width: "80%" }} />
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
+
+// ---------------------------------------------------------------------------
 // InsightCardView
 // ---------------------------------------------------------------------------
 function InsightCardView({ insight, isNew }: { insight: Insight; isNew: boolean }) {
@@ -313,8 +422,7 @@ function InsightCardView({ insight, isNew }: { insight: Insight; isNew: boolean 
     translation: "var(--indigo)",
     jargon: "var(--violet)",
     strength: "var(--good)",
-    risk: "var(--risk)",
-    level: "var(--cyan)",
+    attention: "var(--risk)",
   };
   const colorVar = catColorMap[insight.cat];
 
@@ -379,7 +487,7 @@ function InsightCardView({ insight, isNew }: { insight: Insight; isNew: boolean 
         <span style={{ fontFamily: "var(--mono)", fontSize: 10.5, color: "var(--text-3)" }}>
           {insight.t}
         </span>
-        <Confidence level={insight.confidence} showLabel={false} />
+        <Confidence level={insight.evidence} showLabel={false} />
       </div>
 
       {/* title */}
@@ -395,35 +503,6 @@ function InsightCardView({ insight, isNew }: { insight: Insight; isNew: boolean 
       >
         {insight.title}
       </h3>
-
-      {/* level meter */}
-      {typeof insight.level === "number" && (
-        <div style={{ display: "flex", alignItems: "center", gap: 9, margin: "0 0 9px" }}>
-          <div
-            style={{
-              flex: 1,
-              height: 5,
-              borderRadius: 99,
-              background: "hsl(0 0% 100% / 0.10)",
-              overflow: "hidden",
-            }}
-          >
-            <div
-              style={{
-                width: `${insight.level * 100}%`,
-                height: "100%",
-                borderRadius: 99,
-                background: "linear-gradient(90deg, var(--cyan), var(--indigo))",
-              }}
-            />
-          </div>
-          {insight.levelLabel && (
-            <span style={{ fontSize: 11, fontWeight: 700, color: "var(--cyan)" }}>
-              {insight.levelLabel}
-            </span>
-          )}
-        </div>
-      )}
 
       {/* body */}
       <div style={{ marginBottom: insight.relance ? 11 : 2 }}>
@@ -630,6 +709,7 @@ function FinalReportView({ report }: { report: CandidateReport }) {
 // ---------------------------------------------------------------------------
 export interface OverlayPanelProps {
   insights: Insight[];
+  streamingCard: PartialCard | null;
   isAnalyzing: boolean;
   isSummarizing: boolean;
   finalReport: CandidateReport | null;
@@ -647,6 +727,7 @@ export interface OverlayPanelProps {
 
 export function OverlayPanel({
   insights,
+  streamingCard,
   isAnalyzing,
   isSummarizing,
   finalReport,
@@ -983,37 +1064,9 @@ export function OverlayPanel({
                 <InsightCardView key={card.id} insight={card} isNew={card.id === newId} />
               ))}
 
-              {finalReport && <FinalReportView report={finalReport} />}
+              {streamingCard && <StreamingCardView card={streamingCard} />}
 
-              {/* analyzing skeleton */}
-              {isAnalyzing && (
-                <div
-                  style={{
-                    borderRadius: "var(--radius-card)",
-                    padding: "13px 14px",
-                    background: "var(--card)",
-                    boxShadow: "0 0 0 1px var(--stroke) inset",
-                    display: "flex",
-                    flexDirection: "column",
-                    gap: 8,
-                    animation: "pulse 1.5s ease-in-out infinite",
-                  }}
-                >
-                  <div
-                    style={{
-                      height: 12,
-                      borderRadius: 6,
-                      background: "var(--stroke-2)",
-                      width: "60%",
-                    }}
-                  />
-                  <div style={{ display: "flex", flexDirection: "column", gap: 5 }}>
-                    <div style={{ height: 10, borderRadius: 5, background: "var(--stroke)", width: "100%" }} />
-                    <div style={{ height: 10, borderRadius: 5, background: "var(--stroke)", width: "85%" }} />
-                    <div style={{ height: 10, borderRadius: 5, background: "var(--stroke)", width: "70%" }} />
-                  </div>
-                </div>
-              )}
+              {finalReport && <FinalReportView report={finalReport} />}
             </div>
           </>
         )}

@@ -13,14 +13,12 @@ export interface SessionConfig {
 
 export interface Insight {
   id: string;
-  cat: "translation" | "jargon" | "strength" | "risk" | "level";
-  confidence: "confirmed" | "partial" | "low";
+  cat: "translation" | "jargon" | "strength" | "attention";
+  evidence: "high" | "medium" | "low";
   t: string;
   title: string;
   body: string;
   relance?: string;
-  level?: number;
-  levelLabel?: string;
 }
 
 export interface CandidateReport {
@@ -47,7 +45,9 @@ export type ServerMessage =
   | { type: "transcript:buffering" }
   | { type: "transcript:idle" }
   | { type: "transcript:final"; text: string }
-  | { type: "assist:card"; card: Insight }
+  | { type: "assist:start"; id: string; t: string }
+  | { type: "assist:chunk"; id: string; text: string }
+  | { type: "assist:done"; id: string; fullText: string }
   | { type: "assist:error"; error: string }
   | { type: "analysis:final"; report: CandidateReport }
   | { type: "pong" };

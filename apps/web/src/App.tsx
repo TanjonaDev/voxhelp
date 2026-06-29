@@ -26,6 +26,7 @@ export default function App() {
   return (
     <OverlayPanel
       insights={ws.insights}
+      streamingCard={ws.streamingCard}
       isAnalyzing={ws.isAnalyzing}
       isSummarizing={ws.isSummarizing}
       finalReport={ws.finalReport}

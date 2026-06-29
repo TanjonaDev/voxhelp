@@ -5,11 +5,9 @@ import type {
 } from "@voxhelp/shared";
 import { createId } from "@voxhelp/shared";
 import { FluxSTT } from "./deepgram-flux.js";
-import { callClaudeJSON, correctTranscript } from "./llm.js";
+import { streamAssist, callClaudeJSON, correctTranscript } from "./llm.js";
 import { buildLiveAssistPrompt } from "./prompts/live-assist.js";
 import { buildFinalAnalysisPrompt } from "./prompts/final-analysis.js";
-
-type InsightPayload = Omit<Insight, "id" | "t">;
 
 export class Session {
   private ws: WebSocket;
@@ -158,6 +156,27 @@ export class Session {
     return `${mm}:${ss}`;
   }
 
+  private parseAssistText(text: string, id: string, t: string): Insight {
+    const lines = text.trim().split("\n").filter((l) => l.trim() !== "");
+
+    const headerMatch = lines[0]?.match(
+      /\[(jargon|strength|attention|translation)\]\s*\[(high|medium|low)\]/
+    );
+    const cat = (headerMatch?.[1] as Insight["cat"]) ?? "translation";
+    const evidence = (headerMatch?.[2] as Insight["evidence"]) ?? "medium";
+
+    const title = lines[1]?.replace(/^#\s*/, "").trim() ?? "";
+
+    const lastLine = lines[lines.length - 1];
+    const hasRelance = lastLine?.startsWith(">>");
+    const relance = hasRelance ? lastLine.replace(/^>>\s*/, "").trim() : undefined;
+
+    const bodyEnd = hasRelance ? lines.length - 1 : lines.length;
+    const body = lines.slice(2, bodyEnd).join(" ").trim();
+
+    return { id, cat, evidence, t, title, body, relance };
+  }
+
   private async processTranscript(transcript: string): Promise<void> {
     this.isProcessing = true;
     this.send({ type: "transcript:buffering" });
@@ -165,18 +184,20 @@ export class Session {
     this.conversationLog.push(transcript);
     if (this.conversationLog.length > this.MAX_LOG_ENTRIES) this.conversationLog.shift();
 
+    const cardId = createId();
+    const cardT = this.elapsedTime();
+    this.send({ type: "assist:start", id: cardId, t: cardT });
+
     try {
-      const payload = await callClaudeJSON<InsightPayload>(
+      const fullText = await streamAssist(
         buildLiveAssistPrompt(this.jobContext, this.conversationLog, this.relanceLog, this.cardLog),
-        `Ce qui vient d'être dit :\n"${transcript}"`
+        `Ce qui vient d'être dit :\n"${transcript}"`,
+        (chunk) => this.send({ type: "assist:chunk", id: cardId, text: chunk })
       );
 
-      const card: Insight = {
-        ...payload,
-        id: createId(),
-        t: this.elapsedTime(),
-      };
+      this.send({ type: "assist:done", id: cardId, fullText });
 
+      const card = this.parseAssistText(fullText, cardId, cardT);
       if (card.relance) {
         this.relanceLog.push(card.relance);
         if (this.relanceLog.length > this.MAX_LOG_ENTRIES) this.relanceLog.shift();
@@ -184,7 +205,6 @@ export class Session {
       this.cardLog.push(card);
       if (this.cardLog.length > this.MAX_CARD_LOG) this.cardLog.shift();
 
-      this.send({ type: "assist:card", card });
     } catch (err) {
       this.send({
         type: "assist:error",
@@ -214,16 +234,13 @@ Exemples de questions que le recruteur peut poser :
 - "Le candidat est bon ?" → donne ton avis basé sur ce que tu as observé
 - "Que demander maintenant ?" → suggère la meilleure question de suivi
 
-Retourne UNIQUEMENT un objet JSON (pas de markdown, pas de backticks) :
-{
-  "cat": "translation",
-  "confidence": "confirmed",
-  "title": "Titre de ta réponse (max 10 mots)",
-  "body": "Ta réponse complète au recruteur. 2-5 phrases, langage simple et direct. Si le recruteur demande une question d'entretien, donne la question ET explique ce qu'une bonne réponse devrait contenir.",
-  "relance": "Question de suivi optionnelle, ou null"
-}
+Format de réponse OBLIGATOIRE — commence DIRECTEMENT par le marqueur, rien avant :
+[catégorie] [evidence]
+# Titre court (max 10 mots)
+Ta réponse complète au recruteur. 2-5 phrases, langage simple et direct. Si le recruteur demande une question d'entretien, donne la question ET explique ce qu'une bonne réponse devrait contenir.
+>> Question de suivi optionnelle (ou rien)
 
-Utilise TOUJOURS cat = "translation" pour tes réponses. Le champ "cat" sert juste au style visuel de la card — ce qui compte c'est le contenu de "body".`,
+Utilise TOUJOURS catégorie = translation et evidence = high pour tes réponses.`,
     ];
 
     if (this.jobContext) {
@@ -240,7 +257,7 @@ Utilise TOUJOURS cat = "translation" pour tes réponses. Le champ "cat" sert jus
       parts.push(
         `Analyses déjà faites :\n${this.cardLog
           .slice(-5)
-          .map((c) => `${c.title}: ${c.body}`)
+          .map((c) => `[${c.cat}] ${c.title}: ${c.body}`)
           .join("\n")}`
       );
     }
@@ -250,18 +267,21 @@ Utilise TOUJOURS cat = "translation" pour tes réponses. Le champ "cat" sert jus
 
   private async handleAskQuestion(question: string): Promise<void> {
     this.send({ type: "transcript:buffering" });
+
+    const cardId = createId();
+    const cardT = this.sessionStartMs ? this.elapsedTime() : "00:00";
+    this.send({ type: "assist:start", id: cardId, t: cardT });
+
     try {
-      const payload = await callClaudeJSON<InsightPayload>(
+      const fullText = await streamAssist(
         this.buildAskPrompt(),
-        question
+        question,
+        (chunk) => this.send({ type: "assist:chunk", id: cardId, text: chunk })
       );
 
-      const card: Insight = {
-        ...payload,
-        id: createId(),
-        t: this.sessionStartMs ? this.elapsedTime() : "00:00",
-      };
+      this.send({ type: "assist:done", id: cardId, fullText });
 
+      const card = this.parseAssistText(fullText, cardId, cardT);
       if (card.relance) {
         this.relanceLog.push(card.relance);
         if (this.relanceLog.length > this.MAX_LOG_ENTRIES) this.relanceLog.shift();
@@ -269,7 +289,6 @@ Utilise TOUJOURS cat = "translation" pour tes réponses. Le champ "cat" sert jus
       this.cardLog.push(card);
       if (this.cardLog.length > this.MAX_CARD_LOG) this.cardLog.shift();
 
-      this.send({ type: "assist:card", card });
     } catch (err) {
       this.send({
         type: "assist:error",

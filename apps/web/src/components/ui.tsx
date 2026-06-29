@@ -145,21 +145,21 @@ export function LiveWave({ active = true, bars = 22, h = 16, color = "currentCol
 }
 
 // ---------------------------------------------------------------------------
-// Confidence — 3 dots indicator
+// Evidence — 3 dots indicator
 // ---------------------------------------------------------------------------
-const CONFIDENCE_META: Record<Insight["confidence"], { dots: number; color: string; label: string }> = {
-  confirmed: { dots: 3, color: "var(--good)", label: "Confirmé" },
-  partial: { dots: 2, color: "var(--warn)", label: "Partiel" },
-  low: { dots: 1, color: "var(--risk)", label: "À vérifier" },
+const EVIDENCE_META: Record<Insight["evidence"], { dots: number; color: string; label: string }> = {
+  high: { dots: 3, color: "var(--good)", label: "Concret" },
+  medium: { dots: 2, color: "var(--warn)", label: "Partiel" },
+  low: { dots: 1, color: "var(--risk)", label: "Vague" },
 };
 
-interface ConfidenceProps {
-  level: Insight["confidence"];
+interface EvidenceProps {
+  level: Insight["evidence"];
   showLabel?: boolean;
 }
 
-export function Confidence({ level, showLabel = true }: ConfidenceProps) {
-  const c = CONFIDENCE_META[level];
+export function Confidence({ level, showLabel = true }: EvidenceProps) {
+  const c = EVIDENCE_META[level];
   return (
     <span style={{ display: "inline-flex", alignItems: "center", gap: 7 }}>
       <span style={{ display: "inline-flex", gap: 3, alignItems: "center" }}>
@@ -202,8 +202,7 @@ const CATEGORY_META: Record<
   translation: { color: "indigo", icon: "translate", label: "Traduction" },
   jargon: { color: "violet", icon: "sparkle", label: "Jargon décodé" },
   strength: { color: "good", icon: "strength", label: "Point fort" },
-  risk: { color: "risk", icon: "risk", label: "À creuser" },
-  level: { color: "cyan", icon: "level", label: "Niveau technique" },
+  attention: { color: "risk", icon: "risk", label: "À creuser" },
 };
 
 interface CategoryTagProps {

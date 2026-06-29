@@ -1,6 +1,9 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import type { ClientMessage, ServerMessage, SessionConfig, Insight, CandidateReport } from "@voxhelp/shared";
 import { WS_PING_INTERVAL_MS } from "@voxhelp/shared";
+import { parseAssistCard } from "../lib/parseAssistCard.js";
+import { parsePartialAssist } from "../lib/parseAssistStream.js";
+import type { PartialCard } from "../lib/parseAssistStream.js";
 
 type ConnectionStatus = "disconnected" | "connecting" | "connected" | "error";
 
@@ -9,6 +12,7 @@ interface UseWebSocketReturn {
   isAnalyzing: boolean;
   isSummarizing: boolean;
   insights: Insight[];
+  streamingCard: PartialCard | null;
   finalReport: CandidateReport | null;
   lastTranscript: string;
   lastError: string | null;
@@ -24,11 +28,14 @@ interface UseWebSocketReturn {
 export function useWebSocket(url: string): UseWebSocketReturn {
   const wsRef = useRef<WebSocket | null>(null);
   const pingRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  const streamingTextRef = useRef<string>("");
+  const streamingTRef = useRef<string>("");
 
   const [status, setStatus] = useState<ConnectionStatus>("disconnected");
   const [isAnalyzing, setIsAnalyzing] = useState(false);
   const [isSummarizing, setIsSummarizing] = useState(false);
   const [insights, setInsights] = useState<Insight[]>([]);
+  const [streamingCard, setStreamingCard] = useState<PartialCard | null>(null);
   const [finalReport, setFinalReport] = useState<CandidateReport | null>(null);
   const [lastTranscript, setLastTranscript] = useState("");
   const [lastError, setLastError] = useState<string | null>(null);
@@ -61,12 +68,34 @@ export function useWebSocket(url: string): UseWebSocketReturn {
       case "transcript:final":
         setLastTranscript(msg.text);
         break;
-      case "assist:card":
-        setIsAnalyzing(false);
-        setInsights((prev) => [...prev, msg.card]);
+      case "assist:start":
+        streamingTextRef.current = "";
+        streamingTRef.current = msg.t;
+        setStreamingCard({ id: msg.id, t: msg.t, cat: null, evidence: null, title: null, body: "", relance: null });
+        setIsAnalyzing(true);
         break;
+      case "assist:chunk":
+        streamingTextRef.current += msg.text;
+        setStreamingCard(parsePartialAssist(streamingTextRef.current, msg.id, streamingTRef.current));
+        break;
+      case "assist:done": {
+        const parsed = parseAssistCard(msg.fullText);
+        setStreamingCard(null);
+        setIsAnalyzing(false);
+        setInsights((prev) => [
+          ...prev,
+          {
+            id: msg.id,
+            t: streamingTRef.current,
+            ...parsed,
+            relance: parsed.relance ?? undefined,
+          },
+        ]);
+        break;
+      }
       case "assist:error":
         setIsAnalyzing(false);
+        setStreamingCard(null);
         setLastError(msg.error);
         console.error("[WS] Assist error:", msg.error);
         break;
@@ -120,6 +149,7 @@ export function useWebSocket(url: string): UseWebSocketReturn {
       setIsAnalyzing(false);
       setIsSummarizing(false);
       setInsights([]);
+      setStreamingCard(null);
       setFinalReport(null);
       setLastTranscript("");
 
@@ -183,6 +213,7 @@ export function useWebSocket(url: string): UseWebSocketReturn {
     isAnalyzing,
     isSummarizing,
     insights,
+    streamingCard,
     finalReport,
     lastTranscript,
     lastError,

@@ -40,6 +40,33 @@ Exemples de corrections :
   }
 }
 
+export async function streamAssist(
+  systemPrompt: string,
+  userMessage: string,
+  onChunk: (text: string) => void,
+  model = "claude-haiku-4-5"
+): Promise<string> {
+  const stream = anthropic.messages.stream({
+    model,
+    max_tokens: 1024,
+    system: systemPrompt,
+    messages: [{ role: "user", content: userMessage }],
+  });
+
+  let fullText = "";
+  for await (const event of stream) {
+    if (
+      event.type === "content_block_delta" &&
+      event.delta.type === "text_delta"
+    ) {
+      const chunk = event.delta.text;
+      fullText += chunk;
+      onChunk(chunk);
+    }
+  }
+  return fullText;
+}
+
 export async function callClaudeJSON<T>(
   systemPrompt: string,
   userMessage: string,

@@ -4,30 +4,32 @@ import type { CandidateReport, ServerMessage } from "@voxhelp/shared";
 import { createTestServer, type TestServer } from "./helpers/server.js";
 
 interface STTCallbacks {
-  onBuffering: () => void;
-  onIdle: () => void;
-  onFinal: (text: string) => void;
+  onTranscript: (text: string) => void;
+  onListening: () => void;
   onError: (error: string) => void;
 }
 
-// vi.hoisted allows these values to be captured inside vi.mock factories
 const stt = vi.hoisted(() => ({ callbacks: null as STTCallbacks | null }));
-const mockLlm = vi.hoisted(() => ({ callClaudeJSON: vi.fn() }));
+const mockLlm = vi.hoisted(() => ({
+  streamAssist: vi.fn(),
+  callClaudeJSON: vi.fn(),
+}));
 
-vi.mock("../groq-stt.js", () => ({
-  GroqSTT: class MockGroqSTT {
+vi.mock("../deepgram-flux.js", () => ({
+  FluxSTT: class MockFluxSTT {
     constructor(_lang: string, callbacks: STTCallbacks) {
       stt.callbacks = callbacks;
     }
-    start() {}
+    async start() { stt.callbacks?.onListening(); }
     sendAudio() {}
-    async flush() {}
     close() {}
   },
 }));
 
 vi.mock("../llm.js", () => ({
+  streamAssist: mockLlm.streamAssist,
   callClaudeJSON: mockLlm.callClaudeJSON,
+  correctTranscript: vi.fn((text: string) => Promise.resolve(text)),
 }));
 
 function waitForMessage(ws: WebSocket, type: string, timeout = 5000): Promise<ServerMessage> {
@@ -62,14 +64,12 @@ function connectAndStart(port: number): Promise<WebSocket> {
   });
 }
 
-// InsightPayload — what callClaudeJSON returns (no id, no t)
-const samplePayload = {
-  cat: "strength" as const,
-  confidence: "confirmed" as const,
-  title: "Expérience terrain confirmée en React",
-  body: "Le candidat montre une vraie expérience React en production.",
-  relance: "Dans quel type de projet avez-vous utilisé React ?",
-};
+const sampleAssistText = [
+  "[strength] [high]",
+  "# Expérience terrain confirmée en React",
+  "Le candidat montre une vraie expérience React en production.",
+  ">> Dans quel type de projet avez-vous utilisé React ?",
+].join("\n");
 
 const sampleReport: CandidateReport = {
   overall: "Candidat solide avec une expérience React clairement démontrée.",
@@ -79,11 +79,21 @@ const sampleReport: CandidateReport = {
   recommendationReason: "Profil directement applicable au poste visé.",
 };
 
+function mockStreamAssist(text: string) {
+  mockLlm.streamAssist.mockImplementationOnce(
+    async (_sys: string, _user: string, onChunk: (t: string) => void) => {
+      onChunk(text);
+      return text;
+    }
+  );
+}
+
 describe("Session WebSocket integration", () => {
   let server: TestServer;
   let ws: WebSocket;
 
   beforeEach(async () => {
+    mockLlm.streamAssist.mockReset();
     mockLlm.callClaudeJSON.mockReset();
     stt.callbacks = null;
     server = await createTestServer();
@@ -95,62 +105,53 @@ describe("Session WebSocket integration", () => {
     await server.close();
   });
 
-  it("sends assist:card when a transcript arrives", async () => {
-    mockLlm.callClaudeJSON.mockResolvedValueOnce(samplePayload);
+  it("sends assist:done when a transcript arrives", async () => {
+    mockStreamAssist(sampleAssistText);
 
-    stt.callbacks!.onFinal("J'utilise React depuis 3 ans en production");
+    stt.callbacks!.onTranscript("J'utilise React depuis 3 ans en production");
 
-    const msg = (await waitForMessage(ws, "assist:card")) as Extract<ServerMessage, { type: "assist:card" }>;
+    const msg = (await waitForMessage(ws, "assist:done")) as Extract<ServerMessage, { type: "assist:done" }>;
 
-    expect(msg.card.title).toBe(samplePayload.title);
-    expect(msg.card.confidence).toBe("confirmed");
-    expect(msg.card.cat).toBe("strength");
-    expect(msg.card.relance).toBeTruthy();
-    // id and t are injected by session
-    expect(msg.card.id).toBeTruthy();
-    expect(msg.card.t).toMatch(/^\d{2}:\d{2}$/);
+    expect(msg.fullText).toContain("Expérience terrain confirmée en React");
+    expect(msg.id).toBeTruthy();
   });
 
   it("includes previous card context in the prompt for the second analysis", async () => {
-    mockLlm.callClaudeJSON
-      .mockResolvedValueOnce(samplePayload)
-      .mockResolvedValueOnce({ ...samplePayload, title: "Deuxième analyse" });
+    mockStreamAssist(sampleAssistText);
+    mockStreamAssist(sampleAssistText);
 
-    stt.callbacks!.onFinal("Premier transcript");
-    await waitForMessage(ws, "assist:card");
+    stt.callbacks!.onTranscript("Premier transcript");
+    await waitForMessage(ws, "assist:done");
 
-    stt.callbacks!.onFinal("Deuxième transcript");
-    await waitForMessage(ws, "assist:card");
+    stt.callbacks!.onTranscript("Deuxième transcript");
+    await waitForMessage(ws, "assist:done");
 
-    const secondPrompt = mockLlm.callClaudeJSON.mock.calls[1][0] as string;
-    expect(secondPrompt).toContain("CONFIRMED");
+    const secondPrompt = mockLlm.streamAssist.mock.calls[1][0] as string;
     expect(secondPrompt).toContain("Expérience terrain confirmée en React");
-    expect(secondPrompt).toContain("Analyses déjà effectuées");
+    expect(secondPrompt).toContain("Sujets déjà analysés");
   });
 
   it("does not repeat follow-up questions in subsequent analyses", async () => {
-    mockLlm.callClaudeJSON
-      .mockResolvedValueOnce(samplePayload)
-      .mockResolvedValueOnce({ ...samplePayload, relance: "Autre question ?" });
+    mockStreamAssist(sampleAssistText);
+    mockStreamAssist(sampleAssistText);
 
-    stt.callbacks!.onFinal("Premier transcript");
-    await waitForMessage(ws, "assist:card");
+    stt.callbacks!.onTranscript("Premier transcript");
+    await waitForMessage(ws, "assist:done");
 
-    stt.callbacks!.onFinal("Deuxième transcript");
-    await waitForMessage(ws, "assist:card");
+    stt.callbacks!.onTranscript("Deuxième transcript");
+    await waitForMessage(ws, "assist:done");
 
-    const secondPrompt = mockLlm.callClaudeJSON.mock.calls[1][0] as string;
+    const secondPrompt = mockLlm.streamAssist.mock.calls[1][0] as string;
     expect(secondPrompt).toContain("Dans quel type de projet avez-vous utilisé React ?");
-    expect(secondPrompt).toContain("NE PAS répéter");
+    expect(secondPrompt).toContain("ne pas répéter");
   });
 
   it("sends analysis:final in response to session:summarize", async () => {
-    mockLlm.callClaudeJSON
-      .mockResolvedValueOnce(samplePayload)
-      .mockResolvedValueOnce(sampleReport);
+    mockStreamAssist(sampleAssistText);
+    mockLlm.callClaudeJSON.mockResolvedValueOnce(sampleReport);
 
-    stt.callbacks!.onFinal("Le candidat présente son expérience");
-    await waitForMessage(ws, "assist:card");
+    stt.callbacks!.onTranscript("Le candidat présente son expérience");
+    await waitForMessage(ws, "assist:done");
 
     ws.send(JSON.stringify({ type: "session:summarize" }));
 
@@ -163,18 +164,16 @@ describe("Session WebSocket integration", () => {
   });
 
   it("includes accumulated cards in the final analysis prompt", async () => {
-    mockLlm.callClaudeJSON
-      .mockResolvedValueOnce(samplePayload)
-      .mockResolvedValueOnce(sampleReport);
+    mockStreamAssist(sampleAssistText);
+    mockLlm.callClaudeJSON.mockResolvedValueOnce(sampleReport);
 
-    stt.callbacks!.onFinal("Premier transcript");
-    await waitForMessage(ws, "assist:card");
+    stt.callbacks!.onTranscript("Premier transcript");
+    await waitForMessage(ws, "assist:done");
 
     ws.send(JSON.stringify({ type: "session:summarize" }));
     await waitForMessage(ws, "analysis:final");
 
-    const finalPrompt = mockLlm.callClaudeJSON.mock.calls[1][0] as string;
-    expect(finalPrompt).toContain("CONFIRMED");
+    const finalPrompt = mockLlm.callClaudeJSON.mock.calls[0][0] as string;
     expect(finalPrompt).toContain("Expérience terrain confirmée en React");
     expect(finalPrompt).toContain("bilan final");
   });
