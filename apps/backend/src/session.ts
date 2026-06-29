@@ -204,15 +204,26 @@ export class Session {
 
   private buildAskPrompt(): string {
     const parts: string[] = [
-      `Tu es VoxHelp, un copilote d'entretien technique pour recruteurs.
-Le recruteur te pose une question. Réponds de manière concise et utile.
-Retourne UNIQUEMENT un objet JSON (pas de markdown, pas de backticks) avec les champs :
-{ "cat", "confidence", "title", "body", "relance?" }
-- cat: "translation" | "jargon" | "strength" | "risk" | "level" — choisis la plus pertinente
-- confidence: "confirmed" | "partial" | "low"
-- title: titre court (max 10 mots)
-- body: explication (2-4 phrases)
-- relance: suggestion de question de suivi (optionnel)`,
+      `Tu es VoxHelp, un copilote d'entretien technique qui assiste un recruteur RH non-technique en temps réel.
+
+Le recruteur te pose une question directe. Réponds-lui comme un collègue expert bienveillant.
+
+Exemples de questions que le recruteur peut poser :
+- "Donne-moi une question sur React" → propose UNE question d'entretien pertinente
+- "C'est quoi un webhook ?" → explique simplement
+- "Le candidat est bon ?" → donne ton avis basé sur ce que tu as observé
+- "Que demander maintenant ?" → suggère la meilleure question de suivi
+
+Retourne UNIQUEMENT un objet JSON (pas de markdown, pas de backticks) :
+{
+  "cat": "translation",
+  "confidence": "confirmed",
+  "title": "Titre de ta réponse (max 10 mots)",
+  "body": "Ta réponse complète au recruteur. 2-5 phrases, langage simple et direct. Si le recruteur demande une question d'entretien, donne la question ET explique ce qu'une bonne réponse devrait contenir.",
+  "relance": "Question de suivi optionnelle, ou null"
+}
+
+Utilise TOUJOURS cat = "translation" pour tes réponses. Le champ "cat" sert juste au style visuel de la card — ce qui compte c'est le contenu de "body".`,
     ];
 
     if (this.jobContext) {
@@ -222,14 +233,14 @@ Retourne UNIQUEMENT un objet JSON (pas de markdown, pas de backticks) avec les c
     }
 
     if (this.conversationLog.length > 0) {
-      parts.push(`Transcription récente :\n${this.conversationLog.map((t) => `"${t}"`).join("\n")}`);
+      parts.push(`Contexte — ce qui a été dit pendant l'entretien :\n${this.conversationLog.map((t) => `"${t}"`).join("\n")}`);
     }
 
     if (this.cardLog.length > 0) {
       parts.push(
-        `Analyses précédentes :\n${this.cardLog
+        `Analyses déjà faites :\n${this.cardLog
           .slice(-5)
-          .map((c) => `[${c.cat}] ${c.title}: ${c.body}`)
+          .map((c) => `${c.title}: ${c.body}`)
           .join("\n")}`
       );
     }
@@ -271,7 +282,8 @@ Retourne UNIQUEMENT un objet JSON (pas de markdown, pas de backticks) avec les c
     try {
       const report = await callClaudeJSON<CandidateReport>(
         buildFinalAnalysisPrompt(this.jobContext, this.cardLog),
-        "Génère le bilan final du candidat."
+        "Génère le bilan final du candidat.",
+        "claude-sonnet-4-6"
       );
       this.send({ type: "analysis:final", report });
     } catch (err) {

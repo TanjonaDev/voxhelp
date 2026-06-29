@@ -42,10 +42,11 @@ Exemples de corrections :
 
 export async function callClaudeJSON<T>(
   systemPrompt: string,
-  userMessage: string
+  userMessage: string,
+  model = "claude-haiku-4-5"
 ): Promise<T> {
   const message = await anthropic.messages.create({
-    model: "claude-sonnet-4-6",
+    model,
     max_tokens: 4096,
     system: systemPrompt,
     messages: [{ role: "user", content: userMessage }],
