@@ -182,32 +182,6 @@ function HeaderBar({
               </span>
             </span>
 
-            {/* summarize */}
-            {canSummarize && (
-              <button
-                onClick={onSummarize}
-                disabled={isSummarizing}
-                style={{
-                  all: "unset" as "unset",
-                  cursor: isSummarizing ? "default" : "pointer",
-                  display: "inline-flex",
-                  alignItems: "center",
-                  gap: 6,
-                  padding: "6px 12px",
-                  borderRadius: 9,
-                  background: "var(--card)",
-                  boxShadow: "0 0 0 1px var(--stroke) inset",
-                  color: "var(--text-2)",
-                  fontSize: 12.5,
-                  fontWeight: 600,
-                  opacity: isSummarizing ? 0.5 : 1,
-                }}
-              >
-                <VIcon name="refresh" size={12} />
-                {isSummarizing ? "Génération…" : "Bilan"}
-              </button>
-            )}
-
             {/* stop */}
             <button
               onClick={onStop}
@@ -229,6 +203,32 @@ function HeaderBar({
               <VIcon name="stop" size={11} fill /> Arrêter
             </button>
           </>
+        )}
+
+        {/* summarize — visible hors du bloc isLive pour rester accessible après arrêt */}
+        {canSummarize && (
+          <button
+            onClick={onSummarize}
+            disabled={isSummarizing}
+            style={{
+              all: "unset" as "unset",
+              cursor: isSummarizing ? "default" : "pointer",
+              display: "inline-flex",
+              alignItems: "center",
+              gap: 6,
+              padding: "6px 12px",
+              borderRadius: 9,
+              background: "var(--card)",
+              boxShadow: "0 0 0 1px var(--stroke) inset",
+              color: "var(--text-2)",
+              fontSize: 12.5,
+              fontWeight: 600,
+              opacity: isSummarizing ? 0.5 : 1,
+            }}
+          >
+            <VIcon name="refresh" size={12} />
+            {isSummarizing ? "Génération…" : "Bilan"}
+          </button>
         )}
       </div>
     </header>
@@ -731,7 +731,7 @@ export function OverlayPanel({
         onStop={handleStop}
         onSummarize={onSummarize}
         isSummarizing={isSummarizing}
-        canSummarize={audioStarted && insights.length > 0 && !finalReport}
+        canSummarize={insights.length > 0 && !finalReport}
       />
 
       {/* Error banner */}
