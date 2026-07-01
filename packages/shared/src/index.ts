@@ -48,6 +48,7 @@ export type ServerMessage =
   | { type: "assist:start"; id: string; t: string }
   | { type: "assist:chunk"; id: string; text: string }
   | { type: "assist:done"; id: string; fullText: string }
+  | { type: "assist:cancel"; id: string }
   | { type: "assist:error"; error: string }
   | { type: "analysis:final"; report: CandidateReport }
   | { type: "pong" };

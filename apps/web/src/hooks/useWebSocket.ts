@@ -93,6 +93,10 @@ export function useWebSocket(url: string): UseWebSocketReturn {
         ]);
         break;
       }
+      case "assist:cancel":
+        setStreamingCard(null);
+        setIsAnalyzing(false);
+        break;
       case "assist:error":
         setIsAnalyzing(false);
         setStreamingCard(null);

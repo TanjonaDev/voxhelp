@@ -188,12 +188,35 @@ export class Session {
     const cardT = this.elapsedTime();
     this.send({ type: "assist:start", id: cardId, t: cardT });
 
+    let accumulated = "";
+    let cancelled = false;
+
     try {
       const fullText = await streamAssist(
         buildLiveAssistPrompt(this.jobContext, this.conversationLog, this.relanceLog, this.cardLog),
         `Ce qui vient d'être dit :\n"${transcript}"`,
-        (chunk) => this.send({ type: "assist:chunk", id: cardId, text: chunk })
+        (chunk) => {
+          if (cancelled) return;
+          accumulated += chunk;
+          if (accumulated.trimStart().startsWith("[skip]")) {
+            cancelled = true;
+            this.send({ type: "assist:cancel", id: cardId });
+            return;
+          }
+          this.send({ type: "assist:chunk", id: cardId, text: chunk });
+        }
       );
+
+      if (cancelled) {
+        this.isProcessing = false;
+        this.send({ type: "transcript:idle" });
+        if (this.pendingTranscript) {
+          const pending = this.pendingTranscript;
+          this.pendingTranscript = null;
+          this.processTranscript(pending);
+        }
+        return;
+      }
 
       this.send({ type: "assist:done", id: cardId, fullText });
 
