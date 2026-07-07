@@ -2,6 +2,7 @@ import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import WebSocket from "ws";
 import type { CandidateReport, ServerMessage } from "@voxhelp/shared";
 import { createTestServer, type TestServer } from "./helpers/server.js";
+import { waitForMessage } from "./helpers/ws.js";
 
 interface STTCallbacks {
   onTranscript: (text: string) => void;
@@ -31,25 +32,6 @@ vi.mock("../llm.js", () => ({
   callClaudeJSON: mockLlm.callClaudeJSON,
   correctTranscript: vi.fn((text: string) => Promise.resolve(text)),
 }));
-
-function waitForMessage(ws: WebSocket, type: string, timeout = 5000): Promise<ServerMessage> {
-  return new Promise((resolve, reject) => {
-    const timer = setTimeout(() => {
-      ws.off("message", handler);
-      reject(new Error(`Timeout waiting for message type "${type}"`));
-    }, timeout);
-
-    function handler(data: Buffer) {
-      const msg = JSON.parse(data.toString()) as ServerMessage;
-      if (msg.type === type) {
-        clearTimeout(timer);
-        ws.off("message", handler);
-        resolve(msg);
-      }
-    }
-    ws.on("message", handler);
-  });
-}
 
 function connectAndStart(port: number): Promise<WebSocket> {
   return new Promise((resolve) => {
