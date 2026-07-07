@@ -3,6 +3,7 @@ import Fastify from "fastify";
 import cors from "@fastify/cors";
 import websocket from "@fastify/websocket";
 import { Session } from "./session.js";
+import { supabaseAdmin } from "./supabase.js";
 
 const PORT = Number(process.env.PORT) || 3001;
 const CORS_ORIGIN = process.env.CORS_ORIGIN || "http://localhost:5173";
@@ -15,9 +16,30 @@ async function main() {
 
   app.get("/health", async () => ({ status: "ok", timestamp: Date.now() }));
 
-  app.get("/ws", { websocket: true }, (socket) => {
-    console.log("[Server] New WebSocket connection");
-    new Session(socket);
+  app.get("/ws", { websocket: true }, async (socket, req) => {
+    let userId: string | null = null;
+
+    if (supabaseAdmin) {
+      const token = new URL(req.url ?? "", `http://${req.headers.host}`).searchParams.get("token");
+
+      if (!token) {
+        socket.close(4001, "Missing token");
+        return;
+      }
+
+      const { data, error } = await supabaseAdmin.auth.getUser(token);
+      if (error || !data.user) {
+        socket.close(4003, "Invalid token");
+        return;
+      }
+
+      userId = data.user.id;
+      console.log(`[Server] New WebSocket connection (user ${userId})`);
+    } else {
+      console.log("[Server] New WebSocket connection (auth disabled)");
+    }
+
+    new Session(socket, userId);
   });
 
   try {

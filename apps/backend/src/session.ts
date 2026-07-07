@@ -11,6 +11,7 @@ import { buildFinalAnalysisPrompt } from "./prompts/final-analysis.js";
 
 export class Session {
   private ws: WebSocket;
+  private userId: string | null;
   private stt: FluxSTT | null = null;
   private config: SessionConfig | null = null;
   private jobContext: JobContext | undefined = undefined;
@@ -26,8 +27,9 @@ export class Session {
   private pendingTranscript: string | null = null;
   private readonly DEBOUNCE_MS = 1500;
 
-  constructor(ws: WebSocket) {
+  constructor(ws: WebSocket, userId: string | null = null) {
     this.ws = ws;
+    this.userId = userId;
     this.setupHandlers();
   }
 

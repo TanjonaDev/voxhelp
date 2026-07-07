@@ -7,13 +7,13 @@ export interface TestServer {
   close: () => Promise<void>;
 }
 
-export async function createTestServer(): Promise<TestServer> {
+export async function createTestServer(userId: string | null = null): Promise<TestServer> {
   const app = Fastify({ logger: false });
 
   await app.register(websocket);
 
   app.get("/ws", { websocket: true }, (socket) => {
-    new Session(socket);
+    new Session(socket, userId);
   });
 
   await app.listen({ port: 0, host: "127.0.0.1" });
