@@ -8,6 +8,12 @@ import { FluxSTT } from "./deepgram-flux.js";
 import { streamAssist, callClaudeJSON, correctTranscript } from "./llm.js";
 import { buildLiveAssistPrompt } from "./prompts/live-assist.js";
 import { buildFinalAnalysisPrompt } from "./prompts/final-analysis.js";
+import { supabaseAdmin } from "./supabase.js";
+
+interface ProfileUsage {
+  session_count: number;
+  session_limit: number;
+}
 
 export class Session {
   private ws: WebSocket;
@@ -55,7 +61,7 @@ export class Session {
   private handleMessage(message: ClientMessage): void {
     switch (message.type) {
       case "session:start":
-        this.startSession(message.config);
+        void this.startSession(message.config);
         break;
       case "session:stop":
         this.cleanup();
@@ -78,7 +84,25 @@ export class Session {
     }
   }
 
-  private startSession(config: SessionConfig): void {
+  private async startSession(config: SessionConfig): Promise<void> {
+    if (this.userId && supabaseAdmin) {
+      const { data, error } = await supabaseAdmin
+        .from("profiles")
+        .select("session_count, session_limit")
+        .eq("id", this.userId)
+        .single();
+
+      const usage = data as ProfileUsage | null;
+
+      if (!error && usage && usage.session_count >= usage.session_limit) {
+        this.send({
+          type: "session:error",
+          error: `Limite de ${usage.session_limit} entretiens atteinte pour ce compte. Contacte-nous pour continuer.`,
+        });
+        return;
+      }
+    }
+
     this.config = config;
     this.jobContext = config.jobContext;
     this.transcriptBuffer = [];
