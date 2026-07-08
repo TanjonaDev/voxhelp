@@ -16,6 +16,7 @@ const mockLlm = vi.hoisted(() => ({
 }));
 const mockSupabase = vi.hoisted(() => ({
   profileResult: { data: null as { session_count: number; session_limit: number } | null, error: null as { message: string } | null },
+  rejectProfileRead: false,
   rpc: vi.fn(() => Promise.resolve({ error: null as { message: string } | null })),
 }));
 
@@ -41,7 +42,12 @@ vi.mock("../supabase.js", () => ({
     from: () => ({
       select: () => ({
         eq: () => ({
-          single: () => Promise.resolve(mockSupabase.profileResult),
+          single: () => {
+            if (mockSupabase.rejectProfileRead) {
+              return Promise.reject(new Error("network failure"));
+            }
+            return Promise.resolve(mockSupabase.profileResult);
+          },
         }),
       }),
     }),
@@ -70,6 +76,7 @@ describe("Session usage limit", () => {
     mockLlm.streamAssist.mockReset();
     mockSupabase.rpc.mockClear();
     mockSupabase.rpc.mockResolvedValue({ error: null });
+    mockSupabase.rejectProfileRead = false;
     stt.callbacks = null;
   });
 
@@ -104,6 +111,17 @@ describe("Session usage limit", () => {
   it("allows session:start when Supabase profile read errors (fail open)", async () => {
     mockSupabase.profileResult = { data: null, error: { message: "boom" } };
     server = await createTestServer("user-error");
+    ws = await connect(server.port);
+
+    ws.send(JSON.stringify({ type: "session:start", config: { language: "fr" } }));
+
+    const msg = await waitForMessage(ws, "session:ready");
+    expect(msg.type).toBe("session:ready");
+  });
+
+  it("allows session:start when the Supabase query rejects (fail open on thrown error)", async () => {
+    mockSupabase.rejectProfileRead = true;
+    server = await createTestServer("user-rejected-query");
     ws = await connect(server.port);
 
     ws.send(JSON.stringify({ type: "session:start", config: { language: "fr" } }));

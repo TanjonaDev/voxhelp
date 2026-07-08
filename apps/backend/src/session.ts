@@ -86,20 +86,25 @@ export class Session {
 
   private async startSession(config: SessionConfig): Promise<void> {
     if (this.userId && supabaseAdmin) {
-      const { data, error } = await supabaseAdmin
-        .from("profiles")
-        .select("session_count, session_limit")
-        .eq("id", this.userId)
-        .single();
+      try {
+        const { data, error } = await supabaseAdmin
+          .from("profiles")
+          .select("session_count, session_limit")
+          .eq("id", this.userId)
+          .single();
 
-      const usage = data as ProfileUsage | null;
+        const usage = data as ProfileUsage | null;
 
-      if (!error && usage && usage.session_count >= usage.session_limit) {
-        this.send({
-          type: "session:error",
-          error: `Limite de ${usage.session_limit} entretiens atteinte pour ce compte. Contacte-nous pour continuer.`,
-        });
-        return;
+        if (!error && usage && usage.session_count >= usage.session_limit) {
+          console.log(`[Session] Blocked: user ${this.userId} reached session_limit=${usage.session_limit}`);
+          this.send({
+            type: "session:error",
+            error: `Limite de ${usage.session_limit} entretiens atteinte pour ce compte. Contacte-nous pour continuer.`,
+          });
+          return;
+        }
+      } catch (err) {
+        console.error("[Session] Quota check failed, allowing session:", err);
       }
     }
 
