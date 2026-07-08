@@ -369,6 +369,14 @@ Utilise TOUJOURS catégorie = translation et evidence = high pour tes réponses.
   }
 
   private cleanup(): void {
+    if (this.userId && supabaseAdmin && this.conversationLog.length > 0) {
+      void supabaseAdmin
+        .rpc("increment_session_count", { uid: this.userId })
+        .then(({ error }) => {
+          if (error) console.error("[Session] Failed to increment session_count:", error.message);
+        });
+    }
+
     if (this.debounceTimer) {
       clearTimeout(this.debounceTimer);
       this.debounceTimer = null;

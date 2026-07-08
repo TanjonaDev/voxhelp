@@ -122,4 +122,41 @@ describe("Session usage limit", () => {
     const msg = await waitForMessage(ws, "session:ready");
     expect(msg.type).toBe("session:ready");
   });
+
+  it("increments session_count after a session with at least one transcript", async () => {
+    mockSupabase.profileResult = { data: { session_count: 0, session_limit: 5 }, error: null };
+    mockLlm.streamAssist.mockImplementationOnce(
+      async (_sys: string, _user: string, onChunk: (t: string) => void) => {
+        onChunk(sampleAssistText);
+        return sampleAssistText;
+      }
+    );
+    server = await createTestServer("user-with-content");
+    ws = await connect(server.port);
+
+    ws.send(JSON.stringify({ type: "session:start", config: { language: "fr" } }));
+    await waitForMessage(ws, "session:ready");
+
+    stt.callbacks!.onTranscript("J'utilise React depuis 3 ans en production");
+    await waitForMessage(ws, "assist:done");
+
+    ws.send(JSON.stringify({ type: "session:stop" }));
+    await new Promise((resolve) => setTimeout(resolve, 50));
+
+    expect(mockSupabase.rpc).toHaveBeenCalledWith("increment_session_count", { uid: "user-with-content" });
+  });
+
+  it("does not increment session_count when the session had no transcript", async () => {
+    mockSupabase.profileResult = { data: { session_count: 0, session_limit: 5 }, error: null };
+    server = await createTestServer("user-empty-session");
+    ws = await connect(server.port);
+
+    ws.send(JSON.stringify({ type: "session:start", config: { language: "fr" } }));
+    await waitForMessage(ws, "session:ready");
+
+    ws.send(JSON.stringify({ type: "session:stop" }));
+    await new Promise((resolve) => setTimeout(resolve, 50));
+
+    expect(mockSupabase.rpc).not.toHaveBeenCalled();
+  });
 });
