@@ -256,6 +256,29 @@ create trigger set_updated_at
   for each row execute function update_updated_at();
 ```
 
+### 1.3bis Limite d'usage par utilisateur (bêta)
+
+Pendant la bêta, chaque utilisateur est limité à un nombre de sessions (entretiens démarrés avec succès). À exécuter après le schéma ci-dessus :
+
+```sql
+-- ═══════════════════════════════════
+-- Limite d'usage (bêta)
+-- ═══════════════════════════════════
+
+alter table public.profiles
+  add column session_count int not null default 0,
+  add column session_limit int not null default 5;
+
+create or replace function public.increment_session_count(uid uuid)
+returns void as $$
+begin
+  update public.profiles set session_count = session_count + 1 where id = uid;
+end;
+$$ language plpgsql;
+```
+
+Pour donner un accès illimité (ou une limite différente) à un utilisateur donné, modifier directement `session_limit` sur sa ligne dans Supabase Dashboard → Table Editor → `profiles`.
+
 ### 1.4 Installer le SDK Supabase
 
 ```bash
