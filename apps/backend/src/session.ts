@@ -29,13 +29,16 @@ export class Session {
   private readonly MAX_LOG_ENTRIES = 15;
   private readonly MAX_CARD_LOG = 30;
   private debounceTimer: ReturnType<typeof setTimeout> | null = null;
+  private maxBufferTimer: ReturnType<typeof setTimeout> | null = null;
+  private readonly maxBufferMs: number;
   private isProcessing = false;
   private pendingTranscript: string | null = null;
   private readonly DEBOUNCE_MS = 1500;
 
-  constructor(ws: WebSocket, userId: string | null = null) {
+  constructor(ws: WebSocket, userId: string | null = null, maxBufferMs: number = 3 * 60 * 1000) {
     this.ws = ws;
     this.userId = userId;
+    this.maxBufferMs = maxBufferMs;
     this.setupHandlers();
   }
 
@@ -137,18 +140,28 @@ export class Session {
   }
 
   private triggerAnalysis(): void {
+    this.flushBuffer();
+  }
+
+  private flushBuffer(): void {
+    if (this.maxBufferTimer) {
+      clearTimeout(this.maxBufferTimer);
+      this.maxBufferTimer = null;
+    }
     if (this.debounceTimer) {
       clearTimeout(this.debounceTimer);
       this.debounceTimer = null;
     }
-    const existing = this.transcriptBuffer.join(" ").trim();
-    if (existing) {
-      this.transcriptBuffer = [];
-      if (this.isProcessing) {
-        this.pendingTranscript = existing;
-      } else {
-        this.processTranscript(existing);
-      }
+
+    const fullText = this.transcriptBuffer.join(" ").trim();
+    this.transcriptBuffer = [];
+
+    if (!fullText) return;
+
+    if (this.isProcessing) {
+      this.pendingTranscript = fullText;
+    } else {
+      this.processTranscript(fullText);
     }
   }
 
@@ -161,22 +174,17 @@ export class Session {
     const text = await correctTranscript(rawText, sttContext);
 
     this.send({ type: "transcript:final", text });
+
+    if (this.transcriptBuffer.length === 0 && !this.maxBufferTimer) {
+      this.maxBufferTimer = setTimeout(() => this.flushBuffer(), this.maxBufferMs);
+    }
+
     this.transcriptBuffer.push(text);
 
     if (this.debounceTimer) clearTimeout(this.debounceTimer);
 
     this.debounceTimer = setTimeout(() => {
-      const fullText = this.transcriptBuffer.join(" ");
-      this.transcriptBuffer = [];
-
-      if (!fullText.trim()) return;
-
-      if (this.isProcessing) {
-        this.pendingTranscript = fullText;
-        return;
-      }
-
-      this.processTranscript(fullText);
+      this.flushBuffer();
     }, this.DEBOUNCE_MS);
   }
 
@@ -385,6 +393,10 @@ Utilise TOUJOURS catégorie = translation et evidence = high pour tes réponses.
     if (this.debounceTimer) {
       clearTimeout(this.debounceTimer);
       this.debounceTimer = null;
+    }
+    if (this.maxBufferTimer) {
+      clearTimeout(this.maxBufferTimer);
+      this.maxBufferTimer = null;
     }
     this.transcriptBuffer = [];
     this.conversationLog = [];
