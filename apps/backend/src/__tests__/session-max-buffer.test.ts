@@ -85,8 +85,8 @@ describe("Session max buffer flush", () => {
     await waitForMessage(ws, "assist:done");
     const elapsed = Date.now() - start;
 
-    // With only the 1500ms debounce (pre-implementation), this flush wouldn't
-    // happen until ~1500ms after the last piece (~1620ms total). The 150ms
+    // With only the 2500ms debounce (pre-implementation), this flush wouldn't
+    // happen until ~2500ms after the last piece (~2620ms total). The 150ms
     // maxBufferMs must force it far sooner than that.
     expect(elapsed).toBeLessThan(800);
     expect(mockLlm.streamAssist).toHaveBeenCalledTimes(1);
@@ -109,13 +109,13 @@ describe("Session max buffer flush", () => {
     const elapsed = Date.now() - start;
 
     // Confirms this particular flush was driven by maxBufferMs (100ms), not
-    // the 1500ms debounce — otherwise the check below would be meaningless.
+    // the 2500ms debounce — otherwise the check below would be meaningless.
     expect(elapsed).toBeLessThan(500);
 
-    // Wait past the original (1500ms) debounce deadline that was pending
+    // Wait past the original (2500ms) debounce deadline that was pending
     // when the buffer was flushed early. If flushBuffer() didn't clear it,
     // it would fire again here with an empty buffer.
-    await wait(1700);
+    await wait(2700);
 
     expect(mockLlm.streamAssist).toHaveBeenCalledTimes(1);
   });
