@@ -232,26 +232,44 @@ export class Session {
     this.conversationLog.push(transcript);
     if (this.conversationLog.length > this.MAX_LOG_ENTRIES) this.conversationLog.shift();
 
-    const cardId = createId();
+    const speculativeId = createId();
     const cardT = this.elapsedTime();
-    this.send({ type: "assist:start", id: cardId, t: cardT });
+    this.send({ type: "assist:start", id: speculativeId, t: cardT });
+
+    const mergeCandidate =
+      this.cardLog.length > 0 && Date.now() - this.lastCardEmittedAtMs <= this.mergeWindowMs
+        ? this.cardLog[this.cardLog.length - 1]
+        : undefined;
 
     let accumulated = "";
     let cancelled = false;
+    let activeId = speculativeId;
+    let isMerge = false;
 
     try {
       const fullText = await streamAssist(
-        buildLiveAssistPrompt(this.jobContext, this.conversationLog, this.relanceLog, this.cardLog),
+        buildLiveAssistPrompt(this.jobContext, this.conversationLog, this.relanceLog, this.cardLog, mergeCandidate),
         `Ce qui vient d'être dit :\n"${transcript}"`,
         (chunk) => {
           if (cancelled) return;
           accumulated += chunk;
-          if (accumulated.trimStart().startsWith("[skip]")) {
+          const trimmed = accumulated.trimStart();
+
+          if (trimmed.startsWith("[skip]")) {
             cancelled = true;
-            this.send({ type: "assist:cancel", id: cardId });
+            this.send({ type: "assist:cancel", id: activeId });
             return;
           }
-          this.send({ type: "assist:chunk", id: cardId, text: chunk });
+
+          if (!isMerge && mergeCandidate && trimmed.startsWith("[merge]")) {
+            isMerge = true;
+            this.send({ type: "assist:cancel", id: activeId });
+            activeId = mergeCandidate.id;
+            this.send({ type: "assist:start", id: activeId, t: mergeCandidate.t });
+            return;
+          }
+
+          this.send({ type: "assist:chunk", id: activeId, text: chunk });
         }
       );
 
@@ -266,15 +284,24 @@ export class Session {
         return;
       }
 
-      this.send({ type: "assist:done", id: cardId, fullText });
+      const cardText = isMerge ? fullText.trim().replace(/^\[merge\]\s*/, "") : fullText;
+      this.send({ type: "assist:done", id: activeId, fullText: cardText });
 
-      const card = this.parseAssistText(fullText, cardId, cardT);
+      const card = this.parseAssistText(cardText, activeId, isMerge ? mergeCandidate!.t : cardT);
       if (card.relance) {
         this.relanceLog.push(card.relance);
         if (this.relanceLog.length > this.MAX_LOG_ENTRIES) this.relanceLog.shift();
       }
-      this.cardLog.push(card);
-      if (this.cardLog.length > this.MAX_CARD_LOG) this.cardLog.shift();
+
+      if (isMerge) {
+        const idx = this.cardLog.findIndex((c) => c.id === mergeCandidate!.id);
+        if (idx !== -1) this.cardLog[idx] = card;
+        else this.cardLog.push(card);
+      } else {
+        this.cardLog.push(card);
+        if (this.cardLog.length > this.MAX_CARD_LOG) this.cardLog.shift();
+      }
+      this.lastCardEmittedAtMs = Date.now();
 
     } catch (err) {
       this.send({
