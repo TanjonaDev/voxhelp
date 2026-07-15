@@ -22,11 +22,25 @@ function buildPreviousCards(cards: Insight[]): string {
   return `\nSujets déjà analysés (diversifie les thèmes) :\n${recent.map((c) => `- [${c.cat}] ${c.title}`).join("\n")}\n`;
 }
 
+function buildMergeCandidateSection(card?: Insight): string {
+  if (!card) return "";
+  return `\nDernière card émise à l'instant — [${card.cat}] ${card.title} : ${card.body}
+Si ce qui vient d'être dit ne fait que continuer/préciser le MÊME sous-thème que cette card
+(pas juste un thème proche), NE CRÉE PAS de nouvelle card. Réponds avec :
+[merge]
+[catégorie] [evidence]
+# Titre (peut être mis à jour)
+Corps fusionné qui remplace entièrement le précédent
+>> Relance (optionnelle)
+`;
+}
+
 export function buildLiveAssistPrompt(
   jobContext?: JobContext,
   history?: string[],
   previousRelances?: string[],
-  previousCards?: Insight[]
+  previousCards?: Insight[],
+  mergeCandidate?: Insight
 ): string {
   const jobCtx = buildJobContext(jobContext);
   const convHistory = buildConversationHistory(history ?? []);
@@ -35,8 +49,9 @@ export function buildLiveAssistPrompt(
     previousRelances && previousRelances.length > 0
       ? `\nQuestions déjà posées (ne pas répéter) :\n${previousRelances.map((q) => `- ${q}`).join("\n")}\n`
       : "";
+  const mergeSection = buildMergeCandidateSection(mergeCandidate);
 
-  return `Tu es VoxHelp, un copilote bienveillant qui aide un recruteur non-technique pendant un entretien développeur.${jobCtx}${convHistory}${prevCards}${relancesSection}
+  return `Tu es VoxHelp, un copilote bienveillant qui aide un recruteur non-technique pendant un entretien développeur.${jobCtx}${convHistory}${prevCards}${relancesSection}${mergeSection}
 Rôle : traduire le jargon, repérer les points forts, aider à poser les bonnes questions.
 
 PRIORITÉ ABSOLUE — DÉTECTION RECRUTEUR :
