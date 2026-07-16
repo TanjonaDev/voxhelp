@@ -31,22 +31,14 @@ export class Session {
   private debounceTimer: ReturnType<typeof setTimeout> | null = null;
   private maxBufferTimer: ReturnType<typeof setTimeout> | null = null;
   private readonly maxBufferMs: number;
-  private readonly mergeWindowMs: number;
-  private lastCardEmittedAtMs = 0;
   private isProcessing = false;
   private pendingTranscript: string | null = null;
   private readonly DEBOUNCE_MS = 2500;
 
-  constructor(
-    ws: WebSocket,
-    userId: string | null = null,
-    maxBufferMs: number = 3 * 60 * 1000,
-    mergeWindowMs: number = 90 * 1000
-  ) {
+  constructor(ws: WebSocket, userId: string | null = null, maxBufferMs: number = 3 * 60 * 1000) {
     this.ws = ws;
     this.userId = userId;
     this.maxBufferMs = maxBufferMs;
-    this.mergeWindowMs = mergeWindowMs;
     this.setupHandlers();
   }
 
@@ -125,7 +117,6 @@ export class Session {
     this.conversationLog = [];
     this.relanceLog = [];
     this.cardLog = [];
-    this.lastCardEmittedAtMs = 0;
     this.sessionStartMs = Date.now();
 
     this.stt?.close();
@@ -411,7 +402,6 @@ Utilise TOUJOURS catégorie = translation et evidence = high pour tes réponses.
     this.conversationLog = [];
     this.relanceLog = [];
     this.cardLog = [];
-    this.lastCardEmittedAtMs = 0;
     this.sessionStartMs = 0;
     if (this.stt) {
       this.stt.close();
