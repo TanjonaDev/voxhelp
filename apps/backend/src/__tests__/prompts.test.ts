@@ -57,18 +57,6 @@ describe("buildLiveAssistPrompt", () => {
     const prompt = buildLiveAssistPrompt();
     expect(prompt).not.toContain("Sujets déjà analysés");
   });
-
-  it("includes a merge instruction when a mergeCandidate is provided", () => {
-    const prompt = buildLiveAssistPrompt(undefined, [], [], [], confirmedCard);
-    expect(prompt).toContain("[merge]");
-    expect(prompt).toContain("Expérience terrain solide en React");
-    expect(prompt).toContain("NE CRÉE PAS de nouvelle card");
-  });
-
-  it("omits the merge instruction when mergeCandidate is undefined", () => {
-    const prompt = buildLiveAssistPrompt(undefined, [], [], []);
-    expect(prompt).not.toContain("[merge]");
-  });
 });
 
 describe("buildFinalAnalysisPrompt", () => {
