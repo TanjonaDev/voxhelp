@@ -15,6 +15,14 @@ interface ProfileUsage {
   session_limit: number;
 }
 
+function extractTheme(text: string): string | null {
+  const headerLine = text.trim().split("\n")[0] ?? "";
+  const match = headerLine.match(
+    /\[(?:jargon|strength|attention|translation)\]\s*\[(?:high|medium|low)\]\s*\[([a-z0-9-]+)\]/i
+  );
+  return match?.[1]?.toLowerCase() ?? null;
+}
+
 export class Session {
   private ws: WebSocket;
   private userId: string | null;
@@ -34,6 +42,8 @@ export class Session {
   private isProcessing = false;
   private pendingTranscript: string | null = null;
   private readonly DEBOUNCE_MS = 2500;
+  private lastTheme: string | null = null;
+  private themeStreakCount = 0;
 
   constructor(ws: WebSocket, userId: string | null = null, maxBufferMs: number = 3 * 60 * 1000) {
     this.ws = ws;
@@ -117,6 +127,8 @@ export class Session {
     this.conversationLog = [];
     this.relanceLog = [];
     this.cardLog = [];
+    this.lastTheme = null;
+    this.themeStreakCount = 0;
     this.sessionStartMs = Date.now();
 
     this.stt?.close();
@@ -232,7 +244,14 @@ export class Session {
 
     try {
       const fullText = await streamAssist(
-        buildLiveAssistPrompt(this.jobContext, this.conversationLog, this.relanceLog, this.cardLog),
+        buildLiveAssistPrompt(
+          this.jobContext,
+          this.conversationLog,
+          this.relanceLog,
+          this.cardLog,
+          this.lastTheme,
+          this.themeStreakCount
+        ),
         `Ce qui vient d'être dit :\n"${transcript}"`,
         (chunk) => {
           if (cancelled) return;
@@ -266,6 +285,14 @@ export class Session {
       }
       this.cardLog.push(card);
       if (this.cardLog.length > this.MAX_CARD_LOG) this.cardLog.shift();
+
+      const theme = extractTheme(fullText);
+      if (theme && theme === this.lastTheme) {
+        this.themeStreakCount += 1;
+      } else {
+        this.lastTheme = theme;
+        this.themeStreakCount = theme ? 1 : 0;
+      }
 
     } catch (err) {
       this.send({
@@ -402,6 +429,8 @@ Utilise TOUJOURS catégorie = translation et evidence = high pour tes réponses.
     this.conversationLog = [];
     this.relanceLog = [];
     this.cardLog = [];
+    this.lastTheme = null;
+    this.themeStreakCount = 0;
     this.sessionStartMs = 0;
     if (this.stt) {
       this.stt.close();
