@@ -57,6 +57,30 @@ describe("buildLiveAssistPrompt", () => {
     const prompt = buildLiveAssistPrompt();
     expect(prompt).not.toContain("Sujets déjà analysés");
   });
+
+  it("includes the theme-continuity instruction when lastTheme is provided", () => {
+    const prompt = buildLiveAssistPrompt(undefined, [], [], [], "aws-serverless", 1);
+    expect(prompt).toContain("Thème de la dernière card : « aws-serverless »");
+    expect(prompt).toContain("réutilise EXACTEMENT ce slug");
+  });
+
+  it("does not include the forced-pivot warning below the streak threshold", () => {
+    const prompt = buildLiveAssistPrompt(undefined, [], [], [], "aws-serverless", 2);
+    expect(prompt).not.toContain("DOIT changer complètement de sujet");
+  });
+
+  it("includes the forced-pivot warning once the streak threshold is reached", () => {
+    const prompt = buildLiveAssistPrompt(undefined, [], [], [], "aws-serverless", 3);
+    expect(prompt).toContain("ATTENTION — ce thème a déjà été couvert par 3 cards consécutives");
+    expect(prompt).toContain("DOIT changer complètement de sujet");
+  });
+
+  it("omits the theme section entirely when lastTheme is null or undefined", () => {
+    const promptNull = buildLiveAssistPrompt(undefined, [], [], [], null, 5);
+    expect(promptNull).not.toContain("Thème de la dernière card");
+    const promptUndefined = buildLiveAssistPrompt(undefined, [], [], []);
+    expect(promptUndefined).not.toContain("Thème de la dernière card");
+  });
 });
 
 describe("buildFinalAnalysisPrompt", () => {
