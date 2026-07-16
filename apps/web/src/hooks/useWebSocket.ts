@@ -82,19 +82,15 @@ export function useWebSocket(url: string): UseWebSocketReturn {
         const parsed = parseAssistCard(msg.fullText);
         setStreamingCard(null);
         setIsAnalyzing(false);
-        const updated = {
-          id: msg.id,
-          t: streamingTRef.current,
-          ...parsed,
-          relance: parsed.relance ?? undefined,
-        };
-        setInsights((prev) => {
-          const idx = prev.findIndex((c) => c.id === msg.id);
-          if (idx === -1) return [...prev, updated];
-          const next = [...prev];
-          next[idx] = { ...next[idx], ...updated, t: next[idx].t };
-          return next;
-        });
+        setInsights((prev) => [
+          ...prev,
+          {
+            id: msg.id,
+            t: streamingTRef.current,
+            ...parsed,
+            relance: parsed.relance ?? undefined,
+          },
+        ]);
         break;
       }
       case "assist:cancel":
