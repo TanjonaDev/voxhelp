@@ -59,27 +59,55 @@ describe("buildLiveAssistPrompt", () => {
   });
 
   it("includes the theme-continuity instruction when lastTheme is provided", () => {
-    const prompt = buildLiveAssistPrompt(undefined, [], [], [], "aws-serverless", 1);
+    const prompt = buildLiveAssistPrompt(undefined, [], [], [], "aws-serverless", [], 1);
     expect(prompt).toContain("Thème de la dernière card : « aws-serverless »");
     expect(prompt).toContain("réutilise EXACTEMENT ce slug");
   });
 
-  it("does not include the forced-pivot warning below the streak threshold", () => {
-    const prompt = buildLiveAssistPrompt(undefined, [], [], [], "aws-serverless", 2);
+  it("lists all 3 remaining angles with definitions when no angle is covered yet", () => {
+    const prompt = buildLiveAssistPrompt(undefined, [], [], [], "aws-serverless", [], 1);
+    expect(prompt).toContain("Angles déjà couverts sur ce thème : aucun");
+    expect(prompt).toContain("Angles restants : contexte, ownership, impact");
+    expect(prompt).toContain("contexte : architecture ou projet global");
+    expect(prompt).toContain("ownership : rôle personnel du candidat");
+    expect(prompt).toContain("impact : problème résolu ou résultat concret");
+    expect(prompt).toContain("Ne pose JAMAIS deux relances techniques de suite sur le même outil");
     expect(prompt).not.toContain("DOIT changer complètement de sujet");
   });
 
-  it("includes the forced-pivot warning once the streak threshold is reached", () => {
-    const prompt = buildLiveAssistPrompt(undefined, [], [], [], "aws-serverless", 3);
+  it("lists only the remaining angles once some are already covered", () => {
+    const prompt = buildLiveAssistPrompt(undefined, [], [], [], "aws-serverless", ["contexte"], 2);
+    expect(prompt).toContain("Angles déjà couverts sur ce thème : contexte");
+    expect(prompt).toContain("Angles restants : ownership, impact");
+    expect(prompt).not.toContain("contexte : architecture ou projet global");
+    expect(prompt).not.toContain("DOIT changer complètement de sujet");
+  });
+
+  it("includes the forced-pivot warning once all 3 angles are covered", () => {
+    const prompt = buildLiveAssistPrompt(undefined, [], [], [], "aws-serverless", ["contexte", "ownership", "impact"], 3);
     expect(prompt).toContain("ATTENTION — ce thème a déjà été couvert par 3 cards consécutives");
+    expect(prompt).toContain("DOIT changer complètement de sujet");
+    expect(prompt).not.toContain("Angles restants");
+  });
+
+  it("includes the forced-pivot warning at the 5-card fallback even if angles are missing", () => {
+    const prompt = buildLiveAssistPrompt(undefined, [], [], [], "aws-serverless", [], 5);
+    expect(prompt).toContain("ATTENTION — ce thème a déjà été couvert par 5 cards consécutives");
     expect(prompt).toContain("DOIT changer complètement de sujet");
   });
 
   it("omits the theme section entirely when lastTheme is null or undefined", () => {
-    const promptNull = buildLiveAssistPrompt(undefined, [], [], [], null, 5);
+    const promptNull = buildLiveAssistPrompt(undefined, [], [], [], null, [], 5);
     expect(promptNull).not.toContain("Thème de la dernière card");
     const promptUndefined = buildLiveAssistPrompt(undefined, [], [], []);
     expect(promptUndefined).not.toContain("Thème de la dernière card");
+  });
+
+  it("documents the 4th angle bracket in the format instructions and drops the old generic diversification line", () => {
+    const prompt = buildLiveAssistPrompt();
+    expect(prompt).toContain("[catégorie] [evidence] [theme-slug] [angle]");
+    expect(prompt).toContain("angle : contexte | ownership | impact | none");
+    expect(prompt).not.toContain("DIVERSIFICATION OBLIGATOIRE");
   });
 });
 
