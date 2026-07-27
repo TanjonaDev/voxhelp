@@ -4,3 +4,4 @@ dist
 *.tsbuildinfo
 .claude
 CLAUDE.md
+.worktrees
