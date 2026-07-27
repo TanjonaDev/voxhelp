@@ -45,9 +45,9 @@ function connectAndStart(port: number): Promise<WebSocket> {
   });
 }
 
-function awsCard(title: string): string {
+function awsCard(title: string, angle: "contexte" | "ownership" | "impact" | "none" = "none"): string {
   return [
-    "[strength] [high] [aws-serverless]",
+    `[strength] [high] [aws-serverless] [${angle}]`,
     `# ${title}`,
     "Détail technique sur ce sujet.",
   ].join("\n");
@@ -62,7 +62,7 @@ function mockStreamAssistOnce(text: string) {
   );
 }
 
-describe("Session theme streak", () => {
+describe("Session theme angle", () => {
   let server: TestServer;
   let ws: WebSocket;
 
@@ -76,12 +76,17 @@ describe("Session theme streak", () => {
     await server.close();
   });
 
-  it("adds the forced-pivot instruction once 3 consecutive cards share the same theme", async () => {
+  it("lists remaining angles and does not force a pivot while angles are still uncovered", async () => {
     server = await createTestServer();
     ws = await connectAndStart(server.port);
 
-    mockStreamAssistOnce(awsCard("Fullstack serverless"));
+    mockStreamAssistOnce(awsCard("Fullstack serverless", "contexte"));
     stt.callbacks!.onTranscript("On fait du serverless avec Lambda.");
+    ws.send(JSON.stringify({ type: "trigger:analyze" }));
+    await waitForMessage(ws, "assist:done");
+
+    mockStreamAssistOnce(awsCard("Rôle sur le projet", "ownership"));
+    stt.callbacks!.onTranscript("J'ai porté cette décision.");
     ws.send(JSON.stringify({ type: "trigger:analyze" }));
     await waitForMessage(ws, "assist:done");
 
@@ -90,8 +95,29 @@ describe("Session theme streak", () => {
     ws.send(JSON.stringify({ type: "trigger:analyze" }));
     await waitForMessage(ws, "assist:done");
 
-    mockStreamAssistOnce(awsCard("Gestion de microservices"));
-    stt.callbacks!.onTranscript("On gère une dizaine de microservices.");
+    const thirdPrompt = mockLlm.streamAssist.mock.calls[2][0] as string;
+    expect(thirdPrompt).toContain("Thème de la dernière card : « aws-serverless »");
+    expect(thirdPrompt).toContain("Angles déjà couverts sur ce thème : contexte, ownership");
+    expect(thirdPrompt).toContain("Angles restants : impact");
+    expect(thirdPrompt).not.toContain("DOIT changer complètement de sujet");
+  });
+
+  it("adds the forced-pivot instruction once all 3 angles are covered on the same theme", async () => {
+    server = await createTestServer();
+    ws = await connectAndStart(server.port);
+
+    mockStreamAssistOnce(awsCard("Fullstack serverless", "contexte"));
+    stt.callbacks!.onTranscript("On fait du serverless avec Lambda.");
+    ws.send(JSON.stringify({ type: "trigger:analyze" }));
+    await waitForMessage(ws, "assist:done");
+
+    mockStreamAssistOnce(awsCard("Rôle sur le projet", "ownership"));
+    stt.callbacks!.onTranscript("J'ai porté cette décision.");
+    ws.send(JSON.stringify({ type: "trigger:analyze" }));
+    await waitForMessage(ws, "assist:done");
+
+    mockStreamAssistOnce(awsCard("Résultat obtenu", "impact"));
+    stt.callbacks!.onTranscript("Ça a réduit la latence de 40%.");
     ws.send(JSON.stringify({ type: "trigger:analyze" }));
     await waitForMessage(ws, "assist:done");
 
@@ -106,18 +132,40 @@ describe("Session theme streak", () => {
     expect(fourthPrompt).toContain("DOIT changer complètement de sujet");
   });
 
-  it("resets the streak and does not warn when the theme changes", async () => {
+  it("forces a pivot at the 5-card fallback even if the LLM never tags an angle", async () => {
     server = await createTestServer();
     ws = await connectAndStart(server.port);
 
-    mockStreamAssistOnce(awsCard("Fullstack serverless"));
+    for (let i = 0; i < 5; i++) {
+      mockStreamAssistOnce(awsCard(`Détail technique ${i}`));
+      stt.callbacks!.onTranscript(`Encore un détail sur ce sujet ${i}.`);
+      ws.send(JSON.stringify({ type: "trigger:analyze" }));
+      await waitForMessage(ws, "assist:done");
+    }
+
+    const sixthCallIndex = 5;
+    mockStreamAssistOnce(awsCard("Encore un détail"));
+    stt.callbacks!.onTranscript("Toujours le même sujet.");
+    ws.send(JSON.stringify({ type: "trigger:analyze" }));
+    await waitForMessage(ws, "assist:done");
+
+    const sixthPrompt = mockLlm.streamAssist.mock.calls[sixthCallIndex][0] as string;
+    expect(sixthPrompt).toContain("ATTENTION — ce thème a déjà été couvert par 5 cards consécutives");
+    expect(sixthPrompt).toContain("DOIT changer complètement de sujet");
+  });
+
+  it("resets covered angles and does not warn when the theme changes", async () => {
+    server = await createTestServer();
+    ws = await connectAndStart(server.port);
+
+    mockStreamAssistOnce(awsCard("Fullstack serverless", "contexte"));
     stt.callbacks!.onTranscript("On fait du serverless avec Lambda.");
     ws.send(JSON.stringify({ type: "trigger:analyze" }));
     await waitForMessage(ws, "assist:done");
 
     mockStreamAssistOnce(
       [
-        "[translation] [medium] [methodologie-travail]",
+        "[translation] [medium] [methodologie-travail] [none]",
         "# Méthode de travail en équipe",
         "Le candidat décrit sa méthode agile.",
       ].join("\n")
