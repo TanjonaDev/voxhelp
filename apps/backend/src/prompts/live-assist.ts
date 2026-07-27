@@ -1,6 +1,12 @@
 import type { JobContext, Insight } from "@voxhelp/shared";
 
-const THEME_STREAK_THRESHOLD = 3;
+const ALL_ANGLES = ["contexte", "ownership", "impact"] as const;
+const ANGLE_DEFINITIONS: Record<(typeof ALL_ANGLES)[number], string> = {
+  contexte: "architecture ou projet global (\"Décrivez-moi l'architecture globale\")",
+  ownership: "rôle personnel du candidat dans ce choix/projet (\"Quel était votre rôle ?\")",
+  impact: "problème résolu ou résultat concret (\"Quel problème ça résolvait ?\")",
+};
+const THEME_CARD_COUNT_FALLBACK = 5;
 
 function buildJobContext(ctx?: JobContext): string {
   if (!ctx) return "";
@@ -24,11 +30,22 @@ function buildPreviousCards(cards: Insight[]): string {
   return `\nSujets déjà analysés (diversifie les thèmes) :\n${recent.map((c) => `- [${c.cat}] ${c.title}`).join("\n")}\n`;
 }
 
-function buildThemeStreakSection(lastTheme?: string | null, streakCount = 0): string {
+function buildThemeAngleSection(
+  lastTheme: string | null | undefined,
+  coveredAngles: string[],
+  themeCardCount: number
+): string {
   if (!lastTheme) return "";
-  let section = `\nThème de la dernière card : « ${lastTheme} ». Si le nouveau segment reste sur ce même sujet, réutilise EXACTEMENT ce slug pour le theme-tag ; sinon choisis un nouveau slug court (kebab-case).\n`;
-  if (streakCount >= THEME_STREAK_THRESHOLD) {
-    section += `ATTENTION — ce thème a déjà été couvert par ${streakCount} cards consécutives. Si le nouveau segment reste sur ce même sujet, ta relance DOIT changer complètement de sujet — pas un autre détail technique de « ${lastTheme} », mais un sujet vraiment différent : méthodologie de travail, parcours professionnel, soft skills, un autre projet, gestion d'équipe, préférences technologiques hors de ce sujet, etc.\n`;
+
+  const remaining = ALL_ANGLES.filter((a) => !coveredAngles.includes(a));
+  const forcePivot = remaining.length === 0 || themeCardCount >= THEME_CARD_COUNT_FALLBACK;
+
+  let section = `\nThème de la dernière card : « ${lastTheme} ». Si le nouveau segment reste sur ce thème, réutilise EXACTEMENT ce slug pour le theme-tag.\n`;
+
+  if (forcePivot) {
+    section += `\nATTENTION — ce thème a déjà été couvert par ${themeCardCount} cards consécutives. Si le nouveau segment reste sur ce même sujet, ta relance DOIT changer complètement de sujet — pas un autre détail technique de « ${lastTheme} », mais un sujet vraiment différent : méthodologie de travail, parcours professionnel, soft skills, un autre projet, gestion d'équipe, préférences technologiques hors de ce sujet, etc.\n`;
+  } else {
+    section += `\nAngles déjà couverts sur ce thème : ${coveredAngles.length > 0 ? coveredAngles.join(", ") : "aucun"}.\nAngles restants : ${remaining.join(", ")} — privilégie un de ces angles pour ta prochaine relance :\n${remaining.map((a) => `- ${a} : ${ANGLE_DEFINITIONS[a]}`).join("\n")}\n\nNe pose JAMAIS deux relances techniques de suite sur le même outil (ex : nombre de topics Kafka, puis throughput, puis consumer lag). Le but n'est pas de comprendre l'outil en détail, c'est de comprendre la personne — ses décisions, son rôle, son impact.\n`;
   }
   return section;
 }
@@ -39,7 +56,8 @@ export function buildLiveAssistPrompt(
   previousRelances?: string[],
   previousCards?: Insight[],
   lastTheme?: string | null,
-  themeStreakCount?: number
+  coveredAngles?: string[],
+  themeCardCount?: number
 ): string {
   const jobCtx = buildJobContext(jobContext);
   const convHistory = buildConversationHistory(history ?? []);
@@ -48,7 +66,7 @@ export function buildLiveAssistPrompt(
     previousRelances && previousRelances.length > 0
       ? `\nQuestions déjà posées (ne pas répéter) :\n${previousRelances.map((q) => `- ${q}`).join("\n")}\n`
       : "";
-  const themeSection = buildThemeStreakSection(lastTheme, themeStreakCount ?? 0);
+  const themeSection = buildThemeAngleSection(lastTheme, coveredAngles ?? [], themeCardCount ?? 0);
 
   return `Tu es VoxHelp, un copilote bienveillant qui aide un recruteur non-technique pendant un entretien développeur.${jobCtx}${convHistory}${prevCards}${relancesSection}${themeSection}
 Rôle : traduire le jargon, repérer les points forts, aider à poser les bonnes questions.
@@ -63,7 +81,7 @@ Transcription possiblement incomplète. Ne le mentionne jamais. Analyse ce qui E
 Réponds dans la même langue que le candidat.
 
 Format de réponse OBLIGATOIRE — commence DIRECTEMENT par le marqueur, rien avant :
-[catégorie] [evidence] [theme-slug]
+[catégorie] [evidence] [theme-slug] [angle]
 # Titre court
 Explication simple 1-2 phrases
 >> Question de relance (optionnelle)
@@ -78,7 +96,8 @@ Evidence : high (exemple concret fourni) | medium (mention sans détail) | low (
 
 theme-slug : court identifiant kebab-case (1 à 4 mots) du macro-sujet abordé (ex : aws-serverless, presentation, methodologie-travail).
 
+angle : contexte | ownership | impact | none — l'angle de TA relance suggérée. none si pas de relance (cat = translation) ou si la relance ne correspond à aucun des 3 angles.
+
 Relance : naturelle et bienveillante, jamais accusatrice.
-DIVERSIFICATION OBLIGATOIRE : si les 2 derniers sujets analysés portent sur le même thème ou la même techno, ta relance DOIT aborder un autre aspect (autre compétence, projet marquant, méthode de travail, challenge résolu, préférence technologique).
 Pas de relance si cat = translation ou si le sujet est épuisé.`;
 }
