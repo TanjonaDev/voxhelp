@@ -15,12 +15,15 @@ interface ProfileUsage {
   session_limit: number;
 }
 
-function extractTheme(text: string): string | null {
+function extractThemeAndAngle(text: string): { theme: string | null; angle: string | null } {
   const headerLine = text.trim().split("\n")[0] ?? "";
   const match = headerLine.match(
-    /\[(?:jargon|strength|attention|translation)\]\s*\[(?:high|medium|low)\]\s*\[([a-z0-9-]+)\]/i
+    /\[(?:jargon|strength|attention|translation)\]\s*\[(?:high|medium|low)\]\s*\[([a-z0-9-]+)\](?:\s*\[(contexte|ownership|impact|none)\])?/i
   );
-  return match?.[1]?.toLowerCase() ?? null;
+  return {
+    theme: match?.[1]?.toLowerCase() ?? null,
+    angle: match?.[2]?.toLowerCase() ?? null,
+  };
 }
 
 export class Session {
@@ -43,7 +46,8 @@ export class Session {
   private pendingTranscript: string | null = null;
   private readonly DEBOUNCE_MS = 2500;
   private lastTheme: string | null = null;
-  private themeStreakCount = 0;
+  private coveredAngles: Set<string> = new Set();
+  private themeCardCount = 0;
 
   constructor(ws: WebSocket, userId: string | null = null, maxBufferMs: number = 3 * 60 * 1000) {
     this.ws = ws;
@@ -128,7 +132,8 @@ export class Session {
     this.relanceLog = [];
     this.cardLog = [];
     this.lastTheme = null;
-    this.themeStreakCount = 0;
+    this.coveredAngles = new Set();
+    this.themeCardCount = 0;
     this.sessionStartMs = Date.now();
 
     this.stt?.close();
@@ -250,7 +255,8 @@ export class Session {
           this.relanceLog,
           this.cardLog,
           this.lastTheme,
-          this.themeStreakCount
+          Array.from(this.coveredAngles),
+          this.themeCardCount
         ),
         `Ce qui vient d'être dit :\n"${transcript}"`,
         (chunk) => {
@@ -286,12 +292,14 @@ export class Session {
       this.cardLog.push(card);
       if (this.cardLog.length > this.MAX_CARD_LOG) this.cardLog.shift();
 
-      const theme = extractTheme(fullText);
+      const { theme, angle } = extractThemeAndAngle(fullText);
       if (theme && theme === this.lastTheme) {
-        this.themeStreakCount += 1;
+        this.themeCardCount += 1;
+        if (angle && angle !== "none") this.coveredAngles.add(angle);
       } else {
         this.lastTheme = theme;
-        this.themeStreakCount = theme ? 1 : 0;
+        this.themeCardCount = theme ? 1 : 0;
+        this.coveredAngles = new Set(angle && angle !== "none" ? [angle] : []);
       }
 
     } catch (err) {
@@ -430,7 +438,8 @@ Utilise TOUJOURS catégorie = translation et evidence = high pour tes réponses.
     this.relanceLog = [];
     this.cardLog = [];
     this.lastTheme = null;
-    this.themeStreakCount = 0;
+    this.coveredAngles = new Set();
+    this.themeCardCount = 0;
     this.sessionStartMs = 0;
     if (this.stt) {
       this.stt.close();
