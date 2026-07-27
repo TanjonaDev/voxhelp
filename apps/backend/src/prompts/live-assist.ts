@@ -45,7 +45,7 @@ function buildThemeAngleSection(
   if (forcePivot) {
     section += `\nATTENTION — ce thème a déjà été couvert par ${themeCardCount} cards consécutives. Si le nouveau segment reste sur ce même sujet, ta relance DOIT changer complètement de sujet — pas un autre détail technique de « ${lastTheme} », mais un sujet vraiment différent : méthodologie de travail, parcours professionnel, soft skills, un autre projet, gestion d'équipe, préférences technologiques hors de ce sujet, etc.\n`;
   } else {
-    section += `\nAngles déjà couverts sur ce thème : ${coveredAngles.length > 0 ? coveredAngles.join(", ") : "aucun"}.\nAngles restants : ${remaining.join(", ")} — privilégie un de ces angles pour ta prochaine relance :\n${remaining.map((a) => `- ${a} : ${ANGLE_DEFINITIONS[a]}`).join("\n")}\n\nNe pose JAMAIS deux relances techniques de suite sur le même outil (ex : nombre de topics Kafka, puis throughput, puis consumer lag). Le but n'est pas de comprendre l'outil en détail, c'est de comprendre la personne — ses décisions, son rôle, son impact.\n`;
+    section += `\nAngles déjà couverts sur ce thème : ${coveredAngles.length > 0 ? coveredAngles.join(", ") : "aucun"}.\nAngles restants : ${remaining.join(", ")} — privilégie un de ces angles pour ta prochaine relance :\n${remaining.map((a) => `- ${a} : ${ANGLE_DEFINITIONS[a]}`).join("\n")}\n\nNe pose JAMAIS deux relances techniques de suite sur le même outil (ex : nombre de topics Kafka, puis throughput, puis consumer lag). Le but n'est pas de comprendre l'outil en détail, c'est de comprendre la personne — ses décisions, son rôle, son impact.\nTague ta relance avec le 4ème bracket [contexte|ownership|impact|none].\n`;
   }
   return section;
 }

@@ -182,5 +182,7 @@ describe("Session theme angle", () => {
     const thirdPrompt = mockLlm.streamAssist.mock.calls[2][0] as string;
     expect(thirdPrompt).toContain("Thème de la dernière card : « methodologie-travail »");
     expect(thirdPrompt).not.toContain("ATTENTION — ce thème a déjà été couvert");
+    expect(thirdPrompt).toContain("Angles déjà couverts sur ce thème : aucun");
+    expect(thirdPrompt).toContain("Angles restants : contexte, ownership, impact");
   });
 });

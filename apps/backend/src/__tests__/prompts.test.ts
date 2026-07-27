@@ -72,6 +72,7 @@ describe("buildLiveAssistPrompt", () => {
     expect(prompt).toContain("ownership : rôle personnel du candidat");
     expect(prompt).toContain("impact : problème résolu ou résultat concret");
     expect(prompt).toContain("Ne pose JAMAIS deux relances techniques de suite sur le même outil");
+    expect(prompt).toContain("Tague ta relance avec le 4ème bracket [contexte|ownership|impact|none]");
     expect(prompt).not.toContain("DOIT changer complètement de sujet");
   });
 
@@ -80,6 +81,7 @@ describe("buildLiveAssistPrompt", () => {
     expect(prompt).toContain("Angles déjà couverts sur ce thème : contexte");
     expect(prompt).toContain("Angles restants : ownership, impact");
     expect(prompt).not.toContain("contexte : architecture ou projet global");
+    expect(prompt).toContain("Tague ta relance avec le 4ème bracket [contexte|ownership|impact|none]");
     expect(prompt).not.toContain("DOIT changer complètement de sujet");
   });
 
