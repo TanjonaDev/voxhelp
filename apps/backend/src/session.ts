@@ -18,7 +18,7 @@ interface ProfileUsage {
 function extractThemeAndAngle(text: string): { theme: string | null; angle: string | null } {
   const headerLine = text.trim().split("\n")[0] ?? "";
   const match = headerLine.match(
-    /\[(?:jargon|strength|attention|translation)\]\s*\[(?:high|medium|low)\]\s*\[([a-z0-9-]+)\](?:\s*\[(contexte|ownership|impact|none)\])?/i
+    /\[?(?:jargon|strength|attention|translation)\]?\s*\[?(?:high|medium|low)\]?\s*\[?([a-z0-9-]+)\]?(?:\s*\[?(contexte|ownership|impact|none)\]?)?/i
   );
   return {
     theme: match?.[1]?.toLowerCase() ?? null,
@@ -216,7 +216,7 @@ export class Session {
     const lines = text.trim().split("\n").filter((l) => l.trim() !== "");
 
     const headerMatch = lines[0]?.match(
-      /\[(jargon|strength|attention|translation)\]\s*\[(high|medium|low)\]/
+      /\[?(jargon|strength|attention|translation)\]?\s*\[?(high|medium|low)\]?/
     );
     const cat = (headerMatch?.[1] as Insight["cat"]) ?? "translation";
     const evidence = (headerMatch?.[2] as Insight["evidence"]) ?? "medium";

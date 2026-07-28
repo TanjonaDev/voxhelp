@@ -14,7 +14,7 @@ export function parsePartialAssist(textSoFar: string, id: string, t: string): Pa
   const lines = textSoFar.split("\n").filter((l) => l.trim() !== "");
 
   const headerMatch = lines[0]?.match(
-    /\[(jargon|strength|attention|translation)\]\s*\[(high|medium|low)\]/
+    /\[?(jargon|strength|attention|translation)\]?\s*\[?(high|medium|low)\]?/
   );
   const cat = (headerMatch?.[1] as AssistCard["cat"]) ?? null;
   const evidence = (headerMatch?.[2] as AssistCard["evidence"]) ?? null;

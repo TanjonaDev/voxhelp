@@ -86,6 +86,8 @@ Format de réponse OBLIGATOIRE — commence DIRECTEMENT par le marqueur, rien av
 Explication simple 1-2 phrases
 >> Question de relance (optionnelle)
 
+IMPORTANT — les 4 champs de la ligne d'en-tête doivent CHACUN être entourés de crochets, sans exception : jamais de valeur nue sans crochets, même pour evidence/theme-slug/angle. Exemple exact et complet : [jargon] [high] [aws-lambda-scheduling] [ownership]
+
 Catégories :
 - jargon : terme technique → explique simplement au recruteur
 - strength : expérience concrète ou résultat mesurable → valorise

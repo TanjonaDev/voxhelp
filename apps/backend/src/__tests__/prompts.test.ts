@@ -111,6 +111,12 @@ describe("buildLiveAssistPrompt", () => {
     expect(prompt).toContain("angle : contexte | ownership | impact | none");
     expect(prompt).not.toContain("DIVERSIFICATION OBLIGATOIRE");
   });
+
+  it("insists every header field must be bracketed, with a fully-bracketed example", () => {
+    const prompt = buildLiveAssistPrompt();
+    expect(prompt).toContain("les 4 champs de la ligne d'en-tête doivent CHACUN être entourés de crochets");
+    expect(prompt).toContain("[jargon] [high] [aws-lambda-scheduling] [ownership]");
+  });
 });
 
 describe("buildFinalAnalysisPrompt", () => {

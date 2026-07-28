@@ -185,4 +185,53 @@ describe("Session theme angle", () => {
     expect(thirdPrompt).toContain("Angles déjà couverts sur ce thème : aucun");
     expect(thirdPrompt).toContain("Angles restants : contexte, ownership, impact");
   });
+
+  it("still tracks theme/angle when the LLM omits brackets on some header fields", async () => {
+    // Real production output observed from the live-assist model (Haiku): only the
+    // category is reliably bracketed, the other 3 fields are inconsistently bracketed.
+    server = await createTestServer();
+    ws = await connectAndStart(server.port);
+
+    mockStreamAssistOnce(
+      [
+        "[translation] high parcours-rbc-data-projects none",
+        "# Parcours et contexte du candidat",
+        "Le candidat décrit son parcours.",
+      ].join("\n")
+    );
+    stt.callbacks!.onTranscript("Je travaille chez RBC sur des projets data.");
+    ws.send(JSON.stringify({ type: "trigger:analyze" }));
+    await waitForMessage(ws, "assist:done");
+
+    mockStreamAssistOnce(
+      [
+        "[jargon] high parcours-rbc-data-projects [ownership]",
+        "# Rôle du candidat sur le projet",
+        "Le candidat explique son rôle.",
+        ">> Quel était votre rôle exact ?",
+      ].join("\n")
+    );
+    stt.callbacks!.onTranscript("J'étais responsable de l'architecture.");
+    ws.send(JSON.stringify({ type: "trigger:analyze" }));
+    await waitForMessage(ws, "assist:done");
+
+    const secondPrompt = mockLlm.streamAssist.mock.calls[1][0] as string;
+    expect(secondPrompt).toContain("Thème de la dernière card : « parcours-rbc-data-projects »");
+    expect(secondPrompt).toContain("Angles restants : contexte, ownership, impact");
+
+    mockStreamAssistOnce(
+      [
+        "[strength] high [parcours-rbc-data-projects] impact",
+        "# Résultat obtenu par le candidat",
+        "Le candidat décrit le résultat.",
+      ].join("\n")
+    );
+    stt.callbacks!.onTranscript("Ça a réduit les coûts de 30%.");
+    ws.send(JSON.stringify({ type: "trigger:analyze" }));
+    await waitForMessage(ws, "assist:done");
+
+    const thirdPrompt2 = mockLlm.streamAssist.mock.calls[2][0] as string;
+    expect(thirdPrompt2).toContain("Angles déjà couverts sur ce thème : ownership");
+    expect(thirdPrompt2).toContain("Angles restants : contexte, impact");
+  });
 });

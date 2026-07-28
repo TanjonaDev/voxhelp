@@ -10,7 +10,7 @@ export function parseAssistCard(raw: string): AssistCard {
   const lines = raw.trim().split("\n").filter((l) => l.trim() !== "");
 
   const headerMatch = lines[0]?.match(
-    /\[(jargon|strength|attention|translation)\]\s*\[(high|medium|low)\]/
+    /\[?(jargon|strength|attention|translation)\]?\s*\[?(high|medium|low)\]?/
   );
 
   const title = lines[1]?.replace(/^#\s*/, "").trim() ?? "";
