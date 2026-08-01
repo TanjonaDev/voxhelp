@@ -18,7 +18,7 @@ interface ProfileUsage {
 function extractThemeAndAngle(text: string): { theme: string | null; angle: string | null } {
   const headerLine = text.trim().split("\n")[0] ?? "";
   const match = headerLine.match(
-    /\[?(?:jargon|strength|attention|translation)\]?\s*\[?(?:high|medium|low)\]?\s*\[?([a-z0-9-]+)\]?(?:\s*\[?(contexte|ownership|impact|none)\]?)?/i
+    /\[?(?:jargon|strength|attention|translation)\]?\s*\[?(?:acquis|a-creuser|pas-acquis)\]?\s*\[?([a-z0-9-]+)\]?(?:\s*\[?(contexte|ownership|impact|none)\]?)?/i
   );
   return {
     theme: match?.[1]?.toLowerCase() ?? null,
@@ -216,10 +216,11 @@ export class Session {
     const lines = text.trim().split("\n").filter((l) => l.trim() !== "");
 
     const headerMatch = lines[0]?.match(
-      /\[?(jargon|strength|attention|translation)\]?\s*\[?(high|medium|low)\]?/
+      /\[?(jargon|strength|attention|translation)\]?\s*\[?(acquis|a-creuser|pas-acquis)\]?/
     );
     const cat = (headerMatch?.[1] as Insight["cat"]) ?? "translation";
-    const evidence = (headerMatch?.[2] as Insight["evidence"]) ?? "medium";
+    const status = (headerMatch?.[2] as Insight["status"]) ?? "a-creuser";
+    const { theme } = extractThemeAndAngle(text);
 
     const title = lines[1]?.replace(/^#\s*/, "").trim() ?? "";
 
@@ -230,7 +231,7 @@ export class Session {
     const bodyEnd = hasRelance ? lines.length - 1 : lines.length;
     const body = lines.slice(2, bodyEnd).join(" ").trim();
 
-    return { id, cat, evidence, t, title, body, relance };
+    return { id, cat, status, theme, t, title, body, relance };
   }
 
   private async processTranscript(transcript: string): Promise<void> {
@@ -332,12 +333,12 @@ Exemples de questions que le recruteur peut poser :
 - "Que demander maintenant ?" → suggère la meilleure question de suivi
 
 Format de réponse OBLIGATOIRE — commence DIRECTEMENT par le marqueur, rien avant :
-[catégorie] [evidence]
+[catégorie] [statut]
 # Titre court (max 10 mots)
 Ta réponse complète au recruteur. 2-5 phrases, langage simple et direct. Si le recruteur demande une question d'entretien, donne la question ET explique ce qu'une bonne réponse devrait contenir.
 >> Question de suivi optionnelle (ou rien)
 
-Utilise TOUJOURS catégorie = translation et evidence = high pour tes réponses.`,
+Utilise TOUJOURS catégorie = translation et statut = acquis pour tes réponses.`,
     ];
 
     if (this.jobContext) {
