@@ -1,7 +1,7 @@
 import type { WebSocket } from "ws";
 import type {
   ClientMessage, ServerMessage, SessionConfig,
-  Insight, CandidateReport, JobContext,
+  Insight, CandidateReport, JobContext, ThemeStatus,
 } from "@voxhelp/shared";
 import { createId } from "@voxhelp/shared";
 import { FluxSTT } from "./deepgram-flux.js";
@@ -24,6 +24,19 @@ function extractThemeAndAngle(text: string): { theme: string | null; angle: stri
     theme: match?.[1]?.toLowerCase() ?? null,
     angle: match?.[2]?.toLowerCase() ?? null,
   };
+}
+
+function buildThemeRollup(cards: Insight[]): ThemeStatus[] {
+  const byTheme = new Map<string, Insight>();
+  for (const card of cards) {
+    if (!card.theme || card.cat === "jargon") continue;
+    byTheme.set(card.theme, card);
+  }
+  return Array.from(byTheme.entries()).map(([theme, card]) => ({
+    theme,
+    status: card.status,
+    label: card.title,
+  }));
 }
 
 export class Session {
@@ -397,12 +410,15 @@ Utilise TOUJOURS catégorie = translation et statut = acquis pour tes réponses.
 
   private async generateFinalReport(): Promise<void> {
     try {
-      const report = await callClaudeJSON<CandidateReport>(
+      const report = await callClaudeJSON<Omit<CandidateReport, "themes">>(
         buildFinalAnalysisPrompt(this.jobContext, this.cardLog),
         "Génère le bilan final du candidat.",
         "claude-sonnet-4-6"
       );
-      this.send({ type: "analysis:final", report });
+      this.send({
+        type: "analysis:final",
+        report: { ...report, themes: buildThemeRollup(this.cardLog) },
+      });
     } catch (err) {
       this.send({
         type: "session:error",
