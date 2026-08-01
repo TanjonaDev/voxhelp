@@ -5,3 +5,4 @@ dist
 .claude
 CLAUDE.md
 .worktrees
+.agent-audit.jsonl
