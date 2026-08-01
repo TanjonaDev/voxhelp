@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef } from "react";
-import type { Insight, CandidateReport, JobContext } from "@voxhelp/shared";
-import { VIcon, VHMark, LiveWave, Confidence, CategoryTag, GhostBtn } from "./ui.js";
+import type { Insight, CandidateReport, JobContext, ThemeStatus } from "@voxhelp/shared";
+import { VIcon, VHMark, LiveWave, StatusBadge, CategoryTag, GhostBtn } from "./ui.js";
 import type { PartialCard } from "../lib/parseAssistStream.js";
 
 type WsStatus = "disconnected" | "connecting" | "connected" | "error";
@@ -487,7 +487,7 @@ function InsightCardView({ insight, isNew }: { insight: Insight; isNew: boolean 
         <span style={{ fontFamily: "var(--mono)", fontSize: 10.5, color: "var(--text-3)" }}>
           {insight.t}
         </span>
-        <Confidence level={insight.evidence} showLabel={false} />
+        {insight.cat !== "jargon" && <StatusBadge level={insight.status} />}
       </div>
 
       {/* title */}
@@ -600,6 +600,12 @@ const RECOMMENDATION_META: Record<
   pass: { label: "Non retenu", colorVar: "var(--risk)" },
 };
 
+const THEME_STATUS_META: Record<ThemeStatus["status"], { icon: string; color: string }> = {
+  "acquis": { icon: "✓", color: "var(--good)" },
+  "a-creuser": { icon: "?", color: "var(--warn)" },
+  "pas-acquis": { icon: "✕", color: "var(--risk)" },
+};
+
 function FinalReportView({ report }: { report: CandidateReport }) {
   const r = RECOMMENDATION_META[report.recommendation];
   return (
@@ -640,6 +646,33 @@ function FinalReportView({ report }: { report: CandidateReport }) {
       <p style={{ margin: "0 0 10px", fontSize: 13, lineHeight: 1.5, color: "var(--text-2)" }}>
         {report.overall}
       </p>
+      {report.themes.length > 0 && (
+        <div style={{ marginBottom: 8 }}>
+          <p
+            style={{
+              fontSize: 9.5,
+              fontWeight: 700,
+              letterSpacing: "0.09em",
+              textTransform: "uppercase",
+              color: "var(--text-3)",
+              margin: "0 0 5px",
+            }}
+          >
+            Thèmes abordés
+          </p>
+          <ul style={{ margin: 0, padding: 0, listStyle: "none", display: "flex", flexDirection: "column", gap: 3 }}>
+            {report.themes.map((theme) => {
+              const meta = THEME_STATUS_META[theme.status];
+              return (
+                <li key={theme.theme} style={{ display: "flex", gap: 7, fontSize: 13, color: "var(--text-2)", lineHeight: 1.45 }}>
+                  <span style={{ color: meta.color, flexShrink: 0 }}>{meta.icon}</span>
+                  {theme.label}
+                </li>
+              );
+            })}
+          </ul>
+        </div>
+      )}
       {report.strengths.length > 0 && (
         <div style={{ marginBottom: 8 }}>
           <p
