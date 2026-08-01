@@ -94,6 +94,8 @@ private parseAssistText(text: string, id: string, t: string): Insight {
 
 Le tracking `lastTheme`/`coveredAngles`/`themeCardCount` (lignes 295-303) n'est pas modifié dans sa logique. `parseAssistText` (ligne 287) et ce bloc de tracking (ligne 295) continuent chacun à appeler `extractThemeAndAngle` séparément — double parsing léger (une regex), déjà le cas aujourd'hui pour `cat`/`evidence` vs `theme`/`angle`, pas une régression.
 
+`buildAskPrompt` (ligne 322, prompt séparé pour le flux « le recruteur pose une question directe ») utilise aussi le vocabulaire `evidence` dans son format d'en-tête (`[catégorie] [evidence]`, ligne 335) et instruit en dur `evidence = high` (ligne 340). Mis à jour avec le même vocabulaire : `[catégorie] [statut]` et `statut = acquis`. `parseAssistText` étant partagé entre `processTranscript` et `handleAskQuestion`, ce prompt doit rester cohérent avec la nouvelle regex de parsing.
+
 ### 4. Rollup par thème (`apps/backend/src/prompts/final-analysis.ts` ou nouvelle fonction utilitaire dans `session.ts`)
 
 Nouvelle fonction pure, appelée juste avant `generateFinalReport` (ligne 397) :
@@ -143,4 +145,4 @@ this.send({ type: "analysis:final", report: { ...report, themes: buildThemeRollu
 - `session.test.ts` / nouveau `session-theme-rollup.test.ts` :
   - `parseAssistText` extrait correctement `status` et `theme` avec et sans crochets sur le 2ème bracket (cohérent avec le fix existant sur le parsing tolérant).
   - `buildThemeRollup` : plusieurs cards sur le même thème → seul le dernier statut est gardé (la valeur `Map` est écrasée, mais la clé garde sa position d'insertion en JS) ; cards `cat=jargon` exclues même si elles ont un thème ; cards sans thème (`null`) ignorées ; les thèmes distincts apparaissent dans `themes[]` dans leur ordre de première apparition dans `cardLog`, pour rester lisible chronologiquement côté recruteur.
-- Frontend : tests existants sur `parseAssistCard`/`parsePartialAssist` mis à jour avec les nouveaux mots-clés ; nouveau cas couvrant l'extraction du thème.
+- Frontend : `apps/web` n'a pas d'infra de tests (pas de vitest configuré, `package.json` n'expose que `dev`/`build`/`preview`) — cohérent avec le reste du projet, pas de suite à ajouter pour ce changement. Vérification manuelle : lancer `pnpm dev`, dérouler un entretien de test, vérifier que les badges de statut s'affichent avec les nouvelles valeurs et que le bilan final liste les thèmes.
