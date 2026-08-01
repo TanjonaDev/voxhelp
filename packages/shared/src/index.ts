@@ -14,11 +14,18 @@ export interface SessionConfig {
 export interface Insight {
   id: string;
   cat: "translation" | "jargon" | "strength" | "attention";
-  evidence: "high" | "medium" | "low";
+  status: "acquis" | "a-creuser" | "pas-acquis";
+  theme: string | null;
   t: string;
   title: string;
   body: string;
   relance?: string;
+}
+
+export interface ThemeStatus {
+  theme: string;
+  status: Insight["status"];
+  label: string;
 }
 
 export interface CandidateReport {
@@ -27,6 +34,7 @@ export interface CandidateReport {
   gaps: string[];
   recommendation: "hire" | "maybe" | "pass";
   recommendationReason: string;
+  themes: ThemeStatus[];
 }
 
 export type ClientMessage =
