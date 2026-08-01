@@ -71,7 +71,7 @@ export function useWebSocket(url: string): UseWebSocketReturn {
       case "assist:start":
         streamingTextRef.current = "";
         streamingTRef.current = msg.t;
-        setStreamingCard({ id: msg.id, t: msg.t, cat: null, evidence: null, title: null, body: "", relance: null });
+        setStreamingCard({ id: msg.id, t: msg.t, cat: null, status: null, theme: null, title: null, body: "", relance: null });
         setIsAnalyzing(true);
         break;
       case "assist:chunk":

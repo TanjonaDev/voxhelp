@@ -1,6 +1,7 @@
 export interface AssistCard {
   cat: "jargon" | "strength" | "attention" | "translation";
-  evidence: "high" | "medium" | "low";
+  status: "acquis" | "a-creuser" | "pas-acquis";
+  theme: string | null;
   title: string;
   body: string;
   relance: string | null;
@@ -8,9 +9,13 @@ export interface AssistCard {
 
 export function parseAssistCard(raw: string): AssistCard {
   const lines = raw.trim().split("\n").filter((l) => l.trim() !== "");
+  const headerLine = lines[0] ?? "";
 
-  const headerMatch = lines[0]?.match(
-    /\[?(jargon|strength|attention|translation)\]?\s*\[?(high|medium|low)\]?/
+  const headerMatch = headerLine.match(
+    /\[?(jargon|strength|attention|translation)\]?\s*\[?(acquis|a-creuser|pas-acquis)\]?/
+  );
+  const themeMatch = headerLine.match(
+    /\[?(?:jargon|strength|attention|translation)\]?\s*\[?(?:acquis|a-creuser|pas-acquis)\]?\s*\[?([a-z0-9-]+)\]?/i
   );
 
   const title = lines[1]?.replace(/^#\s*/, "").trim() ?? "";
@@ -24,7 +29,8 @@ export function parseAssistCard(raw: string): AssistCard {
 
   return {
     cat: (headerMatch?.[1] as AssistCard["cat"]) ?? "translation",
-    evidence: (headerMatch?.[2] as AssistCard["evidence"]) ?? "medium",
+    status: (headerMatch?.[2] as AssistCard["status"]) ?? "a-creuser",
+    theme: themeMatch?.[1]?.toLowerCase() ?? null,
     title,
     body,
     relance,
