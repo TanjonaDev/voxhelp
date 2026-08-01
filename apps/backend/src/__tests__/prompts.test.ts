@@ -7,7 +7,8 @@ const confirmedCard: Insight = {
   id: "test-1",
   t: "01:00",
   cat: "strength",
-  evidence: "high",
+  status: "acquis",
+  theme: "react-production",
   title: "Expérience terrain solide en React",
   body: "Le candidat a démontré une utilisation concrète de React en production.",
   relance: "Dans quel contexte avez-vous utilisé React ?",
@@ -17,7 +18,8 @@ const vagueCard: Insight = {
   id: "test-2",
   t: "02:00",
   cat: "attention",
-  evidence: "low",
+  status: "pas-acquis",
+  theme: "react-production",
   title: "Manque de concret",
   body: "Réponse trop générale, sans exemple précis.",
   relance: "Pouvez-vous donner un exemple précis ?",
@@ -107,7 +109,7 @@ describe("buildLiveAssistPrompt", () => {
 
   it("documents the 4th angle bracket in the format instructions and drops the old generic diversification line", () => {
     const prompt = buildLiveAssistPrompt();
-    expect(prompt).toContain("[catégorie] [evidence] [theme-slug] [angle]");
+    expect(prompt).toContain("[catégorie] [statut] [theme-slug] [angle]");
     expect(prompt).toContain("angle : contexte | ownership | impact | none");
     expect(prompt).not.toContain("DIVERSIFICATION OBLIGATOIRE");
   });
@@ -115,7 +117,27 @@ describe("buildLiveAssistPrompt", () => {
   it("insists every header field must be bracketed, with a fully-bracketed example", () => {
     const prompt = buildLiveAssistPrompt();
     expect(prompt).toContain("les 4 champs de la ligne d'en-tête doivent CHACUN être entourés de crochets");
-    expect(prompt).toContain("[jargon] [high] [aws-lambda-scheduling] [ownership]");
+    expect(prompt).toContain("[jargon] [acquis] [aws-lambda-scheduling] [ownership]");
+  });
+
+  it("defines the acquis/a-creuser/pas-acquis vocabulary instead of evidence levels", () => {
+    const prompt = buildLiveAssistPrompt();
+    expect(prompt).toContain("Statut : acquis (exemple concret fourni, réponse complète)");
+    expect(prompt).toContain("a-creuser (mention sans détail, incomplet)");
+    expect(prompt).toContain("pas-acquis (vague, aucune preuve concrète)");
+    expect(prompt).not.toContain("Evidence : high");
+  });
+
+  it("instructs a 1-sentence body in plain, non-technical language", () => {
+    const prompt = buildLiveAssistPrompt();
+    expect(prompt).toContain("1 phrase MAX");
+    expect(prompt).toContain("comme si tu l'expliquais à quelqu'un qui n'a jamais fait de dev");
+  });
+
+  it("forbids technical asides/parentheses in the relance", () => {
+    const prompt = buildLiveAssistPrompt();
+    expect(prompt).toContain("jamais de parenthèse ou d'aside technique d'implémentation");
+    expect(prompt).toContain("lisible à voix haute par un recruteur non-tech");
   });
 });
 
@@ -127,12 +149,12 @@ describe("buildFinalAnalysisPrompt", () => {
     expect(prompt).toContain("Node.js");
   });
 
-  it("includes all card titles and evidence levels", () => {
+  it("includes all card titles and statuses", () => {
     const prompt = buildFinalAnalysisPrompt(undefined, [confirmedCard, vagueCard]);
     expect(prompt).toContain("Expérience terrain solide en React");
     expect(prompt).toContain("Manque de concret");
-    expect(prompt).toContain("HIGH");
-    expect(prompt).toContain("LOW");
+    expect(prompt).toContain("ACQUIS");
+    expect(prompt).toContain("PAS-ACQUIS");
   });
 
   it("mentions when no analysis is available", () => {
