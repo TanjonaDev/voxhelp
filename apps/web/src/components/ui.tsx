@@ -145,21 +145,21 @@ export function LiveWave({ active = true, bars = 22, h = 16, color = "currentCol
 }
 
 // ---------------------------------------------------------------------------
-// Evidence — 3 dots indicator
+// StatusBadge — acquis / à-creuser / pas-acquis
 // ---------------------------------------------------------------------------
-const EVIDENCE_META: Record<Insight["evidence"], { dots: number; color: string; label: string }> = {
-  high: { dots: 3, color: "var(--good)", label: "Concret" },
-  medium: { dots: 2, color: "var(--warn)", label: "Partiel" },
-  low: { dots: 1, color: "var(--risk)", label: "Vague" },
+const STATUS_META: Record<Insight["status"], { dots: number; color: string; label: string }> = {
+  "acquis": { dots: 3, color: "var(--good)", label: "Acquis" },
+  "a-creuser": { dots: 2, color: "var(--warn)", label: "À creuser" },
+  "pas-acquis": { dots: 1, color: "var(--risk)", label: "Pas acquis" },
 };
 
-interface EvidenceProps {
-  level: Insight["evidence"];
+interface StatusBadgeProps {
+  level: Insight["status"];
   showLabel?: boolean;
 }
 
-export function Confidence({ level, showLabel = true }: EvidenceProps) {
-  const c = EVIDENCE_META[level];
+export function StatusBadge({ level, showLabel = true }: StatusBadgeProps) {
+  const c = STATUS_META[level];
   return (
     <span style={{ display: "inline-flex", alignItems: "center", gap: 7 }}>
       <span style={{ display: "inline-flex", gap: 3, alignItems: "center" }}>
@@ -167,8 +167,8 @@ export function Confidence({ level, showLabel = true }: EvidenceProps) {
           <span
             key={i}
             style={{
-              width: 5,
-              height: 5,
+              width: 6,
+              height: 6,
               borderRadius: 99,
               background: i < c.dots ? c.color : "hsl(0 0% 100% / 0.16)",
               boxShadow: i < c.dots ? `0 0 6px -1px ${c.color}` : "none",
@@ -179,8 +179,8 @@ export function Confidence({ level, showLabel = true }: EvidenceProps) {
       {showLabel && (
         <span
           style={{
-            fontSize: 11,
-            fontWeight: 600,
+            fontSize: 11.5,
+            fontWeight: 700,
             color: c.color,
             letterSpacing: "0.01em",
           }}
@@ -202,7 +202,7 @@ const CATEGORY_META: Record<
   translation: { color: "indigo", icon: "translate", label: "Traduction" },
   jargon: { color: "violet", icon: "sparkle", label: "Jargon décodé" },
   strength: { color: "good", icon: "strength", label: "Point fort" },
-  attention: { color: "risk", icon: "risk", label: "À creuser" },
+  attention: { color: "risk", icon: "risk", label: "Point critique" },
 };
 
 interface CategoryTagProps {
