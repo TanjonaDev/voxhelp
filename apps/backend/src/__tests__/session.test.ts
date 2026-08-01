@@ -47,7 +47,7 @@ function connectAndStart(port: number): Promise<WebSocket> {
 }
 
 const sampleAssistText = [
-  "[strength] [high]",
+  "[strength] [acquis]",
   "# Expérience terrain confirmée en React",
   "Le candidat montre une vraie expérience React en production.",
   ">> Dans quel type de projet avez-vous utilisé React ?",
@@ -59,6 +59,7 @@ const sampleReport: CandidateReport = {
   gaps: ["TypeScript avancé non confirmé"],
   recommendation: "hire",
   recommendationReason: "Profil directement applicable au poste visé.",
+  themes: [],
 };
 
 function mockStreamAssist(text: string) {

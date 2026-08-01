@@ -47,7 +47,7 @@ function connectAndStart(port: number): Promise<WebSocket> {
 
 function awsCard(title: string, angle: "contexte" | "ownership" | "impact" | "none" = "none"): string {
   return [
-    `[strength] [high] [aws-serverless] [${angle}]`,
+    `[strength] [acquis] [aws-serverless] [${angle}]`,
     `# ${title}`,
     "Détail technique sur ce sujet.",
   ].join("\n");
@@ -165,7 +165,7 @@ describe("Session theme angle", () => {
 
     mockStreamAssistOnce(
       [
-        "[translation] [medium] [methodologie-travail] [none]",
+        "[translation] [a-creuser] [methodologie-travail] [none]",
         "# Méthode de travail en équipe",
         "Le candidat décrit sa méthode agile.",
       ].join("\n")
@@ -194,7 +194,7 @@ describe("Session theme angle", () => {
 
     mockStreamAssistOnce(
       [
-        "[translation] high parcours-rbc-data-projects none",
+        "[translation] acquis parcours-rbc-data-projects none",
         "# Parcours et contexte du candidat",
         "Le candidat décrit son parcours.",
       ].join("\n")
@@ -205,7 +205,7 @@ describe("Session theme angle", () => {
 
     mockStreamAssistOnce(
       [
-        "[jargon] high parcours-rbc-data-projects [ownership]",
+        "[jargon] acquis parcours-rbc-data-projects [ownership]",
         "# Rôle du candidat sur le projet",
         "Le candidat explique son rôle.",
         ">> Quel était votre rôle exact ?",
@@ -221,7 +221,7 @@ describe("Session theme angle", () => {
 
     mockStreamAssistOnce(
       [
-        "[strength] high [parcours-rbc-data-projects] impact",
+        "[strength] acquis [parcours-rbc-data-projects] impact",
         "# Résultat obtenu par le candidat",
         "Le candidat décrit le résultat.",
       ].join("\n")
