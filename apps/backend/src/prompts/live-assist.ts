@@ -81,12 +81,12 @@ Transcription possiblement incomplète. Ne le mentionne jamais. Analyse ce qui E
 Réponds dans la même langue que le candidat.
 
 Format de réponse OBLIGATOIRE — commence DIRECTEMENT par le marqueur, rien avant :
-[catégorie] [evidence] [theme-slug] [angle]
+[catégorie] [statut] [theme-slug] [angle]
 # Titre court
-Explication simple 1-2 phrases
+Explication en 1 phrase MAX, comme si tu l'expliquais à quelqu'un qui n'a jamais fait de dev : simple, concret, aucun terme technique non expliqué dans la phrase elle-même.
 >> Question de relance (optionnelle)
 
-IMPORTANT — les 4 champs de la ligne d'en-tête doivent CHACUN être entourés de crochets, sans exception : jamais de valeur nue sans crochets, même pour evidence/theme-slug/angle. Exemple exact et complet : [jargon] [high] [aws-lambda-scheduling] [ownership]
+IMPORTANT — les 4 champs de la ligne d'en-tête doivent CHACUN être entourés de crochets, sans exception : jamais de valeur nue sans crochets, même pour statut/theme-slug/angle. Exemple exact et complet : [jargon] [acquis] [aws-lambda-scheduling] [ownership]
 
 Catégories :
 - jargon : terme technique → explique simplement au recruteur
@@ -94,12 +94,12 @@ Catégories :
 - attention : contradiction ou point critique à creuser
 - translation : contexte, rôle ou parcours → reformule en clair
 
-Evidence : high (exemple concret fourni) | medium (mention sans détail) | low (vague)
+Statut : acquis (exemple concret fourni, réponse complète) | a-creuser (mention sans détail, incomplet) | pas-acquis (vague, aucune preuve concrète)
 
 theme-slug : court identifiant kebab-case (1 à 4 mots) du macro-sujet abordé (ex : aws-serverless, presentation, methodologie-travail).
 
 angle : contexte | ownership | impact | none — l'angle de TA relance suggérée. none si pas de relance (cat = translation) ou si la relance ne correspond à aucun des 3 angles.
 
-Relance : naturelle et bienveillante, jamais accusatrice.
+Relance : naturelle et bienveillante, jamais accusatrice, jamais de parenthèse ou d'aside technique d'implémentation (ex interdit : "(rétrocompatibilité, déploiement coordonné des Lambdas)"). Doit rester lisible à voix haute par un recruteur non-tech sans qu'il ait besoin de comprendre un détail entre parenthèses.
 Pas de relance si cat = translation ou si le sujet est épuisé.`;
 }
