@@ -157,6 +157,46 @@ describe("Session theme rollup", () => {
     expect(msg.report.themes.map((t) => t.theme)).toEqual(["parcours-candidat", "aws-lambda-scheduling"]);
   });
 
+  it("normalizes capitalized and accented/spaced status variants instead of falling back to a-creuser", async () => {
+    server = await createTestServer();
+    ws = await connectAndStart(server.port);
+
+    // Capitalized status ("Acquis") — must still resolve to "acquis", not the
+    // "a-creuser" default that a failed case-sensitive match would produce.
+    mockStreamAssistOnce(
+      [
+        "[strength] [Acquis] [aws-lambda-scheduling] [contexte]",
+        "# Maîtrise du scheduling AWS Lambda",
+        "Réponse claire sur l'architecture.",
+      ].join("\n")
+    );
+    stt.callbacks!.onTranscript("On utilise des Lambdas.");
+    ws.send(JSON.stringify({ type: "trigger:analyze" }));
+    await waitForMessage(ws, "assist:done");
+
+    // Accented/spaced status ("pas acquis") — must still resolve to the
+    // canonical "pas-acquis", not fail the whole header match.
+    mockStreamAssistOnce(
+      [
+        "[attention] [pas acquis] [gcp-basics] [contexte]",
+        "# Lacune sur les bases GCP",
+        "Le candidat ne connaît pas les concepts de base de GCP.",
+      ].join("\n")
+    );
+    stt.callbacks!.onTranscript("Je n'ai jamais utilisé GCP.");
+    ws.send(JSON.stringify({ type: "trigger:analyze" }));
+    await waitForMessage(ws, "assist:done");
+
+    mockLlm.callClaudeJSON.mockResolvedValueOnce(baseReport);
+    ws.send(JSON.stringify({ type: "session:summarize" }));
+    const msg = (await waitForMessage(ws, "analysis:final")) as Extract<ServerMessage, { type: "analysis:final" }>;
+
+    expect(msg.report.themes).toEqual([
+      { theme: "aws-lambda-scheduling", status: "acquis", label: "Maîtrise du scheduling AWS Lambda" },
+      { theme: "gcp-basics", status: "pas-acquis", label: "Lacune sur les bases GCP" },
+    ]);
+  });
+
   it("omits themes with no evaluative card (jargon-only)", async () => {
     server = await createTestServer();
     ws = await connectAndStart(server.port);

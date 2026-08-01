@@ -18,12 +18,20 @@ interface ProfileUsage {
 function extractThemeAndAngle(text: string): { theme: string | null; angle: string | null } {
   const headerLine = text.trim().split("\n")[0] ?? "";
   const match = headerLine.match(
-    /\[?(?:jargon|strength|attention|translation)\]?\s*\[?(?:acquis|a-creuser|pas-acquis)\]?\s*\[?([a-z0-9-]+)\]?(?:\s*\[?(contexte|ownership|impact|none)\]?)?/i
+    /\[?(?:jargon|strength|attention|translation)\]?\s*\[?(?:acquis|[aà][\s-]?creuser|pas[\s-]?acquis)\]?\s*\[?([a-z0-9-]+)\]?(?:\s*\[?(contexte|ownership|impact|none)\]?)?/i
   );
   return {
     theme: match?.[1]?.toLowerCase() ?? null,
     angle: match?.[2]?.toLowerCase() ?? null,
   };
+}
+
+function normalizeStatus(raw: string | undefined): Insight["status"] {
+  const normalized = raw?.toLowerCase().trim() ?? "";
+  if (normalized === "acquis") return "acquis";
+  if (/^pas[\s-]?acquis$/.test(normalized)) return "pas-acquis";
+  if (/^[aà][\s-]?creuser$/.test(normalized)) return "a-creuser";
+  return "a-creuser";
 }
 
 function buildThemeRollup(cards: Insight[]): ThemeStatus[] {
@@ -229,10 +237,10 @@ export class Session {
     const lines = text.trim().split("\n").filter((l) => l.trim() !== "");
 
     const headerMatch = lines[0]?.match(
-      /\[?(jargon|strength|attention|translation)\]?\s*\[?(acquis|a-creuser|pas-acquis)\]?/
+      /\[?(jargon|strength|attention|translation)\]?\s*\[?(acquis|[aà][\s-]?creuser|pas[\s-]?acquis)\]?/i
     );
-    const cat = (headerMatch?.[1] as Insight["cat"]) ?? "translation";
-    const status = (headerMatch?.[2] as Insight["status"]) ?? "a-creuser";
+    const cat = (headerMatch?.[1]?.toLowerCase() as Insight["cat"]) ?? "translation";
+    const status = normalizeStatus(headerMatch?.[2]);
     const { theme } = extractThemeAndAngle(text);
 
     const title = lines[1]?.replace(/^#\s*/, "").trim() ?? "";

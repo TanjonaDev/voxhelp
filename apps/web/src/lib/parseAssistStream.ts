@@ -11,18 +11,27 @@ export interface PartialCard {
   relance: string | null;
 }
 
+function normalizeStatus(raw: string | undefined): AssistCard["status"] | null {
+  if (raw === undefined) return null;
+  const normalized = raw.toLowerCase().trim();
+  if (normalized === "acquis") return "acquis";
+  if (/^pas[\s-]?acquis$/.test(normalized)) return "pas-acquis";
+  if (/^[aà][\s-]?creuser$/.test(normalized)) return "a-creuser";
+  return null;
+}
+
 export function parsePartialAssist(textSoFar: string, id: string, t: string): PartialCard {
   const lines = textSoFar.split("\n").filter((l) => l.trim() !== "");
   const headerLine = lines[0] ?? "";
 
   const headerMatch = headerLine.match(
-    /\[?(jargon|strength|attention|translation)\]?\s*\[?(acquis|a-creuser|pas-acquis)\]?/
+    /\[?(jargon|strength|attention|translation)\]?\s*\[?(acquis|[aà][\s-]?creuser|pas[\s-]?acquis)\]?/i
   );
   const themeMatch = headerLine.match(
-    /\[?(?:jargon|strength|attention|translation)\]?\s*\[?(?:acquis|a-creuser|pas-acquis)\]?\s*\[?([a-z0-9-]+)\]?/i
+    /\[?(?:jargon|strength|attention|translation)\]?\s*\[?(?:acquis|[aà][\s-]?creuser|pas[\s-]?acquis)\]?\s*\[?([a-z0-9-]+)\]?/i
   );
-  const cat = (headerMatch?.[1] as AssistCard["cat"]) ?? null;
-  const status = (headerMatch?.[2] as AssistCard["status"]) ?? null;
+  const cat = (headerMatch?.[1]?.toLowerCase() as AssistCard["cat"]) ?? null;
+  const status = normalizeStatus(headerMatch?.[2]);
   const theme = themeMatch?.[1]?.toLowerCase() ?? null;
 
   const titleLine = lines[1];
