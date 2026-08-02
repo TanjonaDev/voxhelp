@@ -22,7 +22,7 @@ const mockSupabase = vi.hoisted(() => ({
 
 vi.mock("../deepgram-flux.js", () => ({
   FluxSTT: class MockFluxSTT {
-    constructor(_lang: string, callbacks: STTCallbacks) {
+    constructor(_lang: string, _keywords: string[] | undefined, callbacks: STTCallbacks) {
       stt.callbacks = callbacks;
     }
     async start() { stt.callbacks?.onListening(); }
