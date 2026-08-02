@@ -2,8 +2,10 @@ import "dotenv/config";
 import Fastify from "fastify";
 import cors from "@fastify/cors";
 import websocket from "@fastify/websocket";
+import multipart from "@fastify/multipart";
 import { Session } from "./session.js";
 import { supabaseAdmin } from "./supabase.js";
+import { registerRoutes } from "./routes.js";
 
 const PORT = Number(process.env.PORT) || 3001;
 const CORS_ORIGIN = process.env.CORS_ORIGIN || "http://localhost:5173";
@@ -13,6 +15,8 @@ async function main() {
 
   await app.register(cors, { origin: CORS_ORIGIN });
   await app.register(websocket);
+  await app.register(multipart, { limits: { fileSize: 5 * 1024 * 1024 } });
+  registerRoutes(app);
 
   app.get("/health", async () => ({ status: "ok", timestamp: Date.now() }));
 
