@@ -68,6 +68,7 @@ function SessionApp({ token }: SessionAppProps) {
 
   return (
     <OverlayPanel
+      token={token}
       insights={ws.insights}
       streamingCard={ws.streamingCard}
       isAnalyzing={ws.isAnalyzing}
