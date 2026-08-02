@@ -1,5 +1,7 @@
 import { useState, useEffect, useRef } from "react";
 import type { Insight, CandidateReport, JobContext, ThemeStatus } from "@voxhelp/shared";
+import { useCvKeywords } from "../hooks/useCvKeywords.js";
+import { deriveStackKeywords, mergeKeywords } from "../lib/mergeKeywords.js";
 import { VIcon, VHMark, LiveWave, StatusBadge, CategoryTag, GhostBtn } from "./ui.js";
 import type { PartialCard } from "../lib/parseAssistStream.js";
 
@@ -741,6 +743,7 @@ function FinalReportView({ report }: { report: CandidateReport }) {
 // OverlayPanel — full-page layout
 // ---------------------------------------------------------------------------
 export interface OverlayPanelProps {
+  token: string;
   insights: Insight[];
   streamingCard: PartialCard | null;
   isAnalyzing: boolean;
@@ -751,7 +754,7 @@ export interface OverlayPanelProps {
   isSpeaking: boolean;
   lastTranscript: string;
   lastError: string | null;
-  onStartAudio: (jobContext?: JobContext) => Promise<void>;
+  onStartAudio: (jobContext?: JobContext, keywords?: string[]) => Promise<void>;
   onStop: () => void;
   onSummarize: () => void;
   onAskQuestion: (text: string) => void;
@@ -759,6 +762,7 @@ export interface OverlayPanelProps {
 }
 
 export function OverlayPanel({
+  token,
   insights,
   streamingCard,
   isAnalyzing,
@@ -780,6 +784,7 @@ export function OverlayPanel({
   const [jobTitle, setJobTitle] = useState("");
   const [jobLevel, setJobLevel] = useState("");
   const [jobStack, setJobStack] = useState("");
+  const cvKeywords = useCvKeywords(token);
   const [askValue, setAskValue] = useState("");
   const [newId, setNewId] = useState<string | null>(null);
   const elapsed = useElapsedTime(isCapturing);
@@ -810,7 +815,8 @@ export function OverlayPanel({
       jobTitle || jobLevel || jobStack
         ? { title: jobTitle, level: jobLevel, stack: jobStack }
         : undefined;
-    await onStartAudio(jobContext);
+    const keywords = mergeKeywords(cvKeywords.keywords, deriveStackKeywords(jobStack));
+    await onStartAudio(jobContext, keywords.length > 0 ? keywords : undefined);
     setAudioStarted(true);
   };
 
@@ -1003,11 +1009,36 @@ export function OverlayPanel({
                     fontFamily: "var(--font)",
                   }}
                 />
+                <div>
+                  <input
+                    type="file"
+                    accept=".pdf,.docx"
+                    onChange={(e) => {
+                      const file = e.target.files?.[0];
+                      if (file) void cvKeywords.upload(file);
+                    }}
+                    style={{
+                      fontSize: 12,
+                      color: "var(--text-3)",
+                      width: "100%",
+                    }}
+                  />
+                  <p style={{ margin: "4px 0 0", fontSize: 11, color: "var(--text-3)" }}>
+                    CV du candidat (PDF ou DOCX) — recommandé, améliore la reconnaissance vocale des noms propres
+                  </p>
+                  {cvKeywords.status === "error" && (
+                    <p style={{ margin: "4px 0 0", fontSize: 11, color: "var(--risk)" }}>
+                      CV non pris en compte — la session démarrera sans ces mots-clés
+                    </p>
+                  )}
+                </div>
                 <button
                   onClick={handleStart}
+                  disabled={cvKeywords.status === "extracting"}
                   style={{
                     all: "unset" as "unset",
-                    cursor: "pointer",
+                    cursor: cvKeywords.status === "extracting" ? "default" : "pointer",
+                    opacity: cvKeywords.status === "extracting" ? 0.6 : 1,
                     display: "flex",
                     alignItems: "center",
                     justifyContent: "center",
@@ -1023,7 +1054,7 @@ export function OverlayPanel({
                   }}
                 >
                   <VIcon name="mic" size={15} />
-                  Démarrer l'écoute
+                  {cvKeywords.status === "extracting" ? "Analyse du CV..." : "Démarrer l'écoute"}
                 </button>
               </div>
             </div>

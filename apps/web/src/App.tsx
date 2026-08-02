@@ -52,8 +52,8 @@ function SessionApp({ token }: SessionAppProps) {
   const ws = useWebSocket(wsUrl);
   const audio = useAudioCapture(ws.sendAudio);
 
-  const handleStartAudio = async (jobContext?: JobContext) => {
-    ws.startSession({ language: "fr", jobContext });
+  const handleStartAudio = async (jobContext?: JobContext, keywords?: string[]) => {
+    ws.startSession({ language: "fr", jobContext, keywords });
     try {
       await audio.startTabCapture();
     } catch {
