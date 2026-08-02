@@ -10,7 +10,7 @@
     "build:backend": "pnpm --filter @voxhelp/backend build"
   },
   "engines": {
-    "node": ">=20"
+    "node": ">=22"
   },
   "devDependencies": {
     "concurrently": "^9.2.1"
