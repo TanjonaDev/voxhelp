@@ -158,7 +158,7 @@ export class Session {
     this.sessionStartMs = Date.now();
 
     this.stt?.close();
-    this.stt = new FluxSTT(config.language, {
+    this.stt = new FluxSTT(config.language, config.keywords, {
       onTranscript: (text) => void this.handleFinalTranscript(text),
       onListening: () => console.log("[Session] Deepgram Flux connected"),
       onError: (err) => this.send({ type: "session:error", error: err }),

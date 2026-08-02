@@ -20,11 +20,13 @@ export class FluxSTT {
   private connection: FluxConnection | null = null;
   private callbacks: FluxSTTCallbacks;
   private language: string;
+  private keywords: string[] | undefined;
   private closed = false;
 
-  constructor(language: string, callbacks: FluxSTTCallbacks) {
+  constructor(language: string, keywords: string[] | undefined, callbacks: FluxSTTCallbacks) {
     this.callbacks = callbacks;
     this.language = language;
+    this.keywords = keywords;
   }
 
   async start(): Promise<void> {
@@ -45,6 +47,7 @@ export class FluxSTT {
         encoding: "linear16",
         sample_rate: 16000,
         language_hint: hints,
+        ...(this.keywords && this.keywords.length > 0 ? { keyterm: this.keywords } : {}),
         Authorization: `Token ${apiKey}`,
       }) as unknown as FluxConnection;
 
