@@ -1,13 +1,33 @@
 import type { FastifyInstance } from "fastify";
 import { supabaseAdmin } from "./supabase.js";
-import { extractTextFromCv } from "./cv-parser.js";
+import { extractTextFromCv, type CvFormat } from "./cv-parser.js";
 import { callClaudeJSON } from "./llm.js";
 import { buildCvKeywordExtractionPrompt } from "./prompts/cv-keyword-extraction.js";
 
-const SUPPORTED_MIMETYPES = new Set([
-  "application/pdf",
-  "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
-]);
+const MIMETYPE_TO_FORMAT: Record<string, CvFormat> = {
+  "application/pdf": "pdf",
+  "application/vnd.openxmlformats-officedocument.wordprocessingml.document": "docx",
+};
+
+const EXTENSION_TO_FORMAT: Record<string, CvFormat> = {
+  ".pdf": "pdf",
+  ".docx": "docx",
+};
+
+/**
+ * Resolves the CV format from the reported mimetype, falling back to the
+ * filename extension when the browser reports a generic/incorrect mimetype
+ * (e.g. "application/octet-stream" for .docx on machines without Office).
+ */
+function resolveCvFormat(mimetype: string, filename: string): CvFormat | null {
+  if (MIMETYPE_TO_FORMAT[mimetype]) {
+    return MIMETYPE_TO_FORMAT[mimetype];
+  }
+  const dotIndex = filename.lastIndexOf(".");
+  if (dotIndex === -1) return null;
+  const extension = filename.slice(dotIndex).toLowerCase();
+  return EXTENSION_TO_FORMAT[extension] ?? null;
+}
 
 export function registerRoutes(app: FastifyInstance): void {
   app.post("/api/extract-cv-keywords", async (request, reply) => {
@@ -29,7 +49,8 @@ export function registerRoutes(app: FastifyInstance): void {
     } catch {
       return reply.code(400).send({ error: "Unsupported or missing file (PDF or DOCX only)" });
     }
-    if (!file || !SUPPORTED_MIMETYPES.has(file.mimetype)) {
+    const format = file ? resolveCvFormat(file.mimetype, file.filename) : null;
+    if (!file || !format) {
       return reply.code(400).send({ error: "Unsupported or missing file (PDF or DOCX only)" });
     }
 
@@ -42,17 +63,20 @@ export function registerRoutes(app: FastifyInstance): void {
 
     let cvText: string;
     try {
-      cvText = await extractTextFromCv(buffer, file.mimetype);
+      cvText = await extractTextFromCv(buffer, format);
     } catch {
       return reply.code(400).send({ error: "Failed to parse file content" });
     }
 
     try {
-      const result = await callClaudeJSON<{ keywords: string[] }>(
+      const result = await callClaudeJSON<{ keywords: unknown }>(
         buildCvKeywordExtractionPrompt(cvText),
         "Extrais les keywords."
       );
-      return reply.send({ keywords: result.keywords });
+      const keywords = Array.isArray(result?.keywords)
+        ? result.keywords.filter((k): k is string => typeof k === "string" && k.length > 0)
+        : [];
+      return reply.send({ keywords });
     } catch {
       return reply.code(502).send({ error: "Keyword extraction failed" });
     }

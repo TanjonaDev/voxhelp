@@ -6,6 +6,7 @@ interface UseCvKeywordsReturn {
   status: CvKeywordsStatus;
   keywords: string[];
   upload: (file: File) => Promise<void>;
+  reset: () => void;
 }
 
 export function useCvKeywords(token: string): UseCvKeywordsReturn {
@@ -31,8 +32,11 @@ export function useCvKeywords(token: string): UseCvKeywordsReturn {
           return;
         }
 
-        const data = (await res.json()) as { keywords: string[] };
-        setKeywords(data.keywords);
+        const data = (await res.json()) as { keywords?: unknown };
+        const safeKeywords = Array.isArray(data?.keywords)
+          ? data.keywords.filter((k): k is string => typeof k === "string")
+          : [];
+        setKeywords(safeKeywords);
         setStatus("done");
       } catch {
         setKeywords([]);
@@ -42,5 +46,10 @@ export function useCvKeywords(token: string): UseCvKeywordsReturn {
     [token]
   );
 
-  return { status, keywords, upload };
+  const reset = useCallback(() => {
+    setStatus("idle");
+    setKeywords([]);
+  }, []);
+
+  return { status, keywords, upload, reset };
 }

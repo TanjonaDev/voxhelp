@@ -823,6 +823,7 @@ export function OverlayPanel({
   const handleStop = () => {
     onStop();
     setAudioStarted(false);
+    cvKeywords.reset();
   };
 
   const handleAsk = () => {

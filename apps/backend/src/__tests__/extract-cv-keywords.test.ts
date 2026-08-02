@@ -107,4 +107,78 @@ describe("POST /api/extract-cv-keywords", () => {
 
     expect(res.status).toBe(502);
   });
+
+  it("sanitizes a null keywords field from the LLM into an empty array", async () => {
+    server = await createTestHttpServer();
+    mockExtract.mockResolvedValueOnce("some cv text");
+    mockCallClaudeJSON.mockResolvedValueOnce({ keywords: null });
+
+    const res = await fetch(`http://127.0.0.1:${server.port}/api/extract-cv-keywords`, {
+      method: "POST",
+      body: buildForm("application/pdf", "cv.pdf"),
+    });
+
+    expect(res.status).toBe(200);
+    const body = await res.json();
+    expect(body.keywords).toEqual([]);
+  });
+
+  it("filters out non-string and empty entries from the LLM keywords array", async () => {
+    server = await createTestHttpServer();
+    mockExtract.mockResolvedValueOnce("some cv text");
+    mockCallClaudeJSON.mockResolvedValueOnce({ keywords: ["ok", 123, "", "also-ok", null] });
+
+    const res = await fetch(`http://127.0.0.1:${server.port}/api/extract-cv-keywords`, {
+      method: "POST",
+      body: buildForm("application/pdf", "cv.pdf"),
+    });
+
+    expect(res.status).toBe(200);
+    const body = await res.json();
+    expect(body.keywords).toEqual(["ok", "also-ok"]);
+  });
+
+  it("accepts a .docx file whose mimetype is reported as application/octet-stream", async () => {
+    server = await createTestHttpServer();
+    mockExtract.mockResolvedValueOnce("some docx text");
+    mockCallClaudeJSON.mockResolvedValueOnce({ keywords: ["AWS Lambda"] });
+
+    const res = await fetch(`http://127.0.0.1:${server.port}/api/extract-cv-keywords`, {
+      method: "POST",
+      body: buildForm("application/octet-stream", "cv.docx"),
+    });
+
+    expect(res.status).toBe(200);
+    const body = await res.json();
+    expect(body.keywords).toEqual(["AWS Lambda"]);
+    expect(mockExtract).toHaveBeenCalledWith(expect.anything(), "docx");
+  });
+
+  it("accepts a .pdf file whose mimetype is reported as application/octet-stream", async () => {
+    server = await createTestHttpServer();
+    mockExtract.mockResolvedValueOnce("some pdf text");
+    mockCallClaudeJSON.mockResolvedValueOnce({ keywords: ["Kubernetes"] });
+
+    const res = await fetch(`http://127.0.0.1:${server.port}/api/extract-cv-keywords`, {
+      method: "POST",
+      body: buildForm("application/octet-stream", "cv.pdf"),
+    });
+
+    expect(res.status).toBe(200);
+    const body = await res.json();
+    expect(body.keywords).toEqual(["Kubernetes"]);
+    expect(mockExtract).toHaveBeenCalledWith(expect.anything(), "pdf");
+  });
+
+  it("still rejects an unsupported extension even with a generic mimetype", async () => {
+    server = await createTestHttpServer();
+
+    const res = await fetch(`http://127.0.0.1:${server.port}/api/extract-cv-keywords`, {
+      method: "POST",
+      body: buildForm("application/octet-stream", "cv.txt"),
+    });
+
+    expect(res.status).toBe(400);
+    expect(mockExtract).not.toHaveBeenCalled();
+  });
 });
