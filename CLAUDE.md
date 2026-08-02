@@ -38,7 +38,7 @@ pnpm --filter @voxhelp/shared add <package>
 
 ## Stack
 
-- **Runtime** : Node.js >= 20
+- **Runtime** : Node.js >= 22 (requis par `unpdf`, utilisé pour le parsing PDF des CVs)
 - **Langage** : TypeScript strict, ESM (`"type": "module"`)
 - **Frontend** : React 19, Vite 6, Tailwind CSS 3.4
 - **Backend** : Fastify 5, @fastify/websocket
