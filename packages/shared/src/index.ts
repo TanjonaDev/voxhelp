@@ -9,6 +9,7 @@ export interface JobContext {
 export interface SessionConfig {
   language: InterviewLanguage;
   jobContext?: JobContext;
+  keywords?: string[];
 }
 
 export interface Insight {
