@@ -83,6 +83,18 @@ describe("POST /api/extract-cv-keywords", () => {
     expect(res.status).toBe(400);
   });
 
+  it("returns 400 for a non-multipart request instead of 406", async () => {
+    server = await createTestHttpServer();
+
+    const res = await fetch(`http://127.0.0.1:${server.port}/api/extract-cv-keywords`, {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({}),
+    });
+
+    expect(res.status).toBe(400);
+  });
+
   it("returns 502 when keyword extraction fails", async () => {
     server = await createTestHttpServer();
     mockExtract.mockResolvedValueOnce("some cv text");

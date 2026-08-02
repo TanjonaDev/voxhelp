@@ -23,7 +23,12 @@ export function registerRoutes(app: FastifyInstance): void {
       }
     }
 
-    const file = await request.file();
+    let file: Awaited<ReturnType<typeof request.file>>;
+    try {
+      file = await request.file();
+    } catch {
+      return reply.code(400).send({ error: "Unsupported or missing file (PDF or DOCX only)" });
+    }
     if (!file || !SUPPORTED_MIMETYPES.has(file.mimetype)) {
       return reply.code(400).send({ error: "Unsupported or missing file (PDF or DOCX only)" });
     }
