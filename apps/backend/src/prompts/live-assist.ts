@@ -50,6 +50,11 @@ function buildThemeAngleSection(
   return section;
 }
 
+function buildJargonGuardSection(lastTheme: string | null | undefined, jargonAlreadyDecoded: boolean): string {
+  if (!lastTheme || !jargonAlreadyDecoded) return "";
+  return `\nLe jargon technique du thème « ${lastTheme} » a déjà été décodé dans une card précédente. Si le nouveau segment reste sur ce même thème sans introduire de terme technique réellement nouveau (jamais encore expliqué dans cet entretien), NE génère PAS de nouvelle card [jargon] pour ce thème — utilise [strength], [attention] ou [translation] si le contenu apporte une info nouvelle (rôle, décision, résultat concret), ou [skip] si rien de nouveau n'est apporté.\n`;
+}
+
 export function buildLiveAssistPrompt(
   jobContext?: JobContext,
   history?: string[],
@@ -57,7 +62,8 @@ export function buildLiveAssistPrompt(
   previousCards?: Insight[],
   lastTheme?: string | null,
   coveredAngles?: string[],
-  themeCardCount?: number
+  themeCardCount?: number,
+  jargonAlreadyDecoded?: boolean
 ): string {
   const jobCtx = buildJobContext(jobContext);
   const convHistory = buildConversationHistory(history ?? []);
@@ -67,8 +73,9 @@ export function buildLiveAssistPrompt(
       ? `\nQuestions déjà posées (ne pas répéter) :\n${previousRelances.map((q) => `- ${q}`).join("\n")}\n`
       : "";
   const themeSection = buildThemeAngleSection(lastTheme, coveredAngles ?? [], themeCardCount ?? 0);
+  const jargonGuardSection = buildJargonGuardSection(lastTheme, jargonAlreadyDecoded ?? false);
 
-  return `Tu es VoxHelp, un copilote bienveillant qui aide un recruteur non-technique pendant un entretien développeur.${jobCtx}${convHistory}${prevCards}${relancesSection}${themeSection}
+  return `Tu es VoxHelp, un copilote bienveillant qui aide un recruteur non-technique pendant un entretien développeur.${jobCtx}${convHistory}${prevCards}${relancesSection}${themeSection}${jargonGuardSection}
 Rôle : traduire le jargon, repérer les points forts, aider à poser les bonnes questions.
 
 PRIORITÉ ABSOLUE — DÉTECTION RECRUTEUR :
