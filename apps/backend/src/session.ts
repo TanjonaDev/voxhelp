@@ -69,6 +69,7 @@ export class Session {
   private lastTheme: string | null = null;
   private coveredAngles: Set<string> = new Set();
   private themeCardCount = 0;
+  private jargonDecodedThemes: Set<string> = new Set();
 
   constructor(ws: WebSocket, userId: string | null = null, maxBufferMs: number = 3 * 60 * 1000) {
     this.ws = ws;
@@ -155,6 +156,7 @@ export class Session {
     this.lastTheme = null;
     this.coveredAngles = new Set();
     this.themeCardCount = 0;
+    this.jargonDecodedThemes = new Set();
     this.sessionStartMs = Date.now();
 
     this.stt?.close();
@@ -273,6 +275,7 @@ export class Session {
     let cancelled = false;
 
     try {
+      const jargonAlreadyDecoded = this.lastTheme ? this.jargonDecodedThemes.has(this.lastTheme) : false;
       const fullText = await streamAssist(
         buildLiveAssistPrompt(
           this.jobContext,
@@ -281,7 +284,8 @@ export class Session {
           this.cardLog,
           this.lastTheme,
           Array.from(this.coveredAngles),
-          this.themeCardCount
+          this.themeCardCount,
+          jargonAlreadyDecoded
         ),
         `Ce qui vient d'être dit :\n"${transcript}"`,
         (chunk) => {
@@ -321,6 +325,10 @@ export class Session {
       console.log(
         `[Session] Card [${card.cat}] [${card.status}] theme=${card.theme ?? "null"} "${card.title}"${card.relance ? ` | relance: "${card.relance}"` : ""}`
       );
+
+      if (card.cat === "jargon" && card.theme) {
+        this.jargonDecodedThemes.add(card.theme);
+      }
 
       const { theme, angle } = extractThemeAndAngle(fullText);
       if (theme && theme === this.lastTheme) {
@@ -480,6 +488,7 @@ Utilise TOUJOURS catégorie = translation et statut = acquis pour tes réponses.
     this.lastTheme = null;
     this.coveredAngles = new Set();
     this.themeCardCount = 0;
+    this.jargonDecodedThemes = new Set();
     this.sessionStartMs = 0;
     if (this.stt) {
       this.stt.close();
