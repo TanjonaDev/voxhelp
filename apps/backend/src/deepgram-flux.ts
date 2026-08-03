@@ -42,12 +42,17 @@ export class FluxSTT {
     try {
       const client = new DeepgramClient();
 
+      const hasKeyterms = Boolean(this.keywords && this.keywords.length > 0);
+      console.log(
+        `[FluxSTT] Connecting to Deepgram: language_hint=[${hints.join(", ")}] keyterm=${hasKeyterms ? `[${this.keywords!.join(", ")}]` : "none"}`
+      );
+
       const connection = await client.listen.v2.connect({
         model: "flux-general-multi",
         encoding: "linear16",
         sample_rate: 16000,
         language_hint: hints,
-        ...(this.keywords && this.keywords.length > 0 ? { keyterm: this.keywords } : {}),
+        ...(hasKeyterms ? { keyterm: this.keywords } : {}),
         Authorization: `Token ${apiKey}`,
       }) as unknown as FluxConnection;
 

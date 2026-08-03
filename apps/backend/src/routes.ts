@@ -67,6 +67,7 @@ export function registerRoutes(app: FastifyInstance): void {
     } catch {
       return reply.code(400).send({ error: "Failed to parse file content" });
     }
+    console.log(`[Routes] CV parsed (${format}): ${cvText.length} caractères extraits`);
 
     try {
       const result = await callClaudeJSON<{ keywords: unknown }>(
@@ -76,8 +77,10 @@ export function registerRoutes(app: FastifyInstance): void {
       const keywords = Array.isArray(result?.keywords)
         ? result.keywords.filter((k): k is string => typeof k === "string" && k.length > 0)
         : [];
+      console.log(`[Routes] CV keywords extraits (${keywords.length}): [${keywords.join(", ")}]`);
       return reply.send({ keywords });
-    } catch {
+    } catch (err) {
+      console.error("[Routes] Keyword extraction failed:", err instanceof Error ? err.message : err);
       return reply.code(502).send({ error: "Keyword extraction failed" });
     }
   });

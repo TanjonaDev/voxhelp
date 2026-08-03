@@ -169,6 +169,9 @@ export class Session {
     const sessionId = `session_${Date.now()}`;
     this.send({ type: "session:ready", sessionId });
     console.log(`[Session] Started: language=${config.language}, jobContext=${config.jobContext ? config.jobContext.title : "none"}`);
+    console.log(
+      `[Session] Keywords for Deepgram keyterm boosting: ${config.keywords && config.keywords.length > 0 ? `[${config.keywords.join(", ")}] (${config.keywords.length} termes)` : "aucun"}`
+    );
   }
 
   private handleAudioChunk(base64Data: string): void {
@@ -286,6 +289,7 @@ export class Session {
           accumulated += chunk;
           if (accumulated.trimStart().startsWith("[skip]")) {
             cancelled = true;
+            console.log(`[Session] Card skippée (détectée comme question recruteur) — transcript: "${transcript}"`);
             this.send({ type: "assist:cancel", id: cardId });
             return;
           }
@@ -314,6 +318,10 @@ export class Session {
       this.cardLog.push(card);
       if (this.cardLog.length > this.MAX_CARD_LOG) this.cardLog.shift();
 
+      console.log(
+        `[Session] Card [${card.cat}] [${card.status}] theme=${card.theme ?? "null"} "${card.title}"${card.relance ? ` | relance: "${card.relance}"` : ""}`
+      );
+
       const { theme, angle } = extractThemeAndAngle(fullText);
       if (theme && theme === this.lastTheme) {
         this.themeCardCount += 1;
@@ -323,6 +331,10 @@ export class Session {
         this.themeCardCount = theme ? 1 : 0;
         this.coveredAngles = new Set(angle && angle !== "none" ? [angle] : []);
       }
+
+      console.log(
+        `[Session] Theme tracking: lastTheme=${this.lastTheme ?? "null"} coveredAngles=[${Array.from(this.coveredAngles).join(", ")}] themeCardCount=${this.themeCardCount}`
+      );
 
     } catch (err) {
       this.send({
@@ -423,9 +435,12 @@ Utilise TOUJOURS catégorie = translation et statut = acquis pour tes réponses.
         "Génère le bilan final du candidat.",
         "claude-sonnet-4-6"
       );
+      const themes = buildThemeRollup(this.cardLog);
+      console.log(`[Session] Theme rollup (${themes.length} thème(s)):`, themes);
+      console.log(`[Session] Recommandation: ${report.recommendation} — ${report.recommendationReason}`);
       this.send({
         type: "analysis:final",
-        report: { ...report, themes: buildThemeRollup(this.cardLog) },
+        report: { ...report, themes },
       });
     } catch (err) {
       this.send({

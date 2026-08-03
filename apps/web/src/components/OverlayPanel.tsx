@@ -816,6 +816,9 @@ export function OverlayPanel({
         ? { title: jobTitle, level: jobLevel, stack: jobStack }
         : undefined;
     const keywords = mergeKeywords(cvKeywords.keywords, deriveStackKeywords(jobStack));
+    console.log(
+      `[Setup] cvKeywords=[${cvKeywords.keywords.join(", ")}] stackKeywords=[${deriveStackKeywords(jobStack).join(", ")}] merged=[${keywords.join(", ")}]`
+    );
     await onStartAudio(jobContext, keywords.length > 0 ? keywords : undefined);
     setAudioStarted(true);
   };
