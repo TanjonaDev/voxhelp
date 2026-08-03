@@ -129,6 +129,9 @@ describe("Session jargon/theme dedup", () => {
     ws.send(JSON.stringify({ type: "trigger:analyze" }));
     await waitForMessage(ws, "assist:done");
 
+    const thirdPrompt = mockLlm.streamAssist.mock.calls[2][0] as string;
+    expect(thirdPrompt).not.toContain("a déjà été décodé");
+
     mockStreamAssistOnce(card("strength", "aws-serverless", "Encore sur le pipeline"));
     stt.callbacks!.onTranscript("Toujours ce même pipeline.");
     ws.send(JSON.stringify({ type: "trigger:analyze" }));

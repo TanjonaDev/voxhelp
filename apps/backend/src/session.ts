@@ -293,7 +293,7 @@ export class Session {
           accumulated += chunk;
           if (accumulated.trimStart().startsWith("[skip]")) {
             cancelled = true;
-            console.log(`[Session] Card skippée (détectée comme question recruteur) — transcript: "${transcript}"`);
+            console.log(`[Session] Card skippée (question recruteur ou rien de nouveau à signaler) — transcript: "${transcript}"`);
             this.send({ type: "assist:cancel", id: cardId });
             return;
           }
