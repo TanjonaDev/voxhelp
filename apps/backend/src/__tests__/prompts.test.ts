@@ -139,6 +139,27 @@ describe("buildLiveAssistPrompt", () => {
     expect(prompt).toContain("jamais de parenthèse ou d'aside technique d'implémentation");
     expect(prompt).toContain("lisible à voix haute par un recruteur non-tech");
   });
+
+  it("adds the jargon-guard instruction when the theme's jargon was already decoded", () => {
+    const prompt = buildLiveAssistPrompt(undefined, [], [], [], "aws-serverless", [], 1, true);
+    expect(prompt).toContain("Le jargon technique du thème « aws-serverless » a déjà été décodé");
+    expect(prompt).toContain("NE génère PAS de nouvelle card [jargon]");
+  });
+
+  it("omits the jargon-guard instruction when jargonAlreadyDecoded is false", () => {
+    const prompt = buildLiveAssistPrompt(undefined, [], [], [], "aws-serverless", [], 1, false);
+    expect(prompt).not.toContain("a déjà été décodé");
+  });
+
+  it("omits the jargon-guard instruction when jargonAlreadyDecoded is omitted (defaults to false)", () => {
+    const prompt = buildLiveAssistPrompt(undefined, [], [], [], "aws-serverless", [], 1);
+    expect(prompt).not.toContain("a déjà été décodé");
+  });
+
+  it("omits the jargon-guard instruction when lastTheme is null even if jargonAlreadyDecoded is true", () => {
+    const prompt = buildLiveAssistPrompt(undefined, [], [], [], null, [], 0, true);
+    expect(prompt).not.toContain("a déjà été décodé");
+  });
 });
 
 describe("buildFinalAnalysisPrompt", () => {
