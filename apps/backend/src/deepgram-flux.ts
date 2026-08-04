@@ -7,7 +7,7 @@ interface FluxSTTCallbacks {
 }
 
 interface FluxConnection {
-  on(event: "message", cb: (msg: { type?: string; transcript?: string }) => void): void;
+  on(event: "message", cb: (msg: { type?: string; event?: string; transcript?: string }) => void): void;
   on(event: "error", cb: (err: Error) => void): void;
   on(event: "open", cb: () => void): void;
   connect(): unknown;
@@ -60,7 +60,7 @@ export class FluxSTT {
 
       connection.on("message", (message) => {
         if (this.closed) return;
-        if (message.type === "TurnInfo" && message.transcript?.trim()) {
+        if (message.type === "TurnInfo" && message.event === "EndOfTurn" && message.transcript?.trim()) {
           this.callbacks.onTranscript(message.transcript.trim());
         }
       });
