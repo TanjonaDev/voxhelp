@@ -1,7 +1,7 @@
 import { describe, it, expect } from "vitest";
 import { buildLiveAssistPrompt } from "../prompts/live-assist.js";
 import { buildFinalAnalysisPrompt } from "../prompts/final-analysis.js";
-import type { Insight } from "@voxhelp/shared";
+import type { Insight, TranscriptEntry } from "@voxhelp/shared";
 
 const confirmedCard: Insight = {
   id: "test-1",
@@ -164,22 +164,63 @@ describe("buildLiveAssistPrompt", () => {
 
 describe("buildFinalAnalysisPrompt", () => {
   it("includes job context when provided", () => {
-    const prompt = buildFinalAnalysisPrompt({ title: "Backend Dev", level: "Junior", stack: "Node.js" });
+    const prompt = buildFinalAnalysisPrompt({ title: "Backend Dev", level: "Junior", stack: "Node.js" }, [], []);
     expect(prompt).toContain("Backend Dev");
     expect(prompt).toContain("Junior");
     expect(prompt).toContain("Node.js");
   });
 
-  it("includes all card titles and statuses", () => {
-    const prompt = buildFinalAnalysisPrompt(undefined, [confirmedCard, vagueCard]);
+  it("mentions explicitly when no job context is provided", () => {
+    const prompt = buildFinalAnalysisPrompt(undefined, [], []);
+    expect(prompt).toContain("Aucun contexte de poste fourni");
+  });
+
+  it("includes all card titles and statuses as supporting signal, not as citation source", () => {
+    const prompt = buildFinalAnalysisPrompt(undefined, [confirmedCard, vagueCard], []);
     expect(prompt).toContain("Expérience terrain solide en React");
     expect(prompt).toContain("Manque de concret");
     expect(prompt).toContain("ACQUIS");
     expect(prompt).toContain("PAS-ACQUIS");
+    expect(prompt).toContain("jamais une source de citation");
   });
 
   it("mentions when no analysis is available", () => {
-    const prompt = buildFinalAnalysisPrompt(undefined, []);
-    expect(prompt).toContain("Aucune analyse disponible");
+    const prompt = buildFinalAnalysisPrompt(undefined, [], []);
+    expect(prompt).toContain("Aucune analyse en direct disponible");
+  });
+
+  it("includes the timestamped transcript, one line per entry", () => {
+    const prompt = buildFinalAnalysisPrompt(undefined, [], [
+      { t: "04:12", text: "Le pipeline CI/CD tourne en production depuis six mois." },
+    ]);
+    expect(prompt).toContain('[04:12] "Le pipeline CI/CD tourne en production depuis six mois."');
+  });
+
+  it("mentions when no transcript is available", () => {
+    const prompt = buildFinalAnalysisPrompt(undefined, [], []);
+    expect(prompt).toContain("Aucun transcript disponible");
+  });
+
+  it("instructs the model to copy citations word-for-word from the transcript", () => {
+    const prompt = buildFinalAnalysisPrompt(undefined, [], []);
+    expect(prompt).toContain("copiée MOT POUR MOT");
+    expect(prompt).toContain("N'invente jamais une citation");
+  });
+
+  it("forbids numeric scores and defines the ternary status system", () => {
+    const prompt = buildFinalAnalysisPrompt(undefined, [], []);
+    expect(prompt).toContain("AUCUN score numérique");
+    expect(prompt).toContain("demontre | mentionne | non-aborde");
+  });
+
+  it("frames the report as a client-facing presentation", () => {
+    const prompt = buildFinalAnalysisPrompt(undefined, [], []);
+    expect(prompt).toContain("PRÉSENTE un candidat");
+    expect(prompt).toContain("jamais de jugement sec");
+  });
+
+  it("requires a citation on every strength but allows attention points without one", () => {
+    const prompt = buildFinalAnalysisPrompt(undefined, [], []);
+    expect(prompt).toContain("chaque point DOIT avoir une citation");
   });
 });
