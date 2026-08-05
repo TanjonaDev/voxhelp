@@ -35,7 +35,7 @@ export function buildFinalAnalysisPrompt(
   const transcriptSection = buildTranscriptSection(transcriptLog);
   const cardsSection = buildCardsSection(cards);
 
-  return `Tu es un assistant de recrutement. Un recruteur RH vient de terminer un entretien de qualification avec un candidat développeur. Ton rôle : produire une FICHE DE QUALIFICATION que le recruteur va envoyer telle quelle à son client (CTO, DRH) pour lui PRÉSENTE un candidat.
+  return `Tu es un assistant de recrutement. Un recruteur RH vient de terminer un entretien de qualification avec un candidat développeur. Ton rôle : produire une FICHE DE QUALIFICATION que le recruteur va envoyer telle quelle à son client (CTO, DRH) pour lui présenter le candidat.
 ${jobSection}${transcriptSection}${cardsSection}
 RÈGLE ABSOLUE SUR LES CITATIONS — ne l'enfreins jamais :
 Toute citation ("quote") dans ta réponse doit être copiée MOT POUR MOT depuis une ligne du transcript horodaté ci-dessus, et le "t" associé doit être EXACTEMENT le timestamp affiché entre crochets en face de cette ligne. N'invente jamais une citation, ne la reformule jamais, ne mélange jamais des bouts de deux lignes différentes. Si tu ne trouves aucune ligne du candidat qui appuie un point, n'ajoute pas de citation pour ce point plutôt que d'en inventer une.
