@@ -650,7 +650,7 @@ function formatInterviewDate(iso: string): string {
 }
 
 function FinalReportView({ report }: { report: CandidateReport }) {
-  const verdict = VERDICT_META[report.verdict];
+  const verdict = VERDICT_META[report.verdict] ?? VERDICT_META["presenter-avec-reserve"];
   const counts = techMatchingCounts(report.techMatching);
   const bilanLine = `${counts["demontre"]} démontré${counts["demontre"] !== 1 ? "s" : ""} · ${counts["mentionne"]} mentionné${counts["mentionne"] !== 1 ? "s" : ""} · ${counts["non-aborde"]} non abordé${counts["non-aborde"] !== 1 ? "s" : ""}`;
 
@@ -701,7 +701,7 @@ function FinalReportView({ report }: { report: CandidateReport }) {
           <p style={sectionLabelStyle}>Matching technique</p>
           <ul style={{ margin: 0, padding: 0, listStyle: "none", display: "flex", flexDirection: "column", gap: 8 }}>
             {report.techMatching.map((m) => {
-              const meta = SKILL_STATUS_META[m.status];
+              const meta = SKILL_STATUS_META[m.status] ?? SKILL_STATUS_META["non-aborde"];
               return (
                 <li key={m.skill} style={{ display: "flex", gap: 7, fontSize: 13, color: "var(--text-2)", lineHeight: 1.45 }}>
                   <span style={{ color: meta.color, flexShrink: 0 }}>{meta.icon}</span>
@@ -727,7 +727,7 @@ function FinalReportView({ report }: { report: CandidateReport }) {
                 <span style={{ color: "var(--good)", flexShrink: 0 }}>+</span>
                 <div style={{ flex: 1, minWidth: 0 }}>
                   {s.text}
-                  <CitationChip citation={s.citation} />
+                  {s.citation && <CitationChip citation={s.citation} />}
                 </div>
               </li>
             ))}

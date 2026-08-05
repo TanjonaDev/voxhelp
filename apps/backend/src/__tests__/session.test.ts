@@ -193,6 +193,33 @@ describe("Session WebSocket integration", () => {
     expect(msg.report.jobTitle).toBe("Lead Backend");
   });
 
+  it("keeps the server-computed header fields even if the LLM hallucinates its own", async () => {
+    ws.send(JSON.stringify({
+      type: "session:start",
+      config: {
+        language: "fr",
+        candidateName: "Awa Diallo",
+        jobContext: { title: "Lead Backend", level: "Senior", stack: "Node.js" },
+      },
+    }));
+    await waitForMessage(ws, "session:ready");
+
+    mockLlm.callClaudeJSON.mockResolvedValueOnce({
+      ...sampleReport,
+      candidateName: "HALLUCINÉ",
+      jobTitle: "Poste inventé",
+      interviewDate: "2000-01-01T00:00:00.000Z",
+      durationLabel: "999 min",
+    });
+    ws.send(JSON.stringify({ type: "session:summarize" }));
+    const msg = (await waitForMessage(ws, "analysis:final")) as Extract<ServerMessage, { type: "analysis:final" }>;
+
+    expect(msg.report.candidateName).toBe("Awa Diallo");
+    expect(msg.report.jobTitle).toBe("Lead Backend");
+    expect(msg.report.interviewDate).not.toBe("2000-01-01T00:00:00.000Z");
+    expect(msg.report.durationLabel).not.toBe("999 min");
+  });
+
   it("includes accumulated cards and the timestamped transcript in the final analysis prompt", async () => {
     mockStreamAssist(sampleAssistText);
     mockLlm.callClaudeJSON.mockResolvedValueOnce(sampleReport);

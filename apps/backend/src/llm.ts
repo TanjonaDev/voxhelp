@@ -70,11 +70,12 @@ export async function streamAssist(
 export async function callClaudeJSON<T>(
   systemPrompt: string,
   userMessage: string,
-  model = "claude-haiku-4-5"
+  model = "claude-haiku-4-5",
+  maxTokens = 4096
 ): Promise<T> {
   const message = await anthropic.messages.create({
     model,
-    max_tokens: 4096,
+    max_tokens: maxTokens,
     system: systemPrompt,
     messages: [{ role: "user", content: userMessage }],
   });

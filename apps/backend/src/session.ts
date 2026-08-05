@@ -2,6 +2,7 @@ import type { WebSocket } from "ws";
 import type {
   ClientMessage, ServerMessage, SessionConfig,
   Insight, CandidateReport, JobContext, TranscriptEntry,
+  SkillMatchStatus, Verdict,
 } from "@voxhelp/shared";
 import { createId } from "@voxhelp/shared";
 import { FluxSTT } from "./deepgram-flux.js";
@@ -32,6 +33,33 @@ function normalizeStatus(raw: string | undefined): Insight["status"] {
   if (/^pas[\s-]?acquis$/.test(normalized)) return "pas-acquis";
   if (/^[aà][\s-]?creuser$/.test(normalized)) return "a-creuser";
   return "a-creuser";
+}
+
+// Le rapport final est un JSON.parse non validé (callClaudeJSON<T> ne fait aucune
+// vérification runtime) : le modèle peut renvoyer des variantes accentuées/espacées
+// de ces tokens ternaires. On normalise ici, à la frontière de confiance, plutôt
+// que défensivement à chaque site de rendu frontend.
+function normalizeEnumToken(raw: string): string {
+  return raw
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .toLowerCase()
+    .trim()
+    .replace(/[\s_]+/g, "-");
+}
+
+function normalizeSkillMatchStatus(raw: string): SkillMatchStatus {
+  const normalized = normalizeEnumToken(raw);
+  if (normalized === "demontre") return "demontre";
+  if (normalized === "mentionne") return "mentionne";
+  return "non-aborde";
+}
+
+function normalizeVerdict(raw: string): Verdict {
+  const normalized = normalizeEnumToken(raw);
+  if (normalized === "presenter") return "presenter";
+  if (normalized === "ne-pas-presenter") return "ne-pas-presenter";
+  return "presenter-avec-reserve";
 }
 
 export class Session {
@@ -438,17 +466,33 @@ Utilise TOUJOURS catégorie = translation et statut = acquis pour tes réponses.
       const generated = await callClaudeJSON<GeneratedReportFields>(
         buildFinalAnalysisPrompt(this.jobContext, this.cardLog, this.fullTranscriptLog),
         "Génère la fiche de qualification du candidat.",
-        "claude-sonnet-4-6"
+        "claude-sonnet-4-6",
+        8192
       );
       const durationLabel = this.sessionStartMs
         ? `${Math.max(1, Math.round((Date.now() - this.sessionStartMs) / 60000))} min`
         : "0 min";
+      // generated est un JSON.parse<T> non validé : le type Omit<...> n'est qu'une
+      // garantie de compilation. On normalise les enums et on défaut les tableaux
+      // manquants ici, puis on spread ...generated EN PREMIER pour que les 4 champs
+      // calculés côté serveur ne puissent jamais être écrasés par une hallucination.
       const report: CandidateReport = {
+        ...generated,
+        techMatching: (generated.techMatching ?? []).map((m) => ({
+          ...m,
+          status: normalizeSkillMatchStatus(m.status),
+        })),
+        strengths: generated.strengths ?? [],
+        attentionPoints: generated.attentionPoints ?? [],
+        keyProjects: generated.keyProjects ?? [],
+        verdict: normalizeVerdict(generated.verdict),
+        verdictChecklist: generated.verdictChecklist ?? [],
+        nextSteps: generated.nextSteps ?? [],
+        suggestedQuestions: generated.suggestedQuestions ?? [],
         candidateName: this.candidateName?.trim() || "Candidat",
         jobTitle: this.jobContext?.title?.trim() || "Poste non précisé",
         interviewDate: new Date().toISOString(),
         durationLabel,
-        ...generated,
       };
       console.log(`[Session] Verdict: ${report.verdict} — ${report.verdictReason}`);
       this.send({ type: "analysis:final", report });
