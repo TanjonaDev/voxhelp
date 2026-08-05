@@ -1,7 +1,7 @@
 import type { WebSocket } from "ws";
 import type {
   ClientMessage, ServerMessage, SessionConfig,
-  Insight, CandidateReport, JobContext, ThemeStatus,
+  Insight, CandidateReport, JobContext, TranscriptEntry,
 } from "@voxhelp/shared";
 import { createId } from "@voxhelp/shared";
 import { FluxSTT } from "./deepgram-flux.js";
@@ -34,29 +34,19 @@ function normalizeStatus(raw: string | undefined): Insight["status"] {
   return "a-creuser";
 }
 
-function buildThemeRollup(cards: Insight[]): ThemeStatus[] {
-  const byTheme = new Map<string, Insight>();
-  for (const card of cards) {
-    if (!card.theme || card.cat === "jargon") continue;
-    byTheme.set(card.theme, card);
-  }
-  return Array.from(byTheme.entries()).map(([theme, card]) => ({
-    theme,
-    status: card.status,
-    label: card.title,
-  }));
-}
-
 export class Session {
   private ws: WebSocket;
   private userId: string | null;
   private stt: FluxSTT | null = null;
   private config: SessionConfig | null = null;
   private jobContext: JobContext | undefined = undefined;
+  private candidateName: string | undefined = undefined;
   private transcriptBuffer: string[] = [];
   private conversationLog: string[] = [];
   private relanceLog: string[] = [];
   private cardLog: Insight[] = [];
+  private fullTranscriptLog: TranscriptEntry[] = [];
+  private readonly MAX_TRANSCRIPT_LOG = 600;
   private sessionStartMs = 0;
   private readonly MAX_LOG_ENTRIES = 15;
   private readonly MAX_CARD_LOG = 30;
@@ -149,10 +139,12 @@ export class Session {
 
     this.config = config;
     this.jobContext = config.jobContext;
+    this.candidateName = config.candidateName;
     this.transcriptBuffer = [];
     this.conversationLog = [];
     this.relanceLog = [];
     this.cardLog = [];
+    this.fullTranscriptLog = [];
     this.lastTheme = null;
     this.coveredAngles = new Set();
     this.themeCardCount = 0;
@@ -217,6 +209,10 @@ export class Session {
     const text = await correctTranscript(rawText, sttContext);
 
     this.send({ type: "transcript:final", text });
+
+    const transcriptT = this.sessionStartMs ? this.elapsedTime() : "00:00";
+    this.fullTranscriptLog.push({ t: transcriptT, text });
+    if (this.fullTranscriptLog.length > this.MAX_TRANSCRIPT_LOG) this.fullTranscriptLog.shift();
 
     if (this.transcriptBuffer.length === 0 && !this.maxBufferTimer) {
       this.maxBufferTimer = setTimeout(() => this.flushBuffer(), this.maxBufferMs);
@@ -438,18 +434,24 @@ Utilise TOUJOURS catégorie = translation et statut = acquis pour tes réponses.
 
   private async generateFinalReport(): Promise<void> {
     try {
-      const report = await callClaudeJSON<Omit<CandidateReport, "themes">>(
-        buildFinalAnalysisPrompt(this.jobContext, this.cardLog),
-        "Génère le bilan final du candidat.",
+      type GeneratedReportFields = Omit<CandidateReport, "candidateName" | "jobTitle" | "interviewDate" | "durationLabel">;
+      const generated = await callClaudeJSON<GeneratedReportFields>(
+        buildFinalAnalysisPrompt(this.jobContext, this.cardLog, this.fullTranscriptLog),
+        "Génère la fiche de qualification du candidat.",
         "claude-sonnet-4-6"
       );
-      const themes = buildThemeRollup(this.cardLog);
-      console.log(`[Session] Theme rollup (${themes.length} thème(s)):`, themes);
-      console.log(`[Session] Recommandation: ${report.recommendation} — ${report.recommendationReason}`);
-      this.send({
-        type: "analysis:final",
-        report: { ...report, themes },
-      });
+      const durationLabel = this.sessionStartMs
+        ? `${Math.max(1, Math.round((Date.now() - this.sessionStartMs) / 60000))} min`
+        : "0 min";
+      const report: CandidateReport = {
+        candidateName: this.candidateName?.trim() || "Candidat",
+        jobTitle: this.jobContext?.title?.trim() || "Poste non précisé",
+        interviewDate: new Date().toISOString(),
+        durationLabel,
+        ...generated,
+      };
+      console.log(`[Session] Verdict: ${report.verdict} — ${report.verdictReason}`);
+      this.send({ type: "analysis:final", report });
     } catch (err) {
       this.send({
         type: "session:error",
@@ -485,6 +487,7 @@ Utilise TOUJOURS catégorie = translation et statut = acquis pour tes réponses.
     this.conversationLog = [];
     this.relanceLog = [];
     this.cardLog = [];
+    this.fullTranscriptLog = [];
     this.lastTheme = null;
     this.coveredAngles = new Set();
     this.themeCardCount = 0;
@@ -496,6 +499,7 @@ Utilise TOUJOURS catégorie = translation et statut = acquis pour tes réponses.
     }
     this.config = null;
     this.jobContext = undefined;
+    this.candidateName = undefined;
     console.log("[Session] Cleaned up");
   }
 }

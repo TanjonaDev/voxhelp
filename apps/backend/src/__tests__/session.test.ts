@@ -53,13 +53,29 @@ const sampleAssistText = [
   ">> Dans quel type de projet avez-vous utilisé React ?",
 ].join("\n");
 
-const sampleReport: CandidateReport = {
-  overall: "Candidat solide avec une expérience React clairement démontrée.",
-  strengths: ["Expérience terrain claire", "Exemples concrets et précis"],
-  gaps: ["TypeScript avancé non confirmé"],
-  recommendation: "hire",
-  recommendationReason: "Profil directement applicable au poste visé.",
-  themes: [],
+const sampleReport: Omit<CandidateReport, "candidateName" | "jobTitle" | "interviewDate" | "durationLabel"> = {
+  summary: "Candidat solide avec une expérience React clairement démontrée.",
+  techMatching: [
+    {
+      skill: "React",
+      status: "demontre",
+      evidence: "Expérience terrain confirmée avec exemple concret.",
+      citation: { quote: "J'ai développé la plateforme e-commerce en React pendant deux ans.", t: "03:10" },
+    },
+  ],
+  strengths: [
+    {
+      text: "Expérience terrain claire",
+      citation: { quote: "J'ai développé la plateforme e-commerce en React pendant deux ans.", t: "03:10" },
+    },
+  ],
+  attentionPoints: [{ text: "TypeScript avancé non confirmé" }],
+  keyProjects: [],
+  verdict: "presenter",
+  verdictReason: "Profil directement applicable au poste visé.",
+  verdictChecklist: [],
+  nextSteps: ["Prévoir un entretien technique approfondi sur TypeScript."],
+  suggestedQuestions: ["Pouvez-vous détailler votre usage des types avancés TypeScript ?"],
 };
 
 function mockStreamAssist(text: string) {
@@ -140,13 +156,44 @@ describe("Session WebSocket integration", () => {
 
     const msg = (await waitForMessage(ws, "analysis:final")) as Extract<ServerMessage, { type: "analysis:final" }>;
 
-    expect(msg.report.recommendation).toBe("hire");
-    expect(msg.report.strengths).toHaveLength(2);
-    expect(msg.report.gaps).toHaveLength(1);
-    expect(msg.report.overall).toContain("Candidat solide");
+    expect(msg.report.verdict).toBe("presenter");
+    expect(msg.report.strengths).toHaveLength(1);
+    expect(msg.report.attentionPoints).toHaveLength(1);
+    expect(msg.report.summary).toContain("Candidat solide");
   });
 
-  it("includes accumulated cards in the final analysis prompt", async () => {
+  it("fills candidateName and jobTitle with defaults when the session was started without them", async () => {
+    mockLlm.callClaudeJSON.mockResolvedValueOnce(sampleReport);
+
+    ws.send(JSON.stringify({ type: "session:summarize" }));
+    const msg = (await waitForMessage(ws, "analysis:final")) as Extract<ServerMessage, { type: "analysis:final" }>;
+
+    expect(msg.report.candidateName).toBe("Candidat");
+    expect(msg.report.jobTitle).toBe("Poste non précisé");
+    expect(msg.report.durationLabel).toMatch(/^\d+ min$/);
+    expect(msg.report.interviewDate).toBeTruthy();
+  });
+
+  it("uses the configured candidate name and job title when provided", async () => {
+    ws.send(JSON.stringify({
+      type: "session:start",
+      config: {
+        language: "fr",
+        candidateName: "Awa Diallo",
+        jobContext: { title: "Lead Backend", level: "Senior", stack: "Node.js" },
+      },
+    }));
+    await waitForMessage(ws, "session:ready");
+
+    mockLlm.callClaudeJSON.mockResolvedValueOnce(sampleReport);
+    ws.send(JSON.stringify({ type: "session:summarize" }));
+    const msg = (await waitForMessage(ws, "analysis:final")) as Extract<ServerMessage, { type: "analysis:final" }>;
+
+    expect(msg.report.candidateName).toBe("Awa Diallo");
+    expect(msg.report.jobTitle).toBe("Lead Backend");
+  });
+
+  it("includes accumulated cards and the timestamped transcript in the final analysis prompt", async () => {
     mockStreamAssist(sampleAssistText);
     mockLlm.callClaudeJSON.mockResolvedValueOnce(sampleReport);
 
@@ -158,6 +205,7 @@ describe("Session WebSocket integration", () => {
 
     const finalPrompt = mockLlm.callClaudeJSON.mock.calls[0][0] as string;
     expect(finalPrompt).toContain("Expérience terrain confirmée en React");
-    expect(finalPrompt).toContain("bilan final");
+    expect(finalPrompt).toContain("FICHE DE QUALIFICATION");
+    expect(finalPrompt).toContain('"Premier transcript"');
   });
 });
