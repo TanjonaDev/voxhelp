@@ -754,7 +754,7 @@ export interface OverlayPanelProps {
   isSpeaking: boolean;
   lastTranscript: string;
   lastError: string | null;
-  onStartAudio: (jobContext?: JobContext, keywords?: string[]) => Promise<void>;
+  onStartAudio: (jobContext?: JobContext, keywords?: string[], candidateName?: string) => Promise<void>;
   onStop: () => void;
   onSummarize: () => void;
   onAskQuestion: (text: string) => void;
@@ -784,6 +784,7 @@ export function OverlayPanel({
   const [jobTitle, setJobTitle] = useState("");
   const [jobLevel, setJobLevel] = useState("");
   const [jobStack, setJobStack] = useState("");
+  const [candidateName, setCandidateName] = useState("");
   const cvKeywords = useCvKeywords(token);
   const [askValue, setAskValue] = useState("");
   const [newId, setNewId] = useState<string | null>(null);
@@ -819,7 +820,7 @@ export function OverlayPanel({
     console.log(
       `[Setup] cvKeywords=[${cvKeywords.keywords.join(", ")}] stackKeywords=[${deriveStackKeywords(jobStack).join(", ")}] merged=[${keywords.join(", ")}]`
     );
-    await onStartAudio(jobContext, keywords.length > 0 ? keywords : undefined);
+    await onStartAudio(jobContext, keywords.length > 0 ? keywords : undefined, candidateName.trim() || undefined);
     setAudioStarted(true);
   };
 
@@ -948,6 +949,34 @@ export function OverlayPanel({
                   gap: 10,
                 }}
               >
+                <p
+                  style={{
+                    margin: 0,
+                    fontSize: 10,
+                    fontWeight: 700,
+                    letterSpacing: "0.09em",
+                    textTransform: "uppercase",
+                    color: "var(--text-3)",
+                  }}
+                >
+                  Candidat (optionnel)
+                </p>
+                <input
+                  type="text"
+                  placeholder="Nom du candidat"
+                  value={candidateName}
+                  onChange={(e) => setCandidateName(e.target.value)}
+                  style={{
+                    all: "unset" as "unset",
+                    fontSize: 13,
+                    color: "var(--text)",
+                    background: "var(--card-hi)",
+                    borderRadius: 9,
+                    padding: "8px 12px",
+                    boxShadow: "0 0 0 1px var(--stroke) inset",
+                    fontFamily: "var(--font)",
+                  }}
+                />
                 <p
                   style={{
                     margin: 0,
