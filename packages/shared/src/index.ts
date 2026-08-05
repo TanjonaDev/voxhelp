@@ -10,6 +10,7 @@ export interface SessionConfig {
   language: InterviewLanguage;
   jobContext?: JobContext;
   keywords?: string[];
+  candidateName?: string;
 }
 
 export interface Insight {
@@ -23,19 +24,60 @@ export interface Insight {
   relance?: string;
 }
 
-export interface ThemeStatus {
-  theme: string;
-  status: Insight["status"];
-  label: string;
+export interface TranscriptEntry {
+  t: string;
+  text: string;
 }
 
+export interface Citation {
+  quote: string;
+  t: string;
+}
+
+export type SkillMatchStatus = "demontre" | "mentionne" | "non-aborde";
+
+export interface SkillMatch {
+  skill: string;
+  status: SkillMatchStatus;
+  evidence: string;
+  citation?: Citation;
+}
+
+export interface QuotedPoint {
+  text: string;
+  citation: Citation;
+}
+
+export interface AttentionPoint {
+  text: string;
+  citation?: Citation;
+}
+
+export interface KeyProject {
+  company: string;
+  period: string;
+  stack: string;
+  role: string;
+  impact: string;
+}
+
+export type Verdict = "presenter" | "presenter-avec-reserve" | "ne-pas-presenter";
+
 export interface CandidateReport {
-  overall: string;
-  strengths: string[];
-  gaps: string[];
-  recommendation: "hire" | "maybe" | "pass";
-  recommendationReason: string;
-  themes: ThemeStatus[];
+  candidateName: string;
+  jobTitle: string;
+  interviewDate: string;
+  durationLabel: string;
+  summary: string;
+  techMatching: SkillMatch[];
+  strengths: QuotedPoint[];
+  attentionPoints: AttentionPoint[];
+  keyProjects: KeyProject[];
+  verdict: Verdict;
+  verdictReason: string;
+  verdictChecklist: string[];
+  nextSteps: string[];
+  suggestedQuestions: string[];
 }
 
 export type ClientMessage =
