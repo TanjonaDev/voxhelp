@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef } from "react";
-import type { Insight, CandidateReport, JobContext, ThemeStatus } from "@voxhelp/shared";
+import type { Insight, CandidateReport, JobContext, SkillMatch, SkillMatchStatus, Verdict, Citation } from "@voxhelp/shared";
 import { useCvKeywords } from "../hooks/useCvKeywords.js";
 import { deriveStackKeywords, mergeKeywords } from "../lib/mergeKeywords.js";
 import { VIcon, VHMark, LiveWave, StatusBadge, CategoryTag, GhostBtn } from "./ui.js";
@@ -593,45 +593,90 @@ function InsightCardView({ insight, isNew }: { insight: Insight; isNew: boolean 
 // ---------------------------------------------------------------------------
 // FinalReportView
 // ---------------------------------------------------------------------------
-const RECOMMENDATION_META: Record<
-  CandidateReport["recommendation"],
-  { label: string; colorVar: string }
-> = {
-  hire: { label: "Recommandé", colorVar: "var(--good)" },
-  maybe: { label: "À revoir", colorVar: "var(--warn)" },
-  pass: { label: "Non retenu", colorVar: "var(--risk)" },
+const SKILL_STATUS_META: Record<SkillMatchStatus, { icon: string; color: string }> = {
+  "demontre": { icon: "✓", color: "var(--good)" },
+  "mentionne": { icon: "?", color: "var(--warn)" },
+  "non-aborde": { icon: "✕", color: "var(--risk)" },
 };
 
-const THEME_STATUS_META: Record<ThemeStatus["status"], { icon: string; color: string }> = {
-  "acquis": { icon: "✓", color: "var(--good)" },
-  "a-creuser": { icon: "?", color: "var(--warn)" },
-  "pas-acquis": { icon: "✕", color: "var(--risk)" },
+const VERDICT_META: Record<Verdict, { label: string; colorVar: string }> = {
+  "presenter": { label: "Présenter au client", colorVar: "var(--good)" },
+  "presenter-avec-reserve": { label: "Présenter avec réserve", colorVar: "var(--warn)" },
+  "ne-pas-presenter": { label: "Ne pas présenter", colorVar: "var(--risk)" },
 };
+
+const sectionLabelStyle = {
+  fontSize: 9.5,
+  fontWeight: 700,
+  letterSpacing: "0.09em",
+  textTransform: "uppercase" as const,
+  color: "var(--text-3)",
+  margin: "0 0 6px",
+};
+
+function CitationChip({ citation }: { citation: Citation }) {
+  return (
+    <span
+      style={{
+        display: "block",
+        fontSize: 11.5,
+        color: "var(--text-3)",
+        fontStyle: "italic",
+        marginTop: 3,
+      }}
+    >
+      <span style={{ fontFamily: "var(--mono)", fontStyle: "normal", marginRight: 5 }}>{citation.t}</span>
+      « {citation.quote} »
+    </span>
+  );
+}
+
+function techMatchingCounts(matches: SkillMatch[]): Record<SkillMatchStatus, number> {
+  return matches.reduce(
+    (acc, m) => {
+      acc[m.status] += 1;
+      return acc;
+    },
+    { "demontre": 0, "mentionne": 0, "non-aborde": 0 } as Record<SkillMatchStatus, number>
+  );
+}
+
+function formatInterviewDate(iso: string): string {
+  try {
+    return new Date(iso).toLocaleDateString("fr-FR", { day: "numeric", month: "long", year: "numeric" });
+  } catch {
+    return iso;
+  }
+}
 
 function FinalReportView({ report }: { report: CandidateReport }) {
-  const r = RECOMMENDATION_META[report.recommendation];
+  const verdict = VERDICT_META[report.verdict];
+  const counts = techMatchingCounts(report.techMatching);
+  const bilanLine = `${counts["demontre"]} démontré${counts["demontre"] !== 1 ? "s" : ""} · ${counts["mentionne"]} mentionné${counts["mentionne"] !== 1 ? "s" : ""} · ${counts["non-aborde"]} non abordé${counts["non-aborde"] !== 1 ? "s" : ""}`;
+
   return (
     <div
       style={{
         gridColumn: "1 / -1",
         borderRadius: "var(--radius-card)",
-        padding: "14px",
+        padding: "16px",
         background: "var(--card)",
         boxShadow: "0 0 0 1px var(--stroke) inset, var(--shadow-card)",
+        display: "flex",
+        flexDirection: "column",
+        gap: 16,
       }}
     >
-      <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 10 }}>
-        <span
-          style={{
-            fontSize: 9.5,
-            fontWeight: 700,
-            letterSpacing: "0.09em",
-            textTransform: "uppercase",
-            color: "var(--text-3)",
-          }}
-        >
-          Bilan candidat
-        </span>
+      {/* 1. En-tête */}
+      <div style={{ display: "flex", alignItems: "flex-start", justifyContent: "space-between", gap: 12 }}>
+        <div>
+          <p style={{ margin: "0 0 2px", fontSize: 15, fontWeight: 700, color: "var(--text)" }}>
+            {report.candidateName}
+          </p>
+          <p style={{ margin: 0, fontSize: 12.5, color: "var(--text-3)" }}>
+            {report.jobTitle} · {formatInterviewDate(report.interviewDate)} · {report.durationLabel}
+          </p>
+        </div>
         <span
           style={{
             fontSize: 11,
@@ -639,102 +684,147 @@ function FinalReportView({ report }: { report: CandidateReport }) {
             padding: "3px 9px",
             borderRadius: 99,
             background: "var(--card-hi)",
-            color: r.colorVar,
+            color: verdict.colorVar,
+            whiteSpace: "nowrap",
           }}
         >
-          {r.label}
+          {verdict.label}
         </span>
       </div>
-      <p style={{ margin: "0 0 10px", fontSize: 13, lineHeight: 1.5, color: "var(--text-2)" }}>
-        {report.overall}
-      </p>
-      {report.themes.length > 0 && (
-        <div style={{ marginBottom: 8 }}>
-          <p
-            style={{
-              fontSize: 9.5,
-              fontWeight: 700,
-              letterSpacing: "0.09em",
-              textTransform: "uppercase",
-              color: "var(--text-3)",
-              margin: "0 0 5px",
-            }}
-          >
-            Thèmes abordés
-          </p>
-          <ul style={{ margin: 0, padding: 0, listStyle: "none", display: "flex", flexDirection: "column", gap: 3 }}>
-            {report.themes.map((theme) => {
-              const meta = THEME_STATUS_META[theme.status];
+
+      {/* 2. Résumé */}
+      <p style={{ margin: 0, fontSize: 13, lineHeight: 1.5, color: "var(--text-2)" }}>{report.summary}</p>
+
+      {/* 3. Matching technique */}
+      {report.techMatching.length > 0 && (
+        <div>
+          <p style={sectionLabelStyle}>Matching technique</p>
+          <ul style={{ margin: 0, padding: 0, listStyle: "none", display: "flex", flexDirection: "column", gap: 8 }}>
+            {report.techMatching.map((m) => {
+              const meta = SKILL_STATUS_META[m.status];
               return (
-                <li key={theme.theme} style={{ display: "flex", gap: 7, fontSize: 13, color: "var(--text-2)", lineHeight: 1.45 }}>
+                <li key={m.skill} style={{ display: "flex", gap: 7, fontSize: 13, color: "var(--text-2)", lineHeight: 1.45 }}>
                   <span style={{ color: meta.color, flexShrink: 0 }}>{meta.icon}</span>
-                  {theme.label}
+                  <div style={{ flex: 1, minWidth: 0 }}>
+                    <span style={{ fontWeight: 600 }}>{m.skill}</span> — {m.evidence}
+                    {m.citation && <CitationChip citation={m.citation} />}
+                  </div>
                 </li>
               );
             })}
           </ul>
+          <p style={{ margin: "8px 0 0", fontSize: 11.5, color: "var(--text-3)" }}>{bilanLine}</p>
         </div>
       )}
+
+      {/* 4. Points forts */}
       {report.strengths.length > 0 && (
-        <div style={{ marginBottom: 8 }}>
-          <p
-            style={{
-              fontSize: 9.5,
-              fontWeight: 700,
-              letterSpacing: "0.09em",
-              textTransform: "uppercase",
-              color: "var(--good)",
-              margin: "0 0 5px",
-            }}
-          >
-            Points forts
-          </p>
-          <ul style={{ margin: 0, padding: 0, listStyle: "none", display: "flex", flexDirection: "column", gap: 3 }}>
+        <div>
+          <p style={{ ...sectionLabelStyle, color: "var(--good)" }}>Points forts</p>
+          <ul style={{ margin: 0, padding: 0, listStyle: "none", display: "flex", flexDirection: "column", gap: 8 }}>
             {report.strengths.map((s, i) => (
               <li key={i} style={{ display: "flex", gap: 7, fontSize: 13, color: "var(--text-2)", lineHeight: 1.45 }}>
                 <span style={{ color: "var(--good)", flexShrink: 0 }}>+</span>
-                {s}
+                <div style={{ flex: 1, minWidth: 0 }}>
+                  {s.text}
+                  <CitationChip citation={s.citation} />
+                </div>
               </li>
             ))}
           </ul>
         </div>
       )}
-      {report.gaps.length > 0 && (
+
+      {/* 5. Points d'attention */}
+      {report.attentionPoints.length > 0 && (
         <div>
-          <p
-            style={{
-              fontSize: 9.5,
-              fontWeight: 700,
-              letterSpacing: "0.09em",
-              textTransform: "uppercase",
-              color: "var(--risk)",
-              margin: "0 0 5px",
-            }}
-          >
-            Points à creuser
-          </p>
-          <ul style={{ margin: 0, padding: 0, listStyle: "none", display: "flex", flexDirection: "column", gap: 3 }}>
-            {report.gaps.map((g, i) => (
+          <p style={{ ...sectionLabelStyle, color: "var(--warn)" }}>Points d'attention</p>
+          <ul style={{ margin: 0, padding: 0, listStyle: "none", display: "flex", flexDirection: "column", gap: 8 }}>
+            {report.attentionPoints.map((a, i) => (
               <li key={i} style={{ display: "flex", gap: 7, fontSize: 13, color: "var(--text-2)", lineHeight: 1.45 }}>
-                <span style={{ color: "var(--risk)", flexShrink: 0 }}>?</span>
-                {g}
+                <span style={{ color: "var(--warn)", flexShrink: 0 }}>?</span>
+                <div style={{ flex: 1, minWidth: 0 }}>
+                  {a.text}
+                  {a.citation && <CitationChip citation={a.citation} />}
+                </div>
               </li>
             ))}
           </ul>
         </div>
       )}
-      <p
+
+      {/* 6. Projets clés identifiés */}
+      {report.keyProjects.length > 0 && (
+        <div>
+          <p style={sectionLabelStyle}>Projets clés identifiés</p>
+          <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+            {report.keyProjects.map((p, i) => (
+              <div
+                key={i}
+                style={{
+                  borderRadius: 10,
+                  padding: "10px 12px",
+                  background: "var(--card-hi)",
+                  boxShadow: "0 0 0 1px var(--stroke) inset",
+                  fontSize: 12.5,
+                  color: "var(--text-2)",
+                  lineHeight: 1.5,
+                }}
+              >
+                <p style={{ margin: "0 0 3px", fontWeight: 700, color: "var(--text)" }}>
+                  {p.company} <span style={{ fontWeight: 400, color: "var(--text-3)" }}>· {p.period}</span>
+                </p>
+                <p style={{ margin: 0 }}>{p.role} — {p.stack}</p>
+                <p style={{ margin: "3px 0 0", color: "var(--text-3)" }}>{p.impact}</p>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {/* 7. Recommandation */}
+      <div
         style={{
-          fontSize: 11,
-          color: "var(--text-3)",
-          fontStyle: "italic",
-          margin: "10px 0 0",
-          paddingTop: 10,
-          borderTop: "1px solid var(--stroke)",
+          borderRadius: 10,
+          padding: "10px 12px",
+          background: "var(--card-hi)",
+          boxShadow: "0 0 0 1px var(--stroke) inset",
         }}
       >
-        {report.recommendationReason}
-      </p>
+        <p style={sectionLabelStyle}>Recommandation</p>
+        <p style={{ margin: "0 0 6px", fontSize: 13, lineHeight: 1.5, color: "var(--text-2)" }}>{report.verdictReason}</p>
+        {report.verdictChecklist.length > 0 && (
+          <ul style={{ margin: "0 0 6px", padding: "0 0 0 16px", fontSize: 12.5, color: "var(--text-2)", lineHeight: 1.5 }}>
+            {report.verdictChecklist.map((c, i) => (
+              <li key={i}>{c}</li>
+            ))}
+          </ul>
+        )}
+        {report.nextSteps.length > 0 && (
+          <>
+            <p style={{ margin: "6px 0 3px", fontSize: 10.5, fontWeight: 700, color: "var(--text-3)" }}>
+              Prochaines étapes
+            </p>
+            <ul style={{ margin: 0, padding: "0 0 0 16px", fontSize: 12.5, color: "var(--text-2)", lineHeight: 1.5 }}>
+              {report.nextSteps.map((s, i) => (
+                <li key={i}>{s}</li>
+              ))}
+            </ul>
+          </>
+        )}
+      </div>
+
+      {/* 8. Questions non posées */}
+      {report.suggestedQuestions.length > 0 && (
+        <div>
+          <p style={sectionLabelStyle}>Questions non posées</p>
+          <ul style={{ margin: 0, padding: "0 0 0 16px", fontSize: 12.5, color: "var(--text-2)", lineHeight: 1.5 }}>
+            {report.suggestedQuestions.map((q, i) => (
+              <li key={i}>{q}</li>
+            ))}
+          </ul>
+        </div>
+      )}
     </div>
   );
 }
