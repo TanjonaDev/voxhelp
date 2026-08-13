@@ -61,7 +61,7 @@ export function formatReportAsText(report: CandidateReport): string {
     lines.push("POINTS FORTS");
     for (const s of report.strengths) {
       lines.push(`+ ${s.text}`);
-      lines.push(`  "${s.citation.quote}" (${s.citation.t})`);
+      if (s.citation) lines.push(`  "${s.citation.quote}" (${s.citation.t})`);
     }
   }
 
