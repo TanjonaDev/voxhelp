@@ -127,3 +127,35 @@
     transition: none !important;
   }
 }
+
+@media print {
+  body * {
+    visibility: hidden;
+  }
+
+  [data-print-area],
+  [data-print-area] * {
+    visibility: visible;
+  }
+
+  [data-print-area] {
+    position: absolute;
+    inset: 0;
+    background: white;
+    color: black;
+    --card: white;
+    --card-hi: #f4f4f5;
+    --stroke: #d4d4d8;
+    --text: #18181b;
+    --text-2: #3f3f46;
+    --text-3: #71717a;
+    --good: #16a34a;
+    --warn: #b45309;
+    --risk: #dc2626;
+    --shadow-card: none;
+  }
+
+  [data-print-area] .report-actions {
+    display: none;
+  }
+}
