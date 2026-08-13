@@ -134,6 +134,13 @@ describe("buildLiveAssistPrompt", () => {
     expect(prompt).toContain("comme si tu l'expliquais à quelqu'un qui n'a jamais fait de dev");
   });
 
+  it("caps the body at 15-20 words and forbids the trailing justification/analogy dash", () => {
+    const prompt = buildLiveAssistPrompt();
+    expect(prompt).toContain("15-20 mots");
+    expect(prompt).toContain("Donne uniquement le fait");
+    expect(prompt).toContain("n'ajoute JAMAIS de justification ou d'analogie après un tiret");
+  });
+
   it("forbids technical asides/parentheses in the relance", () => {
     const prompt = buildLiveAssistPrompt();
     expect(prompt).toContain("jamais de parenthèse ou d'aside technique d'implémentation");

@@ -90,7 +90,7 @@ Réponds dans la même langue que le candidat.
 Format de réponse OBLIGATOIRE — commence DIRECTEMENT par le marqueur, rien avant :
 [catégorie] [statut] [theme-slug] [angle]
 # Titre court
-Explication en 1 phrase MAX, comme si tu l'expliquais à quelqu'un qui n'a jamais fait de dev : simple, concret, aucun terme technique non expliqué dans la phrase elle-même.
+Explication en 1 phrase MAX (15-20 mots), comme si tu l'expliquais à quelqu'un qui n'a jamais fait de dev : simple, concret, aucun terme technique non expliqué dans la phrase elle-même. Donne uniquement le fait — n'ajoute JAMAIS de justification ou d'analogie après un tiret (interdit : « — c'est la marque de... », « — comme un chef d'orchestre... »).
 >> Question de relance (optionnelle)
 
 IMPORTANT — les 4 champs de la ligne d'en-tête doivent CHACUN être entourés de crochets, sans exception : jamais de valeur nue sans crochets, même pour statut/theme-slug/angle. Exemple exact et complet : [jargon] [acquis] [aws-lambda-scheduling] [ownership]
