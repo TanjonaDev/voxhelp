@@ -838,6 +838,7 @@ export interface OverlayPanelProps {
   isSummarizing: boolean;
   finalReport: CandidateReport | null;
   touchedId: string | null;
+  touchedSeq: number;
   wsStatus: WsStatus;
   isCapturing: boolean;
   isSpeaking: boolean;
@@ -858,6 +859,7 @@ export function OverlayPanel({
   isSummarizing,
   finalReport,
   touchedId,
+  touchedSeq,
   wsStatus,
   isCapturing,
   isSpeaking,
@@ -888,7 +890,7 @@ export function OverlayPanel({
 
   useEffect(() => {
     if (touchedId) setNewId(touchedId);
-  }, [touchedId]);
+  }, [touchedId, touchedSeq]);
 
   useEffect(() => {
     if (feedRef.current) {

@@ -75,6 +75,7 @@ function SessionApp({ token }: SessionAppProps) {
       isSummarizing={ws.isSummarizing}
       finalReport={ws.finalReport}
       touchedId={ws.touchedId}
+      touchedSeq={ws.touchedSeq}
       wsStatus={ws.status}
       isCapturing={audio.isCapturing}
       isSpeaking={audio.isSpeaking}

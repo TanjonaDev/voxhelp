@@ -15,6 +15,7 @@ interface UseWebSocketReturn {
   streamingCard: PartialCard | null;
   finalReport: CandidateReport | null;
   touchedId: string | null;
+  touchedSeq: number;
   lastTranscript: string;
   lastError: string | null;
   startSession: (config: SessionConfig) => void;
@@ -39,6 +40,7 @@ export function useWebSocket(url: string): UseWebSocketReturn {
   const [streamingCard, setStreamingCard] = useState<PartialCard | null>(null);
   const [finalReport, setFinalReport] = useState<CandidateReport | null>(null);
   const [touchedId, setTouchedId] = useState<string | null>(null);
+  const [touchedSeq, setTouchedSeq] = useState(0);
   const [lastTranscript, setLastTranscript] = useState("");
   const [lastError, setLastError] = useState<string | null>(null);
 
@@ -94,6 +96,7 @@ export function useWebSocket(url: string): UseWebSocketReturn {
           },
         ]);
         setTouchedId(msg.id);
+        setTouchedSeq((s) => s + 1);
         break;
       }
       case "assist:update": {
@@ -108,6 +111,7 @@ export function useWebSocket(url: string): UseWebSocketReturn {
           )
         );
         setTouchedId(msg.id);
+        setTouchedSeq((s) => s + 1);
         break;
       }
       case "assist:cancel":
@@ -237,6 +241,7 @@ export function useWebSocket(url: string): UseWebSocketReturn {
     streamingCard,
     finalReport,
     touchedId,
+    touchedSeq,
     lastTranscript,
     lastError,
     startSession,
