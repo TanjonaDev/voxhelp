@@ -15,7 +15,7 @@ export interface SessionConfig {
 
 export interface Insight {
   id: string;
-  cat: "translation" | "jargon" | "strength" | "attention";
+  cat: "translation" | "strength" | "attention";
   status: "acquis" | "a-creuser" | "pas-acquis";
   theme: string | null;
   t: string;
@@ -99,6 +99,7 @@ export type ServerMessage =
   | { type: "assist:start"; id: string; t: string }
   | { type: "assist:chunk"; id: string; text: string }
   | { type: "assist:done"; id: string; fullText: string }
+  | { type: "assist:update"; id: string; fullText: string }
   | { type: "assist:cancel"; id: string }
   | { type: "assist:error"; error: string }
   | { type: "analysis:final"; report: CandidateReport }
