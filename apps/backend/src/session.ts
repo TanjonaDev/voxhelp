@@ -19,7 +19,7 @@ interface ProfileUsage {
 function extractThemeAndAngle(text: string): { theme: string | null; angle: string | null } {
   const headerLine = text.trim().split("\n")[0] ?? "";
   const match = headerLine.match(
-    /\[?(?:jargon|strength|attention|translation)\]?\s*\[?(?:acquis|[aà][\s-]?creuser|pas[\s-]?acquis)\]?\s*\[?([a-z0-9-]+)\]?(?:\s*\[?(contexte|ownership|impact|none)\]?)?/i
+    /\[?(?:strength|attention|translation)\]?\s*\[?(?:acquis|[aà][\s-]?creuser|pas[\s-]?acquis)\]?\s*\[?([a-z0-9-]+)\]?(?:\s*\[?(contexte|ownership|impact|none)\]?)?/i
   );
   return {
     theme: match?.[1]?.toLowerCase() ?? null,
@@ -87,7 +87,6 @@ export class Session {
   private lastTheme: string | null = null;
   private coveredAngles: Set<string> = new Set();
   private themeCardCount = 0;
-  private jargonDecodedThemes: Set<string> = new Set();
 
   constructor(ws: WebSocket, userId: string | null = null, maxBufferMs: number = 3 * 60 * 1000) {
     this.ws = ws;
@@ -176,7 +175,6 @@ export class Session {
     this.lastTheme = null;
     this.coveredAngles = new Set();
     this.themeCardCount = 0;
-    this.jargonDecodedThemes = new Set();
     this.sessionStartMs = Date.now();
 
     this.stt?.close();
@@ -266,7 +264,7 @@ export class Session {
     const lines = text.trim().split("\n").filter((l) => l.trim() !== "");
 
     const headerMatch = lines[0]?.match(
-      /\[?(jargon|strength|attention|translation)\]?\s*\[?(acquis|[aà][\s-]?creuser|pas[\s-]?acquis)\]?/i
+      /\[?(strength|attention|translation)\]?\s*\[?(acquis|[aà][\s-]?creuser|pas[\s-]?acquis)\]?/i
     );
     const cat = (headerMatch?.[1]?.toLowerCase() as Insight["cat"]) ?? "translation";
     const status = normalizeStatus(headerMatch?.[2]);
@@ -299,7 +297,6 @@ export class Session {
     let cancelled = false;
 
     try {
-      const jargonAlreadyDecoded = this.lastTheme ? this.jargonDecodedThemes.has(this.lastTheme) : false;
       const fullText = await streamAssist(
         buildLiveAssistPrompt(
           this.jobContext,
@@ -308,8 +305,7 @@ export class Session {
           this.cardLog,
           this.lastTheme,
           Array.from(this.coveredAngles),
-          this.themeCardCount,
-          jargonAlreadyDecoded
+          this.themeCardCount
         ),
         `Ce qui vient d'être dit :\n"${transcript}"`,
         (chunk) => {
@@ -336,23 +332,30 @@ export class Session {
         return;
       }
 
-      this.send({ type: "assist:done", id: cardId, fullText });
-
       const card = this.parseAssistText(fullText, cardId, cardT);
       if (card.relance) {
         this.relanceLog.push(card.relance);
         if (this.relanceLog.length > this.MAX_LOG_ENTRIES) this.relanceLog.shift();
       }
-      this.cardLog.push(card);
-      if (this.cardLog.length > this.MAX_CARD_LOG) this.cardLog.shift();
 
-      console.log(
-        `[Session] Card [${card.cat}] [${card.status}] theme=${card.theme ?? "null"} "${card.title}"${card.relance ? ` | relance: "${card.relance}"` : ""}`
-      );
+      const lastCard = this.cardLog[this.cardLog.length - 1];
+      const canMerge = !!lastCard && !!card.theme && card.theme === lastCard.theme && !lastCard.relance;
 
-      if (card.cat === "jargon" && card.theme) {
-        this.jargonDecodedThemes.add(card.theme);
+      if (canMerge) {
+        const mergedCard: Insight = { ...card, id: lastCard.id, t: lastCard.t };
+        this.cardLog[this.cardLog.length - 1] = mergedCard;
+        this.send({ type: "assist:update", id: lastCard.id, fullText });
+        console.log(
+          `[Session] Card fusionnée dans ${lastCard.id} [${card.cat}] [${card.status}] theme=${card.theme} "${card.title}"`
+        );
+      } else {
+        this.cardLog.push(card);
+        this.send({ type: "assist:done", id: cardId, fullText });
+        console.log(
+          `[Session] Card [${card.cat}] [${card.status}] theme=${card.theme ?? "null"} "${card.title}"${card.relance ? ` | relance: "${card.relance}"` : ""}`
+        );
       }
+      if (this.cardLog.length > this.MAX_CARD_LOG) this.cardLog.shift();
 
       const { theme, angle } = extractThemeAndAngle(fullText);
       if (theme && theme === this.lastTheme) {
@@ -535,7 +538,6 @@ Utilise TOUJOURS catégorie = translation et statut = acquis pour tes réponses.
     this.lastTheme = null;
     this.coveredAngles = new Set();
     this.themeCardCount = 0;
-    this.jargonDecodedThemes = new Set();
     this.sessionStartMs = 0;
     if (this.stt) {
       this.stt.close();

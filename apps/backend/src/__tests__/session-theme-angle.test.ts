@@ -88,12 +88,12 @@ describe("Session theme angle", () => {
     mockStreamAssistOnce(awsCard("Rôle sur le projet", "ownership"));
     stt.callbacks!.onTranscript("J'ai porté cette décision.");
     ws.send(JSON.stringify({ type: "trigger:analyze" }));
-    await waitForMessage(ws, "assist:done");
+    await waitForMessage(ws, "assist:update");
 
     mockStreamAssistOnce(awsCard("ETL et data pipeline"));
     stt.callbacks!.onTranscript("On a un pipeline ETL derrière.");
     ws.send(JSON.stringify({ type: "trigger:analyze" }));
-    await waitForMessage(ws, "assist:done");
+    await waitForMessage(ws, "assist:update");
 
     const thirdPrompt = mockLlm.streamAssist.mock.calls[2][0] as string;
     expect(thirdPrompt).toContain("Thème de la dernière card : « aws-serverless »");
@@ -114,17 +114,17 @@ describe("Session theme angle", () => {
     mockStreamAssistOnce(awsCard("Rôle sur le projet", "ownership"));
     stt.callbacks!.onTranscript("J'ai porté cette décision.");
     ws.send(JSON.stringify({ type: "trigger:analyze" }));
-    await waitForMessage(ws, "assist:done");
+    await waitForMessage(ws, "assist:update");
 
     mockStreamAssistOnce(awsCard("Résultat obtenu", "impact"));
     stt.callbacks!.onTranscript("Ça a réduit la latence de 40%.");
     ws.send(JSON.stringify({ type: "trigger:analyze" }));
-    await waitForMessage(ws, "assist:done");
+    await waitForMessage(ws, "assist:update");
 
     mockStreamAssistOnce(awsCard("SQS vs SNS"));
     stt.callbacks!.onTranscript("On utilise SQS plutôt que SNS.");
     ws.send(JSON.stringify({ type: "trigger:analyze" }));
-    await waitForMessage(ws, "assist:done");
+    await waitForMessage(ws, "assist:update");
 
     const fourthPrompt = mockLlm.streamAssist.mock.calls[3][0] as string;
     expect(fourthPrompt).toContain("Thème de la dernière card : « aws-serverless »");
@@ -140,14 +140,14 @@ describe("Session theme angle", () => {
       mockStreamAssistOnce(awsCard(`Détail technique ${i}`));
       stt.callbacks!.onTranscript(`Encore un détail sur ce sujet ${i}.`);
       ws.send(JSON.stringify({ type: "trigger:analyze" }));
-      await waitForMessage(ws, "assist:done");
+      await waitForMessage(ws, i === 0 ? "assist:done" : "assist:update");
     }
 
     const sixthCallIndex = 5;
     mockStreamAssistOnce(awsCard("Encore un détail"));
     stt.callbacks!.onTranscript("Toujours le même sujet.");
     ws.send(JSON.stringify({ type: "trigger:analyze" }));
-    await waitForMessage(ws, "assist:done");
+    await waitForMessage(ws, "assist:update");
 
     const sixthPrompt = mockLlm.streamAssist.mock.calls[sixthCallIndex][0] as string;
     expect(sixthPrompt).toContain("ATTENTION — ce thème a déjà été couvert par 5 cards consécutives");
@@ -205,7 +205,7 @@ describe("Session theme angle", () => {
 
     mockStreamAssistOnce(
       [
-        "[jargon] acquis parcours-rbc-data-projects [ownership]",
+        "[strength] acquis parcours-rbc-data-projects [ownership]",
         "# Rôle du candidat sur le projet",
         "Le candidat explique son rôle.",
         ">> Quel était votre rôle exact ?",
@@ -213,7 +213,7 @@ describe("Session theme angle", () => {
     );
     stt.callbacks!.onTranscript("J'étais responsable de l'architecture.");
     ws.send(JSON.stringify({ type: "trigger:analyze" }));
-    await waitForMessage(ws, "assist:done");
+    await waitForMessage(ws, "assist:update");
 
     const secondPrompt = mockLlm.streamAssist.mock.calls[1][0] as string;
     expect(secondPrompt).toContain("Thème de la dernière card : « parcours-rbc-data-projects »");
