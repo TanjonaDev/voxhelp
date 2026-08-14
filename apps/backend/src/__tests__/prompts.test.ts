@@ -63,7 +63,19 @@ describe("buildLiveAssistPrompt", () => {
   it("includes the theme-continuity instruction when lastTheme is provided", () => {
     const prompt = buildLiveAssistPrompt(undefined, [], [], [], "aws-serverless", [], 1);
     expect(prompt).toContain("Thème de la dernière card : « aws-serverless »");
-    expect(prompt).toContain("réutilise EXACTEMENT ce slug");
+    expect(prompt).toContain("Réutilise EXACTEMENT ce slug");
+  });
+
+  it("only reuses the slug when the segment genuinely continues the same precise subject", () => {
+    const prompt = buildLiveAssistPrompt(undefined, [], [], [], "aws-serverless", [], 1);
+    expect(prompt).toContain("Réutilise EXACTEMENT ce slug seulement si le nouveau segment approfondit vraiment ce même sujet précis");
+    expect(prompt).toContain("Dès qu'une techno, un projet ou une compétence différente apparaît, c'est un NOUVEAU thème");
+  });
+
+  it("defines theme-slug as the precise subject, not a broad umbrella category", () => {
+    const prompt = buildLiveAssistPrompt();
+    expect(prompt).toContain("sujet PRÉCIS abordé");
+    expect(prompt).toContain("pas une catégorie large");
   });
 
   it("lists all 3 remaining angles with definitions when no angle is covered yet", () => {

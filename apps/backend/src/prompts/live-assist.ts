@@ -40,7 +40,7 @@ function buildThemeAngleSection(
   const remaining = ALL_ANGLES.filter((a) => !coveredAngles.includes(a));
   const forcePivot = remaining.length === 0 || themeCardCount >= THEME_CARD_COUNT_FALLBACK;
 
-  let section = `\nThème de la dernière card : « ${lastTheme} ». Si le nouveau segment reste sur ce thème, réutilise EXACTEMENT ce slug pour le theme-tag.\n`;
+  let section = `\nThème de la dernière card : « ${lastTheme} ». Réutilise EXACTEMENT ce slug seulement si le nouveau segment approfondit vraiment ce même sujet précis. Dès qu'une techno, un projet ou une compétence différente apparaît, c'est un NOUVEAU thème — même si la conversation reste globalement dans la même veine (ex : parcours professionnel).\n`;
 
   if (forcePivot) {
     section += `\nATTENTION — ce thème a déjà été couvert par ${themeCardCount} cards consécutives. Si le nouveau segment reste sur ce même sujet, ta relance DOIT changer complètement de sujet — pas un autre détail technique de « ${lastTheme} », mais un sujet vraiment différent : méthodologie de travail, parcours professionnel, soft skills, un autre projet, gestion d'équipe, préférences technologiques hors de ce sujet, etc.\n`;
@@ -103,7 +103,7 @@ Catégories :
 
 Statut : acquis (exemple concret fourni, réponse complète) | a-creuser (mention sans détail, incomplet) | pas-acquis (vague, aucune preuve concrète)
 
-theme-slug : court identifiant kebab-case (1 à 4 mots) du macro-sujet abordé (ex : aws-serverless, presentation, methodologie-travail).
+theme-slug : court identifiant kebab-case (1 à 4 mots) du sujet PRÉCIS abordé — pas une catégorie large. Dès qu'une techno, un projet ou une compétence spécifique est nommé, le slug doit refléter CE sujet précis (ex : aws-lambda-scheduling, dynamodb-streams, typescript-strict-mode) — pas le thème général de la conversation (« parcours-professionnel » ne doit couvrir que le récit de carrière lui-même, pas les technos mentionnées en passant).
 
 angle : contexte | ownership | impact | none — l'angle de TA relance suggérée. none si pas de relance (cat = translation) ou si la relance ne correspond à aucun des 3 angles.
 
