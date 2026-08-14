@@ -14,6 +14,7 @@ interface UseWebSocketReturn {
   insights: Insight[];
   streamingCard: PartialCard | null;
   finalReport: CandidateReport | null;
+  touchedId: string | null;
   lastTranscript: string;
   lastError: string | null;
   startSession: (config: SessionConfig) => void;
@@ -37,6 +38,7 @@ export function useWebSocket(url: string): UseWebSocketReturn {
   const [insights, setInsights] = useState<Insight[]>([]);
   const [streamingCard, setStreamingCard] = useState<PartialCard | null>(null);
   const [finalReport, setFinalReport] = useState<CandidateReport | null>(null);
+  const [touchedId, setTouchedId] = useState<string | null>(null);
   const [lastTranscript, setLastTranscript] = useState("");
   const [lastError, setLastError] = useState<string | null>(null);
 
@@ -91,6 +93,21 @@ export function useWebSocket(url: string): UseWebSocketReturn {
             relance: parsed.relance ?? undefined,
           },
         ]);
+        setTouchedId(msg.id);
+        break;
+      }
+      case "assist:update": {
+        const parsed = parseAssistCard(msg.fullText);
+        setStreamingCard(null);
+        setIsAnalyzing(false);
+        setInsights((prev) =>
+          prev.map((insight) =>
+            insight.id === msg.id
+              ? { ...insight, ...parsed, id: msg.id, t: insight.t, relance: parsed.relance ?? undefined }
+              : insight
+          )
+        );
+        setTouchedId(msg.id);
         break;
       }
       case "assist:cancel":
@@ -219,6 +236,7 @@ export function useWebSocket(url: string): UseWebSocketReturn {
     insights,
     streamingCard,
     finalReport,
+    touchedId,
     lastTranscript,
     lastError,
     startSession,
