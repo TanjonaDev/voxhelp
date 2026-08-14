@@ -879,7 +879,7 @@ export function OverlayPanel({
   const [candidateName, setCandidateName] = useState("");
   const cvKeywords = useCvKeywords(token);
   const [askValue, setAskValue] = useState("");
-  const [newId, setNewId] = useState<string | null>(null);
+  const [touched, setTouched] = useState<{ id: string; seq: number } | null>(null);
   const elapsed = useElapsedTime(isCapturing);
 
   const copilotStatus: CopilotStatus = isAnalyzing
@@ -889,7 +889,7 @@ export function OverlayPanel({
     : "listening";
 
   useEffect(() => {
-    if (touchedId) setNewId(touchedId);
+    if (touchedId) setTouched({ id: touchedId, seq: touchedSeq });
   }, [touchedId, touchedSeq]);
 
   useEffect(() => {
@@ -1244,9 +1244,16 @@ export function OverlayPanel({
                 </div>
               )}
 
-              {insights.map((card) => (
-                <InsightCardView key={card.id} insight={card} isNew={card.id === newId} />
-              ))}
+              {insights.map((card) => {
+                const hit = touched?.id === card.id;
+                return (
+                  <InsightCardView
+                    key={hit ? `${card.id}:${touched!.seq}` : card.id}
+                    insight={card}
+                    isNew={hit}
+                  />
+                );
+              })}
 
               {streamingCard && <StreamingCardView card={streamingCard} />}
 
