@@ -25,10 +25,10 @@ export function parsePartialAssist(textSoFar: string, id: string, t: string): Pa
   const headerLine = lines[0] ?? "";
 
   const headerMatch = headerLine.match(
-    /\[?(jargon|strength|attention|translation)\]?\s*\[?(acquis|[aà][\s-]?creuser|pas[\s-]?acquis)\]?/i
+    /\[?(strength|attention|translation)\]?\s*\[?(acquis|[aà][\s-]?creuser|pas[\s-]?acquis)\]?/i
   );
   const themeMatch = headerLine.match(
-    /\[?(?:jargon|strength|attention|translation)\]?\s*\[?(?:acquis|[aà][\s-]?creuser|pas[\s-]?acquis)\]?\s*\[?([a-z0-9-]+)\]?/i
+    /\[?(?:strength|attention|translation)\]?\s*\[?(?:acquis|[aà][\s-]?creuser|pas[\s-]?acquis)\]?\s*\[?([a-z0-9-]+)\]?/i
   );
   const cat = (headerMatch?.[1]?.toLowerCase() as AssistCard["cat"]) ?? null;
   const status = normalizeStatus(headerMatch?.[2]);
