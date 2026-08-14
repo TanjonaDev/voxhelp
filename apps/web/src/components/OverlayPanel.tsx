@@ -311,7 +311,6 @@ function LiveCaption({ caption, speaking }: { caption: string; speaking: boolean
 function StreamingCardView({ card }: { card: PartialCard }) {
   const catColorMap: Record<string, string> = {
     translation: "var(--indigo)",
-    jargon: "var(--violet)",
     strength: "var(--good)",
     attention: "var(--risk)",
   };
@@ -385,7 +384,7 @@ function StreamingCardView({ card }: { card: PartialCard }) {
             marginBottom: 4,
           }}
         >
-          Ce que ça veut dire
+          Ce qui a été dit
         </div>
         {card.body ? (
           <p style={{ margin: 0, fontSize: 13, lineHeight: 1.5, color: "var(--text-2)" }}>
@@ -422,7 +421,6 @@ function InsightCardView({ insight, isNew }: { insight: Insight; isNew: boolean 
 
   const catColorMap: Record<Insight["cat"], string> = {
     translation: "var(--indigo)",
-    jargon: "var(--violet)",
     strength: "var(--good)",
     attention: "var(--risk)",
   };
@@ -489,7 +487,7 @@ function InsightCardView({ insight, isNew }: { insight: Insight; isNew: boolean 
         <span style={{ fontFamily: "var(--mono)", fontSize: 10.5, color: "var(--text-3)" }}>
           {insight.t}
         </span>
-        {insight.cat !== "jargon" && <StatusBadge level={insight.status} />}
+        <StatusBadge level={insight.status} />
       </div>
 
       {/* title */}
@@ -518,7 +516,7 @@ function InsightCardView({ insight, isNew }: { insight: Insight; isNew: boolean 
             marginBottom: 4,
           }}
         >
-          Ce que ça veut dire
+          Ce qui a été dit
         </div>
         <p style={{ margin: 0, fontSize: 13, lineHeight: 1.5, color: "var(--text-2)" }}>
           {insight.body}
@@ -839,6 +837,7 @@ export interface OverlayPanelProps {
   isAnalyzing: boolean;
   isSummarizing: boolean;
   finalReport: CandidateReport | null;
+  touchedId: string | null;
   wsStatus: WsStatus;
   isCapturing: boolean;
   isSpeaking: boolean;
@@ -858,6 +857,7 @@ export function OverlayPanel({
   isAnalyzing,
   isSummarizing,
   finalReport,
+  touchedId,
   wsStatus,
   isCapturing,
   isSpeaking,
@@ -886,14 +886,9 @@ export function OverlayPanel({
     ? "speaking"
     : "listening";
 
-  const prevCountRef = useRef(0);
   useEffect(() => {
-    if (insights.length > prevCountRef.current) {
-      const newest = insights[insights.length - 1];
-      setNewId(newest.id);
-      prevCountRef.current = insights.length;
-    }
-  }, [insights]);
+    if (touchedId) setNewId(touchedId);
+  }, [touchedId]);
 
   useEffect(() => {
     if (feedRef.current) {

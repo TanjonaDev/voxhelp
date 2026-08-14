@@ -200,7 +200,6 @@ const CATEGORY_META: Record<
   { color: string; icon: string; label: string }
 > = {
   translation: { color: "indigo", icon: "translate", label: "Traduction" },
-  jargon: { color: "violet", icon: "sparkle", label: "Jargon décodé" },
   strength: { color: "good", icon: "strength", label: "Point fort" },
   attention: { color: "risk", icon: "risk", label: "Point critique" },
 };
