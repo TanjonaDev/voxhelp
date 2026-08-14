@@ -50,11 +50,6 @@ function buildThemeAngleSection(
   return section;
 }
 
-function buildJargonGuardSection(lastTheme: string | null | undefined, jargonAlreadyDecoded: boolean): string {
-  if (!lastTheme || !jargonAlreadyDecoded) return "";
-  return `\nLe jargon technique du thème « ${lastTheme} » a déjà été décodé dans une card précédente. Si le nouveau segment reste sur ce même thème sans introduire de terme technique réellement nouveau (jamais encore expliqué dans cet entretien), NE génère PAS de nouvelle card [jargon] pour ce thème — utilise [strength], [attention] ou [translation] si le contenu apporte une info nouvelle (rôle, décision, résultat concret), ou [skip] si rien de nouveau n'est apporté.\n`;
-}
-
 export function buildLiveAssistPrompt(
   jobContext?: JobContext,
   history?: string[],
@@ -62,8 +57,7 @@ export function buildLiveAssistPrompt(
   previousCards?: Insight[],
   lastTheme?: string | null,
   coveredAngles?: string[],
-  themeCardCount?: number,
-  jargonAlreadyDecoded?: boolean
+  themeCardCount?: number
 ): string {
   const jobCtx = buildJobContext(jobContext);
   const convHistory = buildConversationHistory(history ?? []);
@@ -73,10 +67,9 @@ export function buildLiveAssistPrompt(
       ? `\nQuestions déjà posées (ne pas répéter) :\n${previousRelances.map((q) => `- ${q}`).join("\n")}\n`
       : "";
   const themeSection = buildThemeAngleSection(lastTheme, coveredAngles ?? [], themeCardCount ?? 0);
-  const jargonGuardSection = buildJargonGuardSection(lastTheme, jargonAlreadyDecoded ?? false);
 
-  return `Tu es VoxHelp, un copilote bienveillant qui aide un recruteur non-technique pendant un entretien développeur.${jobCtx}${convHistory}${prevCards}${relancesSection}${themeSection}${jargonGuardSection}
-Rôle : traduire le jargon, repérer les points forts, aider à poser les bonnes questions.
+  return `Tu es VoxHelp, un copilote bienveillant qui aide un recruteur non-technique pendant un entretien développeur.${jobCtx}${convHistory}${prevCards}${relancesSection}${themeSection}
+Rôle : donner un signal clair au recruteur — ce qui a été dit, faut-il creuser, avec quelle question.
 
 PRIORITÉ ABSOLUE — DÉTECTION RECRUTEUR :
 Si le texte transcrit est une question ou une invitation à parler typique d'un recruteur (ex : "Parlez-moi de...", "Comment gérez-vous...", "Pouvez-vous décrire...", "Tell me about...", "What is your experience with..."), réponds UNIQUEMENT avec :
@@ -90,23 +83,22 @@ Réponds dans la même langue que le candidat.
 Format de réponse OBLIGATOIRE — commence DIRECTEMENT par le marqueur, rien avant :
 [catégorie] [statut] [theme-slug] [angle]
 # Titre court
-Explication en 1 phrase MAX (15-20 mots), comme si tu l'expliquais à quelqu'un qui n'a jamais fait de dev : simple, concret, aucun terme technique non expliqué dans la phrase elle-même. Donne uniquement le fait — n'ajoute JAMAIS de justification ou d'analogie après un tiret (interdit : « — c'est la marque de... », « — comme un chef d'orchestre... »).
+Explication en 1 phrase courte : ce qui a été dit, factuellement — pas une explication de la techno elle-même. Si un terme technique est indispensable à la compréhension de la phrase, glose-le en 2-3 mots maximum entre parenthèses, jamais plus. Une seule idée, jamais deux reliées par un tiret, un deux-points ou un « et » de liaison.
 >> Question de relance (optionnelle)
 
-IMPORTANT — les 4 champs de la ligne d'en-tête doivent CHACUN être entourés de crochets, sans exception : jamais de valeur nue sans crochets, même pour statut/theme-slug/angle. Exemple exact et complet : [jargon] [acquis] [aws-lambda-scheduling] [ownership]
+IMPORTANT — les 4 champs de la ligne d'en-tête doivent CHACUN être entourés de crochets, sans exception : jamais de valeur nue sans crochets, même pour statut/theme-slug/angle. Exemple exact et complet : [strength] [acquis] [aws-lambda-scheduling] [ownership]
 
 Catégories :
-- jargon : terme technique → explique simplement au recruteur
 - strength : expérience concrète ou résultat mesurable → valorise
-- attention : contradiction ou point critique à creuser
-- translation : contexte, rôle ou parcours → reformule en clair
+- attention : contradiction, point vague ou signal à creuser
+- translation : contexte, rôle ou parcours → signal factuel
 
 Statut : acquis (exemple concret fourni, réponse complète) | a-creuser (mention sans détail, incomplet) | pas-acquis (vague, aucune preuve concrète)
 
 theme-slug : court identifiant kebab-case (1 à 4 mots) du sujet PRÉCIS abordé — pas une catégorie large. Dès qu'une techno, un projet ou une compétence spécifique est nommé, le slug doit refléter CE sujet précis (ex : aws-lambda-scheduling, dynamodb-streams, typescript-strict-mode) — pas le thème général de la conversation (« parcours-professionnel » ne doit couvrir que le récit de carrière lui-même, pas les technos mentionnées en passant).
 
-angle : contexte | ownership | impact | none — l'angle de TA relance suggérée. none si pas de relance (cat = translation) ou si la relance ne correspond à aucun des 3 angles.
+angle : contexte | ownership | impact | none — l'angle de TA relance suggérée. none si pas de relance (cas exceptionnel où le point est déjà clos) ou si la relance ne correspond à aucun des 3 angles.
 
 Relance : naturelle et bienveillante, jamais accusatrice, jamais de parenthèse ou d'aside technique d'implémentation (ex interdit : "(rétrocompatibilité, déploiement coordonné des Lambdas)"). Doit rester lisible à voix haute par un recruteur non-tech sans qu'il ait besoin de comprendre un détail entre parenthèses.
-Pas de relance si cat = translation ou si le sujet est épuisé.`;
+Inclus une relance, sauf exception : ne l'omets que si le point est déjà totalement clos et qu'aucune question n'apporterait de signal supplémentaire — c'est l'exception, pas la règle.`;
 }

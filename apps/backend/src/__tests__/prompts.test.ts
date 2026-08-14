@@ -129,7 +129,7 @@ describe("buildLiveAssistPrompt", () => {
   it("insists every header field must be bracketed, with a fully-bracketed example", () => {
     const prompt = buildLiveAssistPrompt();
     expect(prompt).toContain("les 4 champs de la ligne d'en-tête doivent CHACUN être entourés de crochets");
-    expect(prompt).toContain("[jargon] [acquis] [aws-lambda-scheduling] [ownership]");
+    expect(prompt).toContain("[strength] [acquis] [aws-lambda-scheduling] [ownership]");
   });
 
   it("defines the acquis/a-creuser/pas-acquis vocabulary instead of evidence levels", () => {
@@ -140,17 +140,16 @@ describe("buildLiveAssistPrompt", () => {
     expect(prompt).not.toContain("Evidence : high");
   });
 
-  it("instructs a 1-sentence body in plain, non-technical language", () => {
+  it("instructs a factual signal body, not a tech explanation", () => {
     const prompt = buildLiveAssistPrompt();
-    expect(prompt).toContain("1 phrase MAX");
-    expect(prompt).toContain("comme si tu l'expliquais à quelqu'un qui n'a jamais fait de dev");
+    expect(prompt).toContain("ce qui a été dit, factuellement");
+    expect(prompt).toContain("pas une explication de la techno elle-même");
+    expect(prompt).not.toContain("comme si tu l'expliquais à quelqu'un qui n'a jamais fait de dev");
   });
 
-  it("caps the body at 15-20 words and forbids the trailing justification/analogy dash", () => {
+  it("forbids compound sentences joined by a dash, colon, or linking et", () => {
     const prompt = buildLiveAssistPrompt();
-    expect(prompt).toContain("15-20 mots");
-    expect(prompt).toContain("Donne uniquement le fait");
-    expect(prompt).toContain("n'ajoute JAMAIS de justification ou d'analogie après un tiret");
+    expect(prompt).toContain("jamais deux reliées par un tiret, un deux-points ou un « et » de liaison");
   });
 
   it("forbids technical asides/parentheses in the relance", () => {
@@ -159,25 +158,24 @@ describe("buildLiveAssistPrompt", () => {
     expect(prompt).toContain("lisible à voix haute par un recruteur non-tech");
   });
 
-  it("adds the jargon-guard instruction when the theme's jargon was already decoded", () => {
-    const prompt = buildLiveAssistPrompt(undefined, [], [], [], "aws-serverless", [], 1, true);
-    expect(prompt).toContain("Le jargon technique du thème « aws-serverless » a déjà été décodé");
-    expect(prompt).toContain("NE génère PAS de nouvelle card [jargon]");
+  it("lists exactly 3 categories and never mentions jargon anywhere in the prompt", () => {
+    const prompt = buildLiveAssistPrompt();
+    expect(prompt).toContain("strength : expérience concrète ou résultat mesurable");
+    expect(prompt).toContain("attention : contradiction, point vague ou signal à creuser");
+    expect(prompt).toContain("translation : contexte, rôle ou parcours");
+    expect(prompt).not.toContain("jargon");
   });
 
-  it("omits the jargon-guard instruction when jargonAlreadyDecoded is false", () => {
-    const prompt = buildLiveAssistPrompt(undefined, [], [], [], "aws-serverless", [], 1, false);
-    expect(prompt).not.toContain("a déjà été décodé");
+  it("makes the relance the default, not the exception, and drops the translation-only exclusion", () => {
+    const prompt = buildLiveAssistPrompt();
+    expect(prompt).toContain("Inclus une relance, sauf exception");
+    expect(prompt).not.toContain("Pas de relance si cat = translation");
   });
 
-  it("omits the jargon-guard instruction when jargonAlreadyDecoded is omitted (defaults to false)", () => {
-    const prompt = buildLiveAssistPrompt(undefined, [], [], [], "aws-serverless", [], 1);
-    expect(prompt).not.toContain("a déjà été décodé");
-  });
-
-  it("omits the jargon-guard instruction when lastTheme is null even if jargonAlreadyDecoded is true", () => {
-    const prompt = buildLiveAssistPrompt(undefined, [], [], [], null, [], 0, true);
-    expect(prompt).not.toContain("a déjà été décodé");
+  it("reframes the assistant's role around signal, not jargon translation", () => {
+    const prompt = buildLiveAssistPrompt();
+    expect(prompt).toContain("donner un signal clair au recruteur");
+    expect(prompt).not.toContain("traduire le jargon");
   });
 });
 
