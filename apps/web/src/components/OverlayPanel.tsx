@@ -1,7 +1,15 @@
 import { useState, useEffect, useRef } from "react";
-import type { Insight, CandidateReport, JobContext, SkillMatch, SkillMatchStatus, Verdict, Citation } from "@voxhelp/shared";
+import type { Insight, CandidateReport, JobContext, Citation } from "@voxhelp/shared";
 import { useCvKeywords } from "../hooks/useCvKeywords.js";
 import { deriveStackKeywords, mergeKeywords } from "../lib/mergeKeywords.js";
+import {
+  formatReportAsText,
+  techMatchingCounts,
+  formatBilanLine,
+  formatInterviewDate,
+  SKILL_STATUS_META,
+  VERDICT_META,
+} from "../lib/formatReport.js";
 import { VIcon, VHMark, LiveWave, StatusBadge, CategoryTag, GhostBtn } from "./ui.js";
 import type { PartialCard } from "../lib/parseAssistStream.js";
 
@@ -591,18 +599,6 @@ function InsightCardView({ insight, isNew }: { insight: Insight; isNew: boolean 
 // ---------------------------------------------------------------------------
 // FinalReportView
 // ---------------------------------------------------------------------------
-const SKILL_STATUS_META: Record<SkillMatchStatus, { icon: string; color: string }> = {
-  "demontre": { icon: "✓", color: "var(--good)" },
-  "mentionne": { icon: "?", color: "var(--warn)" },
-  "non-aborde": { icon: "✕", color: "var(--risk)" },
-};
-
-const VERDICT_META: Record<Verdict, { label: string; colorVar: string }> = {
-  "presenter": { label: "Présenter au client", colorVar: "var(--good)" },
-  "presenter-avec-reserve": { label: "Présenter avec réserve", colorVar: "var(--warn)" },
-  "ne-pas-presenter": { label: "Ne pas présenter", colorVar: "var(--risk)" },
-};
-
 const sectionLabelStyle = {
   fontSize: 9.5,
   fontWeight: 700,
@@ -629,31 +625,55 @@ function CitationChip({ citation }: { citation: Citation }) {
   );
 }
 
-function techMatchingCounts(matches: SkillMatch[]): Record<SkillMatchStatus, number> {
-  return matches.reduce(
-    (acc, m) => {
-      acc[m.status] += 1;
-      return acc;
-    },
-    { "demontre": 0, "mentionne": 0, "non-aborde": 0 } as Record<SkillMatchStatus, number>
+function ReportActionBtn({ icon, label, onClick }: { icon: string; label: string; onClick: () => void }) {
+  const [hover, setHover] = useState(false);
+  return (
+    <button
+      onClick={onClick}
+      onMouseEnter={() => setHover(true)}
+      onMouseLeave={() => setHover(false)}
+      style={{
+        all: "unset" as "unset",
+        cursor: "pointer",
+        display: "inline-flex",
+        alignItems: "center",
+        gap: 5,
+        padding: "5px 10px",
+        borderRadius: 99,
+        background: hover ? "var(--card-lift)" : "var(--card-hi)",
+        boxShadow: "0 0 0 1px var(--stroke) inset",
+        color: "var(--text-2)",
+        fontSize: 11.5,
+        fontWeight: 600,
+        fontFamily: "var(--font)",
+        transition: "background 0.15s",
+      }}
+    >
+      <VIcon name={icon} size={12} />
+      {label}
+    </button>
   );
-}
-
-function formatInterviewDate(iso: string): string {
-  try {
-    return new Date(iso).toLocaleDateString("fr-FR", { day: "numeric", month: "long", year: "numeric" });
-  } catch {
-    return iso;
-  }
 }
 
 function FinalReportView({ report }: { report: CandidateReport }) {
   const verdict = VERDICT_META[report.verdict] ?? VERDICT_META["presenter-avec-reserve"];
   const counts = techMatchingCounts(report.techMatching);
-  const bilanLine = `${counts["demontre"]} démontré${counts["demontre"] !== 1 ? "s" : ""} · ${counts["mentionne"]} mentionné${counts["mentionne"] !== 1 ? "s" : ""} · ${counts["non-aborde"]} non abordé${counts["non-aborde"] !== 1 ? "s" : ""}`;
+  const bilanLine = formatBilanLine(counts);
+  const [copied, setCopied] = useState(false);
+
+  const handleCopy = async () => {
+    try {
+      await navigator.clipboard.writeText(formatReportAsText(report));
+      setCopied(true);
+      setTimeout(() => setCopied(false), 1500);
+    } catch {
+      // Presse-papier indisponible (contexte non sécurisé / navigateur ancien) — pas de fallback, hors scope.
+    }
+  };
 
   return (
     <div
+      data-print-area
       style={{
         gridColumn: "1 / -1",
         borderRadius: "var(--radius-card)",
@@ -675,19 +695,29 @@ function FinalReportView({ report }: { report: CandidateReport }) {
             {report.jobTitle} · {formatInterviewDate(report.interviewDate)} · {report.durationLabel}
           </p>
         </div>
-        <span
-          style={{
-            fontSize: 11,
-            fontWeight: 700,
-            padding: "3px 9px",
-            borderRadius: 99,
-            background: "var(--card-hi)",
-            color: verdict.colorVar,
-            whiteSpace: "nowrap",
-          }}
-        >
-          {verdict.label}
-        </span>
+        <div style={{ display: "flex", flexDirection: "column", alignItems: "flex-end", gap: 6 }}>
+          <span
+            style={{
+              fontSize: 11,
+              fontWeight: 700,
+              padding: "3px 9px",
+              borderRadius: 99,
+              background: "var(--card-hi)",
+              color: verdict.colorVar,
+              whiteSpace: "nowrap",
+            }}
+          >
+            {verdict.label}
+          </span>
+          <div className="report-actions" style={{ display: "flex", gap: 6 }}>
+            <ReportActionBtn
+              icon={copied ? "check" : "copy"}
+              label={copied ? "Copié !" : "Copier"}
+              onClick={handleCopy}
+            />
+            <ReportActionBtn icon="download" label="Télécharger PDF" onClick={() => window.print()} />
+          </div>
+        </div>
       </div>
 
       {/* 2. Résumé */}

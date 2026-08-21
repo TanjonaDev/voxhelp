@@ -22,6 +22,7 @@ const VH_ICONS: Record<string, string> = {
   send: "M22 2 11 13M22 2l-7 20-4-9-9-4z",
   refresh: "M21 12a9 9 0 1 1-3-6.7M21 4v4h-4",
   check: "M20 6 9 17l-5-5",
+  download: "M12 3v11M7 9l5 5 5-5M4 20h16",
   dot: "M12 12m-2 0a2 2 0 1 0 4 0a2 2 0 1 0-4 0",
 };
 
