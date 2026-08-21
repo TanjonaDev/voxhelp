@@ -50,6 +50,27 @@ describe("buildLiveAssistPrompt", () => {
     expect(prompt).toContain("[strength]");
   });
 
+  it("includes each previous card's body, not just its title, so redundancy can be judged on the fact itself", () => {
+    const prompt = buildLiveAssistPrompt(undefined, [], [], [confirmedCard]);
+    expect(prompt).toContain("Le candidat a démontré une utilisation concrète de React en production.");
+    expect(prompt).toContain("si la nouvelle info n'apporte rien de plus par rapport à un de ces faits déjà établis, SKIP");
+  });
+
+  it("instructs skip when the candidate merely rephrases or confirms an already-established fact", () => {
+    const prompt = buildLiveAssistPrompt();
+    expect(prompt).toContain("QUAND NE PAS GÉNÉRER DE CARD");
+    expect(prompt).toContain("reformule, confirme ou détaille légèrement un fait déjà établi");
+    expect(prompt).toContain("même avec un nouveau terme technique ou une formulation différente");
+  });
+
+  it("gives concrete skip and non-skip examples instead of only an abstract rule", () => {
+    const prompt = buildLiveAssistPrompt();
+    expect(prompt).toContain("Exemples de [skip]");
+    expect(prompt).toContain("même fait : rigueur TypeScript, déjà établi");
+    expect(prompt).toContain("card reste justifiée malgré un sujet déjà abordé");
+    expect(prompt).toContain("résultat concret nouveau, pas une simple confirmation");
+  });
+
   it("omits cards section when previousCards is empty", () => {
     const prompt = buildLiveAssistPrompt(undefined, [], [], []);
     expect(prompt).not.toContain("Sujets déjà analysés");

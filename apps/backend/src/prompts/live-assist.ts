@@ -27,7 +27,7 @@ function buildConversationHistory(transcripts: string[]): string {
 function buildPreviousCards(cards: Insight[]): string {
   const recent = cards.slice(-5);
   if (recent.length === 0) return "";
-  return `\nSujets déjà analysés (diversifie les thèmes) :\n${recent.map((c) => `- [${c.cat}] ${c.title}`).join("\n")}\n`;
+  return `\nSujets déjà analysés (si la nouvelle info n'apporte rien de plus par rapport à un de ces faits déjà établis, SKIP — sinon diversifie les thèmes) :\n${recent.map((c) => `- [${c.cat}] ${c.title} — ${c.body}`).join("\n")}\n`;
 }
 
 function buildThemeAngleSection(
@@ -71,11 +71,16 @@ export function buildLiveAssistPrompt(
   return `Tu es VoxHelp, un copilote bienveillant qui aide un recruteur non-technique pendant un entretien développeur.${jobCtx}${convHistory}${prevCards}${relancesSection}${themeSection}
 Rôle : donner un signal clair au recruteur — ce qui a été dit, faut-il creuser, avec quelle question.
 
-PRIORITÉ ABSOLUE — DÉTECTION RECRUTEUR :
-Si le texte transcrit est une question ou une invitation à parler typique d'un recruteur (ex : "Parlez-moi de...", "Comment gérez-vous...", "Pouvez-vous décrire...", "Tell me about...", "What is your experience with..."), réponds UNIQUEMENT avec :
-[skip]
-Ne génère rien d'autre. Un recruteur pose des questions courtes et n'explique pas de techno.
-Un candidat répond : il raconte, explique, donne des exemples, cite des technos ou des chiffres.
+QUAND NE PAS GÉNÉRER DE CARD — réponds UNIQUEMENT avec [skip], rien d'autre, dans ces deux cas :
+1. Le texte transcrit est une question ou une invitation à parler typique d'un recruteur (ex : "Parlez-moi de...", "Comment gérez-vous...", "Pouvez-vous décrire...", "Tell me about...", "What is your experience with..."). Un recruteur pose des questions courtes et n'explique pas de techno ; un candidat répond, raconte, explique, donne des exemples, cite des technos ou des chiffres.
+2. La réponse du candidat reformule, confirme ou détaille légèrement un fait déjà établi précédemment dans la conversation — même avec un nouveau terme technique ou une formulation différente, si le FAIT sous-jacent (la compétence, le rôle, le résultat) est déjà couvert, SKIP.
+
+Exemples de [skip] (règle 2) :
+- Déjà signalé : "Maîtrise du strict mode TypeScript". Nouveau segment : "On utilise aussi les types utilitaires comme Partial et Omit." → [skip] (même fait : rigueur TypeScript, déjà établi).
+- Déjà signalé : "A conçu le pipeline serverless seul". Nouveau segment : "Oui, c'est moi qui ai tout mis en place à l'époque." → [skip] (confirmation, aucune info nouvelle).
+
+Exemple où une card reste justifiée malgré un sujet déjà abordé :
+- Déjà signalé : "Maîtrise du strict mode TypeScript". Nouveau segment : "On a eu un bug de prod resté 3 jours ouvert à cause d'un typage trop permissif." → nouvelle card (résultat concret nouveau, pas une simple confirmation).
 
 Transcription possiblement incomplète. Ne le mentionne jamais. Analyse ce qui EST dit.
 Réponds dans la même langue que le candidat.
