@@ -83,15 +83,22 @@ export class Session {
   private readonly maxBufferMs: number;
   private isProcessing = false;
   private pendingTranscript: string | null = null;
-  private readonly DEBOUNCE_MS = 2500;
+  private readonly debounceMs: number;
+  private readonly MIN_FLUSH_WORDS = 4;
   private lastTheme: string | null = null;
   private coveredAngles: Set<string> = new Set();
   private themeCardCount = 0;
 
-  constructor(ws: WebSocket, userId: string | null = null, maxBufferMs: number = 3 * 60 * 1000) {
+  constructor(
+    ws: WebSocket,
+    userId: string | null = null,
+    maxBufferMs: number = 3 * 60 * 1000,
+    debounceMs: number = 6000
+  ) {
     this.ws = ws;
     this.userId = userId;
     this.maxBufferMs = maxBufferMs;
+    this.debounceMs = debounceMs;
     this.setupHandlers();
   }
 
@@ -249,8 +256,16 @@ export class Session {
     if (this.debounceTimer) clearTimeout(this.debounceTimer);
 
     this.debounceTimer = setTimeout(() => {
+      const pendingWordCount = this.transcriptBuffer.join(" ").trim().split(/\s+/).filter(Boolean).length;
+      if (pendingWordCount > 0 && pendingWordCount < this.MIN_FLUSH_WORDS) {
+        // Fragment trop court pour être analysé seul (probablement une hésitation
+        // ou un faux départ) — on continue d'accumuler ; le prochain segment relance
+        // ce debounce, et le filet de sécurité maxBufferMs finira par déclencher
+        // l'analyse si rien d'autre n'arrive.
+        return;
+      }
       this.flushBuffer();
-    }, this.DEBOUNCE_MS);
+    }, this.debounceMs);
   }
 
   private elapsedTime(): string {

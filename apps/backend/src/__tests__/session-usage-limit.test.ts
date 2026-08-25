@@ -149,7 +149,7 @@ describe("Session usage limit", () => {
         return sampleAssistText;
       }
     );
-    server = await createTestServer("user-with-content");
+    server = await createTestServer("user-with-content", undefined, 50);
     ws = await connect(server.port);
 
     ws.send(JSON.stringify({ type: "session:start", config: { language: "fr" } }));

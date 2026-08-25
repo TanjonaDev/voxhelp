@@ -95,7 +95,7 @@ describe("Session WebSocket integration", () => {
     mockLlm.streamAssist.mockReset();
     mockLlm.callClaudeJSON.mockReset();
     stt.callbacks = null;
-    server = await createTestServer();
+    server = await createTestServer(null, undefined, 50);
     ws = await connectAndStart(server.port);
   });
 
@@ -119,10 +119,10 @@ describe("Session WebSocket integration", () => {
     mockStreamAssist(sampleAssistText);
     mockStreamAssist(sampleAssistText);
 
-    stt.callbacks!.onTranscript("Premier transcript");
+    stt.callbacks!.onTranscript("Premier transcript du candidat");
     await waitForMessage(ws, "assist:done");
 
-    stt.callbacks!.onTranscript("Deuxième transcript");
+    stt.callbacks!.onTranscript("Deuxième transcript du candidat");
     await waitForMessage(ws, "assist:done");
 
     const secondPrompt = mockLlm.streamAssist.mock.calls[1][0] as string;
@@ -134,10 +134,10 @@ describe("Session WebSocket integration", () => {
     mockStreamAssist(sampleAssistText);
     mockStreamAssist(sampleAssistText);
 
-    stt.callbacks!.onTranscript("Premier transcript");
+    stt.callbacks!.onTranscript("Premier transcript du candidat");
     await waitForMessage(ws, "assist:done");
 
-    stt.callbacks!.onTranscript("Deuxième transcript");
+    stt.callbacks!.onTranscript("Deuxième transcript du candidat");
     await waitForMessage(ws, "assist:done");
 
     const secondPrompt = mockLlm.streamAssist.mock.calls[1][0] as string;
@@ -224,7 +224,7 @@ describe("Session WebSocket integration", () => {
     mockStreamAssist(sampleAssistText);
     mockLlm.callClaudeJSON.mockResolvedValueOnce(sampleReport);
 
-    stt.callbacks!.onTranscript("Premier transcript");
+    stt.callbacks!.onTranscript("Premier transcript du candidat");
     await waitForMessage(ws, "assist:done");
 
     ws.send(JSON.stringify({ type: "session:summarize" }));
@@ -233,6 +233,6 @@ describe("Session WebSocket integration", () => {
     const finalPrompt = mockLlm.callClaudeJSON.mock.calls[0][0] as string;
     expect(finalPrompt).toContain("Expérience terrain confirmée en React");
     expect(finalPrompt).toContain("FICHE DE QUALIFICATION");
-    expect(finalPrompt).toContain('"Premier transcript"');
+    expect(finalPrompt).toContain('"Premier transcript du candidat"');
   });
 });
