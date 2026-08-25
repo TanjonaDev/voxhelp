@@ -52,6 +52,12 @@ export class FluxSTT {
         encoding: "linear16",
         sample_rate: 16000,
         language_hint: hints,
+        // Défaut Deepgram (0.7) trop permissif en pratique : une hésitation, une
+        // pause de réflexion ou une reprise de phrase suffisait à déclencher une
+        // fin de tour prématurée (cf. logs de test réel, EndOfTurn sur un seul mot).
+        // Valeur plus conservatrice pour réduire ces faux positifs, au prix d'une
+        // latence légèrement plus élevée avant l'affichage du transcript.
+        eot_threshold: 0.85,
         ...(hasKeyterms ? { keyterm: this.keywords } : {}),
         Authorization: `Token ${apiKey}`,
       }) as unknown as FluxConnection;
