@@ -66,7 +66,8 @@ export function useAudioCapture(
       // eslint-disable-next-line @typescript-eslint/no-deprecated
       const frame = e.inputBuffer.getChannelData(0);
 
-      // Always send audio — GroqSTT accumulates and applies RMS-based VAD server-side
+      // Toujours envoyer l'audio — Deepgram Flux gère lui-même la détection de fin
+      // de tour ; le RMS ci-dessous ne sert qu'à piloter l'indicateur "isSpeaking" UI.
       onChunkRef.current(float32ToPcm16Base64(new Float32Array(frame)));
 
       // RMS used only to drive the isSpeaking UI indicator
@@ -119,7 +120,10 @@ export function useAudioCapture(
     try {
       const stream = await navigator.mediaDevices.getDisplayMedia({
         video: true,
-        audio: true,
+        audio: {
+          sampleRate: TARGET_SAMPLE_RATE,
+          channelCount: 1,
+        },
       });
       stream.getVideoTracks().forEach((t) => t.stop());
 
@@ -130,6 +134,11 @@ export function useAudioCapture(
         );
         return;
       }
+
+      // getDisplayMedia n'honore les contraintes audio qu'au mieux (best-effort) —
+      // on logue ce qui a réellement été négocié pour pouvoir diagnostiquer un
+      // sample rate/nombre de canaux inattendu sur un test réel.
+      console.log("[AudioCapture] tab audio track settings:", audioTracks[0].getSettings());
 
       await startCapture(new MediaStream(audioTracks), "tab");
     } catch (err) {
