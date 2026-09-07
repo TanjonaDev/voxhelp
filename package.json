@@ -5,9 +5,10 @@
     "dev:web": "pnpm --filter @voxhelp/web dev",
     "dev:backend": "pnpm --filter @voxhelp/backend dev",
     "dev": "concurrently \"pnpm dev:backend\" \"pnpm dev:web\"",
-    "build": "pnpm --filter @voxhelp/shared build && pnpm run --parallel build:web build:backend",
+    "build": "pnpm --filter @voxhelp/shared build && pnpm --filter @voxhelp/lecture build && pnpm run --parallel build:web build:backend",
     "build:web": "pnpm --filter @voxhelp/web build",
-    "build:backend": "pnpm --filter @voxhelp/backend build"
+    "build:backend": "pnpm --filter @voxhelp/backend build",
+    "build:lecture": "pnpm --filter @voxhelp/lecture build"
   },
   "engines": {
     "node": ">=22"
