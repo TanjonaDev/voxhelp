@@ -71,13 +71,15 @@ export async function callClaudeJSON<T>(
   systemPrompt: string,
   userMessage: string,
   model = "claude-haiku-4-5",
-  maxTokens = 4096
+  maxTokens = 4096,
+  temperature?: number
 ): Promise<T> {
   const message = await anthropic.messages.create({
     model,
     max_tokens: maxTokens,
     system: systemPrompt,
     messages: [{ role: "user", content: userMessage }],
+    ...(temperature !== undefined ? { temperature } : {}),
   });
 
   const content = message.content[0];

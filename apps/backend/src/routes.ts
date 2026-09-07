@@ -3,6 +3,7 @@ import { supabaseAdmin } from "./supabase.js";
 import { extractTextFromCv, type CvFormat } from "./cv-parser.js";
 import { callClaudeJSON } from "./llm.js";
 import { buildCvKeywordExtractionPrompt } from "./prompts/cv-keyword-extraction.js";
+import { analyzePass1, type Pass1Input } from "@voxhelp/lecture";
 
 const MIMETYPE_TO_FORMAT: Record<string, CvFormat> = {
   "application/pdf": "pdf",
@@ -82,6 +83,41 @@ export function registerRoutes(app: FastifyInstance): void {
     } catch (err) {
       console.error("[Routes] Keyword extraction failed:", err instanceof Error ? err.message : err);
       return reply.code(502).send({ error: "Keyword extraction failed" });
+    }
+  });
+
+  app.post("/api/lecture/analyze-pass1", async (request, reply) => {
+    if (supabaseAdmin) {
+      const auth = request.headers.authorization;
+      const token = auth?.startsWith("Bearer ") ? auth.slice(7) : null;
+      if (!token) {
+        return reply.code(401).send({ error: "Missing token" });
+      }
+      const { data, error } = await supabaseAdmin.auth.getUser(token);
+      if (error || !data.user) {
+        return reply.code(401).send({ error: "Invalid token" });
+      }
+    }
+
+    const body = request.body as Partial<Pass1Input> | undefined;
+    if (!body || !Array.isArray(body.transcript) || body.transcript.length === 0 || !body.course) {
+      return reply.code(400).send({ error: "Missing transcript or course context" });
+    }
+
+    const input: Pass1Input = {
+      transcript: body.transcript,
+      course: body.course,
+      existingGlossary: Array.isArray(body.existingGlossary) ? body.existingGlossary : [],
+    };
+
+    try {
+      const output = await analyzePass1(input, (system, user) =>
+        callClaudeJSON(system, user, "claude-sonnet-4-6", 8192, 0)
+      );
+      return reply.send(output);
+    } catch (err) {
+      console.error("[Routes] Lecture pass1 analysis failed:", err instanceof Error ? err.message : err);
+      return reply.code(502).send({ error: "Lecture analysis failed" });
     }
   });
 }

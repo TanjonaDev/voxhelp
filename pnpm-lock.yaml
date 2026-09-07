@@ -32,6 +32,9 @@ importers:
       '@supabase/supabase-js':
         specifier: ^2.110.1
         version: 2.110.1
+      '@voxhelp/lecture':
+        specifier: workspace:*
+        version: link:../../packages/lecture
       '@voxhelp/shared':
         specifier: workspace:*
         version: link:../../packages/shared
