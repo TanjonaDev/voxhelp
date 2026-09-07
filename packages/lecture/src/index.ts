@@ -1,1 +1,1 @@
-export const LECTURE_PACKAGE_READY = true;
+export * from "./types.js";
