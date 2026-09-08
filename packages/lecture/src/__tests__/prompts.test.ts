@@ -35,6 +35,18 @@ describe("buildPass1SystemPrompt", () => {
     expect(prompt).toContain("N'invente jamais");
     expect(prompt).toContain("uniquement par un objet JSON valide");
   });
+
+  it("spells out the exact JSON schema with the literal English enum tokens", () => {
+    const prompt = buildPass1SystemPrompt();
+    // Without this, the model tends to translate the categories described in
+    // prose above ("contenu de cours", "question d'étudiant"...) into French
+    // JSON values instead of the literal enum tokens the Zod schema expects.
+    expect(prompt).toContain('"type": "content | digression | student_question | administrative"');
+    expect(prompt).toContain('"category": "proper_noun | technical_term | concept | acronym | foreign_term"');
+    expect(prompt).toContain('"type": "author | work | article | scripture | date | concept"');
+    expect(prompt).toContain("EXACTEMENT");
+    expect(prompt).toContain("jamais une traduction française");
+  });
 });
 
 describe("buildPass1UserPrompt", () => {

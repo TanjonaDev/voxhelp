@@ -49,7 +49,51 @@ RÈGLES ABSOLUES :
 - Ne fusionne pas des sections courtes pour faire joli. Un plan de 14
   sections est un plan valide.
 - Réponds uniquement par un objet JSON valide, sans texte avant ou après,
-  sans balises Markdown.`;
+  sans balises Markdown, ayant EXACTEMENT cette forme :
+
+{
+  "detectedLanguage": "code langue ISO, ex: fr",
+  "transcriptQuality": 0.0,
+  "plan": [
+    {
+      "index": 0,
+      "title": "titre descriptif de la section",
+      "startMs": 0,
+      "endMs": 60000,
+      "oneLineSummary": "résumé en une ligne, 120 caractères max",
+      "type": "content | digression | student_question | administrative",
+      "confidence": 0.0
+    }
+  ],
+  "glossary": [
+    {
+      "term": "forme correcte du terme",
+      "heardVariants": ["variante1", "variante2"],
+      "category": "proper_noun | technical_term | concept | acronym | foreign_term",
+      "sourceLanguage": "code langue, uniquement si category = foreign_term",
+      "shortDefinition": "une phrase, uniquement si le cours la donne",
+      "occurrences": 1,
+      "confidence": 0.0
+    }
+  ],
+  "references": [
+    {
+      "type": "author | work | article | scripture | date | concept",
+      "rawCitation": "citation telle qu'entendue",
+      "normalized": "forme normalisée, uniquement si identifiable avec certitude",
+      "contextMs": 0,
+      "confidence": 0.0
+    }
+  ],
+  "uncertainZones": [
+    { "startMs": 0, "endMs": 0, "excerpt": "extrait du passage douteux", "reason": "ex: audio dégradé" }
+  ]
+}
+
+Les valeurs de "type" et "category" doivent être EXACTEMENT l'un des tokens
+anglais listés ci-dessus, jamais une traduction française. Les champs
+"sourceLanguage", "shortDefinition" et "normalized" sont à omettre
+entièrement (pas de null, pas de chaîne vide) quand ils ne s'appliquent pas.`;
 }
 
 function formatExistingGlossary(glossary: GlossaryEntry[]): string {
