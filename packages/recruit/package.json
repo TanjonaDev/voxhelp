@@ -1,0 +1,23 @@
+{
+  "name": "@voxhelp/recruit",
+  "version": "0.0.1",
+  "private": true,
+  "type": "module",
+  "main": "./src/index.ts",
+  "types": "./src/index.ts",
+  "scripts": {
+    "build": "tsc",
+    "typecheck": "tsc --noEmit",
+    "test": "vitest run",
+    "test:watch": "vitest"
+  },
+  "dependencies": {
+    "@voxhelp/shared": "workspace:*",
+    "mammoth": "^1.12.0",
+    "unpdf": "^1.8.0"
+  },
+  "devDependencies": {
+    "typescript": "^5.7.0",
+    "vitest": "^4.1.8"
+  }
+}
