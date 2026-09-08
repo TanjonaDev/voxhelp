@@ -319,7 +319,8 @@ export class Session {
           this.cardLog,
           this.lastTheme,
           Array.from(this.coveredAngles),
-          this.themeCardCount
+          this.themeCardCount,
+          this.candidateName
         ),
         `Ce qui vient d'être dit :\n"${transcript}"`,
         (chunk) => {
@@ -481,7 +482,7 @@ Utilise TOUJOURS catégorie = translation et statut = acquis pour tes réponses.
     try {
       type GeneratedReportFields = Omit<CandidateReport, "candidateName" | "jobTitle" | "interviewDate" | "durationLabel">;
       const generated = await callClaudeJSON<GeneratedReportFields>(
-        buildFinalAnalysisPrompt(this.jobContext, this.cardLog, this.fullTranscriptLog),
+        buildFinalAnalysisPrompt(this.jobContext, this.cardLog, this.fullTranscriptLog, this.candidateName),
         "Génère la fiche de qualification du candidat.",
         "claude-sonnet-4-6",
         8192

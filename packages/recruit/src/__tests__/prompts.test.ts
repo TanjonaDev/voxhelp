@@ -153,6 +153,17 @@ describe("buildLiveAssistPrompt", () => {
     expect(prompt).toContain("[strength] [acquis] [aws-lambda-scheduling] [ownership]");
   });
 
+  it("names the candidate explicitly when a name is provided, forbidding a substitute name", () => {
+    const prompt = buildLiveAssistPrompt(undefined, [], [], [], undefined, [], 0, "Tanjona");
+    expect(prompt).toContain("Tanjona");
+    expect(prompt).toContain("ne le remplace jamais par un autre prénom");
+  });
+
+  it("forbids inventing a candidate name when none is provided", () => {
+    const prompt = buildLiveAssistPrompt();
+    expect(prompt).toContain("N'invente jamais de prénom pour le candidat");
+  });
+
   it("defines the acquis/a-creuser/pas-acquis vocabulary instead of evidence levels", () => {
     const prompt = buildLiveAssistPrompt();
     expect(prompt).toContain("Statut : acquis (exemple concret fourni, réponse complète)");
@@ -260,5 +271,16 @@ describe("buildFinalAnalysisPrompt", () => {
   it("requires a citation on every strength but allows attention points without one", () => {
     const prompt = buildFinalAnalysisPrompt(undefined, [], []);
     expect(prompt).toContain("chaque point DOIT avoir une citation");
+  });
+
+  it("names the candidate explicitly when a name is provided, forbidding a substitute name", () => {
+    const prompt = buildFinalAnalysisPrompt(undefined, [], [], "Tanjona");
+    expect(prompt).toContain("Tanjona");
+    expect(prompt).toContain("ne le remplace jamais par un autre prénom");
+  });
+
+  it("forbids inventing a candidate name when none is provided", () => {
+    const prompt = buildFinalAnalysisPrompt(undefined, [], []);
+    expect(prompt).toContain("N'invente jamais de prénom pour le candidat");
   });
 });

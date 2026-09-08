@@ -30,6 +30,14 @@ function buildPreviousCards(cards: Insight[]): string {
   return `\nSujets déjà analysés (si la nouvelle info n'apporte rien de plus par rapport à un de ces faits déjà établis, SKIP — sinon diversifie les thèmes) :\n${recent.map((c) => `- [${c.cat}] ${c.title} — ${c.body}`).join("\n")}\n`;
 }
 
+function buildCandidateNameSection(candidateName?: string): string {
+  const name = candidateName?.trim();
+  if (!name) {
+    return "\nN'invente jamais de prénom pour le candidat — dis « le candidat » ou utilise il/elle, jamais un prénom halluciné.\n";
+  }
+  return `\nLe candidat s'appelle ${name} — utilise ce prénom exact si tu le nommes, ne le remplace jamais par un autre prénom.\n`;
+}
+
 function buildThemeAngleSection(
   lastTheme: string | null | undefined,
   coveredAngles: string[],
@@ -57,7 +65,8 @@ export function buildLiveAssistPrompt(
   previousCards?: Insight[],
   lastTheme?: string | null,
   coveredAngles?: string[],
-  themeCardCount?: number
+  themeCardCount?: number,
+  candidateName?: string
 ): string {
   const jobCtx = buildJobContext(jobContext);
   const convHistory = buildConversationHistory(history ?? []);
@@ -67,8 +76,9 @@ export function buildLiveAssistPrompt(
       ? `\nQuestions déjà posées (ne pas répéter) :\n${previousRelances.map((q) => `- ${q}`).join("\n")}\n`
       : "";
   const themeSection = buildThemeAngleSection(lastTheme, coveredAngles ?? [], themeCardCount ?? 0);
+  const nameSection = buildCandidateNameSection(candidateName);
 
-  return `Tu es VoxHelp, un copilote bienveillant qui aide un recruteur non-technique pendant un entretien développeur.${jobCtx}${convHistory}${prevCards}${relancesSection}${themeSection}
+  return `Tu es VoxHelp, un copilote bienveillant qui aide un recruteur non-technique pendant un entretien développeur.${jobCtx}${convHistory}${prevCards}${relancesSection}${themeSection}${nameSection}
 Rôle : donner un signal clair au recruteur — ce qui a été dit, faut-il creuser, avec quelle question.
 
 QUAND NE PAS GÉNÉRER DE CARD — réponds UNIQUEMENT avec [skip], rien d'autre, dans ces deux cas :

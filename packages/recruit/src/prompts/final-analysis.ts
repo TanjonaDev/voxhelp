@@ -17,6 +17,14 @@ function buildTranscriptSection(transcriptLog: TranscriptEntry[]): string {
     .join("\n")}\n`;
 }
 
+function buildCandidateNameSection(candidateName?: string): string {
+  const name = candidateName?.trim();
+  if (!name) {
+    return "\nN'invente jamais de prénom pour le candidat — dis « le candidat » ou utilise il/elle, jamais un prénom halluciné.\n";
+  }
+  return `\nLe candidat s'appelle ${name} — utilise ce prénom exact partout où tu le nommes dans la fiche, ne le remplace jamais par un autre prénom.\n`;
+}
+
 function buildCardsSection(cards: Insight[]): string {
   if (cards.length === 0) {
     return "\nAucune analyse en direct disponible.\n";
@@ -29,14 +37,16 @@ function buildCardsSection(cards: Insight[]): string {
 export function buildFinalAnalysisPrompt(
   jobContext: JobContext | undefined,
   cards: Insight[],
-  transcriptLog: TranscriptEntry[]
+  transcriptLog: TranscriptEntry[],
+  candidateName?: string
 ): string {
   const jobSection = buildJobContextSection(jobContext);
   const transcriptSection = buildTranscriptSection(transcriptLog);
   const cardsSection = buildCardsSection(cards);
+  const nameSection = buildCandidateNameSection(candidateName);
 
   return `Tu es un assistant de recrutement. Un recruteur RH vient de terminer un entretien de qualification avec un candidat développeur. Ton rôle : produire une FICHE DE QUALIFICATION que le recruteur va envoyer telle quelle à son client (CTO, DRH) pour lui présenter le candidat.
-${jobSection}${transcriptSection}${cardsSection}
+${jobSection}${transcriptSection}${cardsSection}${nameSection}
 RÈGLE ABSOLUE SUR LES CITATIONS — ne l'enfreins jamais :
 Toute citation ("quote") dans ta réponse doit être copiée MOT POUR MOT depuis une ligne du transcript horodaté ci-dessus, et le "t" associé doit être EXACTEMENT le timestamp affiché entre crochets en face de cette ligne. N'invente jamais une citation, ne la reformule jamais, ne mélange jamais des bouts de deux lignes différentes. Si tu ne trouves aucune ligne du candidat qui appuie un point, n'ajoute pas de citation pour ce point plutôt que d'en inventer une.
 
