@@ -35,6 +35,9 @@ importers:
       '@voxhelp/lecture':
         specifier: workspace:*
         version: link:../../packages/lecture
+      '@voxhelp/recruit':
+        specifier: workspace:*
+        version: link:../../packages/recruit
       '@voxhelp/shared':
         specifier: workspace:*
         version: link:../../packages/shared
@@ -44,12 +47,6 @@ importers:
       fastify:
         specifier: ^5.2.0
         version: 5.8.5
-      mammoth:
-        specifier: ^1.12.0
-        version: 1.12.0
-      unpdf:
-        specifier: ^1.8.0
-        version: 1.8.0
       ws:
         specifier: ^8.20.0
         version: 8.20.0

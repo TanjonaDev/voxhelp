@@ -1,8 +1,7 @@
 import type { FastifyInstance } from "fastify";
 import { supabaseAdmin } from "./supabase.js";
-import { extractTextFromCv, type CvFormat } from "./cv-parser.js";
 import { callClaudeJSON } from "./llm.js";
-import { buildCvKeywordExtractionPrompt } from "./prompts/cv-keyword-extraction.js";
+import { extractTextFromCv, buildCvKeywordExtractionPrompt, type CvFormat } from "@voxhelp/recruit";
 import { analyzePass1, type Pass1Input } from "@voxhelp/lecture";
 
 const MIMETYPE_TO_FORMAT: Record<string, CvFormat> = {

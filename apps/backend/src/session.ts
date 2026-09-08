@@ -7,8 +7,7 @@ import type {
 import { createId } from "@voxhelp/shared";
 import { FluxSTT } from "./deepgram-flux.js";
 import { streamAssist, callClaudeJSON, correctTranscript } from "./llm.js";
-import { buildLiveAssistPrompt } from "./prompts/live-assist.js";
-import { buildFinalAnalysisPrompt } from "./prompts/final-analysis.js";
+import { buildLiveAssistPrompt, buildFinalAnalysisPrompt } from "@voxhelp/recruit";
 import { supabaseAdmin } from "./supabase.js";
 
 interface ProfileUsage {

@@ -4,7 +4,10 @@ import { createTestHttpServer, type TestHttpServer } from "./helpers/http-server
 const mockExtract = vi.hoisted(() => vi.fn());
 const mockCallClaudeJSON = vi.hoisted(() => vi.fn());
 
-vi.mock("../cv-parser.js", () => ({ extractTextFromCv: mockExtract }));
+vi.mock("@voxhelp/recruit", async (importOriginal) => ({
+  ...(await importOriginal<typeof import("@voxhelp/recruit")>()),
+  extractTextFromCv: mockExtract,
+}));
 vi.mock("../llm.js", () => ({ callClaudeJSON: mockCallClaudeJSON }));
 vi.mock("../supabase.js", () => ({ supabaseAdmin: null }));
 

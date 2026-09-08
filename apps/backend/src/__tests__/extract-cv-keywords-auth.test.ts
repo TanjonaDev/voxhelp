@@ -5,7 +5,10 @@ const mockExtract = vi.hoisted(() => vi.fn());
 const mockCallClaudeJSON = vi.hoisted(() => vi.fn());
 const mockGetUser = vi.hoisted(() => vi.fn());
 
-vi.mock("../cv-parser.js", () => ({ extractTextFromCv: mockExtract }));
+vi.mock("@voxhelp/recruit", async (importOriginal) => ({
+  ...(await importOriginal<typeof import("@voxhelp/recruit")>()),
+  extractTextFromCv: mockExtract,
+}));
 vi.mock("../llm.js", () => ({ callClaudeJSON: mockCallClaudeJSON }));
 // Unlike extract-cv-keywords.test.ts (supabaseAdmin: null, auth block skipped), this file
 // mocks supabaseAdmin as truthy so the auth branch in routes.ts actually executes.
