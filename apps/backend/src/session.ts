@@ -2,63 +2,18 @@ import type { WebSocket } from "ws";
 import type {
   ClientMessage, ServerMessage, SessionConfig,
   Insight, CandidateReport, JobContext, TranscriptEntry,
-  SkillMatchStatus, Verdict,
 } from "@voxhelp/shared";
 import { createId } from "@voxhelp/shared";
 import { FluxSTT } from "./deepgram-flux.js";
 import { streamAssist, callClaudeJSON, correctTranscript } from "./llm.js";
 import { buildLiveAssistPrompt, buildFinalAnalysisPrompt } from "@voxhelp/recruit";
 import { supabaseAdmin } from "./supabase.js";
+import { extractThemeAndAngle, parseAssistText as parseAssistTextPure } from "./insight-parsing.js";
+import { normalizeSkillMatchStatus, normalizeVerdict } from "./report-normalize.js";
 
 interface ProfileUsage {
   session_count: number;
   session_limit: number;
-}
-
-function extractThemeAndAngle(text: string): { theme: string | null; angle: string | null } {
-  const headerLine = text.trim().split("\n")[0] ?? "";
-  const match = headerLine.match(
-    /\[?(?:strength|attention|translation)\]?\s*\[?(?:acquis|[aà][\s-]?creuser|pas[\s-]?acquis)\]?\s*\[?([a-z0-9-]+)\]?(?:\s*\[?(contexte|ownership|impact|none)\]?)?/i
-  );
-  return {
-    theme: match?.[1]?.toLowerCase() ?? null,
-    angle: match?.[2]?.toLowerCase() ?? null,
-  };
-}
-
-function normalizeStatus(raw: string | undefined): Insight["status"] {
-  const normalized = raw?.toLowerCase().trim() ?? "";
-  if (normalized === "acquis") return "acquis";
-  if (/^pas[\s-]?acquis$/.test(normalized)) return "pas-acquis";
-  if (/^[aà][\s-]?creuser$/.test(normalized)) return "a-creuser";
-  return "a-creuser";
-}
-
-// Le rapport final est un JSON.parse non validé (callClaudeJSON<T> ne fait aucune
-// vérification runtime) : le modèle peut renvoyer des variantes accentuées/espacées
-// de ces tokens ternaires. On normalise ici, à la frontière de confiance, plutôt
-// que défensivement à chaque site de rendu frontend.
-function normalizeEnumToken(raw: string): string {
-  return raw
-    .normalize("NFD")
-    .replace(/[\u0300-\u036f]/g, "")
-    .toLowerCase()
-    .trim()
-    .replace(/[\s_]+/g, "-");
-}
-
-function normalizeSkillMatchStatus(raw: string): SkillMatchStatus {
-  const normalized = normalizeEnumToken(raw);
-  if (normalized === "demontre") return "demontre";
-  if (normalized === "mentionne") return "mentionne";
-  return "non-aborde";
-}
-
-function normalizeVerdict(raw: string): Verdict {
-  const normalized = normalizeEnumToken(raw);
-  if (normalized === "presenter") return "presenter";
-  if (normalized === "ne-pas-presenter") return "ne-pas-presenter";
-  return "presenter-avec-reserve";
 }
 
 export class Session {
@@ -275,25 +230,7 @@ export class Session {
   }
 
   private parseAssistText(text: string, id: string, t: string): Insight {
-    const lines = text.trim().split("\n").filter((l) => l.trim() !== "");
-
-    const headerMatch = lines[0]?.match(
-      /\[?(strength|attention|translation)\]?\s*\[?(acquis|[aà][\s-]?creuser|pas[\s-]?acquis)\]?/i
-    );
-    const cat = (headerMatch?.[1]?.toLowerCase() as Insight["cat"]) ?? "translation";
-    const status = normalizeStatus(headerMatch?.[2]);
-    const { theme } = extractThemeAndAngle(text);
-
-    const title = lines[1]?.replace(/^#\s*/, "").trim() ?? "";
-
-    const lastLine = lines[lines.length - 1];
-    const hasRelance = lastLine?.startsWith(">>");
-    const relance = hasRelance ? lastLine.replace(/^>>\s*/, "").trim() : undefined;
-
-    const bodyEnd = hasRelance ? lines.length - 1 : lines.length;
-    const body = lines.slice(2, bodyEnd).join(" ").trim();
-
-    return { id, cat, status, theme, t, title, body, relance };
+    return parseAssistTextPure(text, id, t);
   }
 
   private async processTranscript(transcript: string): Promise<void> {

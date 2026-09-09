@@ -29,4 +29,10 @@ describe("buildCvKeywordExtractionPrompt", () => {
     const prompt = buildCvKeywordExtractionPrompt("some cv text");
     expect(prompt).toContain('{ "keywords": [] }');
   });
+
+  it("requires each keyword to be copied verbatim, never paraphrased", () => {
+    const prompt = buildCvKeywordExtractionPrompt("some cv text");
+    expect(prompt).toContain("TEL QUEL");
+    expect(prompt).toContain("jamais reformulé, généralisé ou résumé");
+  });
 });

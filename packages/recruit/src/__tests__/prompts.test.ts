@@ -71,6 +71,13 @@ describe("buildLiveAssistPrompt", () => {
     expect(prompt).toContain("résultat concret nouveau, pas une simple confirmation");
   });
 
+  it("biases against over-skipping and against judging on the sentence opener alone", () => {
+    const prompt = buildLiveAssistPrompt();
+    expect(prompt).toContain("Ne skippe QUE si le cas 1 ou 2 ci-dessus s'applique clairement");
+    expect(prompt).toContain("Dans le doute");
+    expect(prompt).toContain("n'est PAS un skip automatique");
+  });
+
   it("omits cards section when previousCards is empty", () => {
     const prompt = buildLiveAssistPrompt(undefined, [], [], []);
     expect(prompt).not.toContain("Sujets déjà analysés");
@@ -254,6 +261,12 @@ describe("buildFinalAnalysisPrompt", () => {
     const prompt = buildFinalAnalysisPrompt(undefined, [], []);
     expect(prompt).toContain("copiée MOT POUR MOT");
     expect(prompt).toContain("N'invente jamais une citation");
+  });
+
+  it("requires the citation's letter case to match the source exactly, in either direction", () => {
+    const prompt = buildFinalAnalysisPrompt(undefined, [], []);
+    expect(prompt).toContain("La casse de la citation doit être IDENTIQUE");
+    expect(prompt).toContain("ni ajout ni retrait de majuscule, dans un sens comme dans l'autre");
   });
 
   it("forbids numeric scores and defines the ternary status system", () => {

@@ -10,6 +10,7 @@ Retourne un JSON strict (sans backticks, sans texte autour) :
 { "keywords": ["terme1", "terme2", ...] }
 
 Règles :
+- Chaque terme doit être recopié TEL QUEL (mot pour mot) depuis le texte du CV ci-dessus — jamais reformulé, généralisé ou résumé. Si le terme exact n'apparaît nulle part dans le texte, ne le propose pas.
 - Uniquement des noms propres et termes spécifiques à CE candidat : noms d'entreprises, noms de produits/outils internes, certifications, technologies/frameworks nommés précisément, noms de projets.
 - Pas de mots génériques (ex : "développeur", "expérience", "gestion de projet").
 - Maximum 40 termes, les plus susceptibles d'être mal transcrits en priorité (noms propres rares avant termes techniques courants).

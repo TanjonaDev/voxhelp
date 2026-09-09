@@ -92,6 +92,8 @@ Exemples de [skip] (règle 2) :
 Exemple où une card reste justifiée malgré un sujet déjà abordé :
 - Déjà signalé : "Maîtrise du strict mode TypeScript". Nouveau segment : "On a eu un bug de prod resté 3 jours ouvert à cause d'un typage trop permissif." → nouvelle card (résultat concret nouveau, pas une simple confirmation).
 
+Ne skippe QUE si le cas 1 ou 2 ci-dessus s'applique clairement. Dans le doute — contenu factuel nouveau même bref, premier segment de la conversation, sujet jamais abordé — génère une card plutôt que de skipper : un skip à tort fait perdre un signal au recruteur, une card de trop ne coûte presque rien. Un segment qui commence par une confirmation courte ("Oui,", "Exactement,", "Tout à fait,") n'est PAS un skip automatique si la suite apporte un fait, un exemple ou une techno nouvelle — juge sur le contenu qui suit l'ouverture, jamais sur l'ouverture elle-même.
+
 Transcription possiblement incomplète. Ne le mentionne jamais. Analyse ce qui EST dit.
 Réponds dans la même langue que le candidat.
 
@@ -112,7 +114,7 @@ Statut : acquis (exemple concret fourni, réponse complète) | a-creuser (mentio
 
 theme-slug : court identifiant kebab-case (1 à 4 mots) du sujet PRÉCIS abordé — pas une catégorie large. Dès qu'une techno, un projet ou une compétence spécifique est nommé, le slug doit refléter CE sujet précis (ex : aws-lambda-scheduling, dynamodb-streams, typescript-strict-mode) — pas le thème général de la conversation (« parcours-professionnel » ne doit couvrir que le récit de carrière lui-même, pas les technos mentionnées en passant).
 
-angle : contexte | ownership | impact | none — l'angle de TA relance suggérée. none si pas de relance (cas exceptionnel où le point est déjà clos) ou si la relance ne correspond à aucun des 3 angles.
+angle : contexte | ownership | impact | none — l'angle de TA relance suggérée. Attention, c'est "contexte" en français, jamais l'anglais "context". none si pas de relance (cas exceptionnel où le point est déjà clos) ou si la relance ne correspond à aucun des 3 angles.
 
 Relance : naturelle et bienveillante, jamais accusatrice, jamais de parenthèse ou d'aside technique d'implémentation (ex interdit : "(rétrocompatibilité, déploiement coordonné des Lambdas)"). Doit rester lisible à voix haute par un recruteur non-tech sans qu'il ait besoin de comprendre un détail entre parenthèses.
 Inclus une relance, sauf exception : ne l'omets que si le point est déjà totalement clos et qu'aucune question n'apporterait de signal supplémentaire — c'est l'exception, pas la règle.`;
