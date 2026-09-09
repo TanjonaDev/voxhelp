@@ -2,6 +2,41 @@ import Anthropic from "@anthropic-ai/sdk";
 
 const anthropic = new Anthropic();
 
+/**
+ * Extrait le premier objet/tableau JSON complet d'une chaîne, en ignorant tout
+ * ce qui suit — malgré la consigne de JSON strict, Claude ajoute parfois une
+ * phrase après (ou avant) le JSON. Un `JSON.parse` naïf sur la chaîne entière
+ * casse dans ce cas (trouvé via un smoke test sur un CV à faible signal).
+ * Suit les accolades/crochets en ignorant ceux contenus dans des chaînes.
+ */
+function extractJsonPayload(raw: string): string {
+  const start = raw.search(/[[{]/);
+  if (start === -1) return raw;
+
+  const openChar = raw[start];
+  const closeChar = openChar === "{" ? "}" : "]";
+  let depth = 0;
+  let inString = false;
+  let escaped = false;
+
+  for (let i = start; i < raw.length; i++) {
+    const char = raw[i];
+    if (inString) {
+      if (escaped) escaped = false;
+      else if (char === "\\") escaped = true;
+      else if (char === '"') inString = false;
+      continue;
+    }
+    if (char === '"') inString = true;
+    else if (char === openChar) depth++;
+    else if (char === closeChar) {
+      depth--;
+      if (depth === 0) return raw.slice(start, i + 1);
+    }
+  }
+  return raw.slice(start);
+}
+
 export async function correctTranscript(rawText: string, sttContext?: string): Promise<string> {
   try {
     const contextHint = sttContext ? `\nContexte de l'entretien : ${sttContext}` : "";
@@ -85,6 +120,6 @@ export async function callClaudeJSON<T>(
   const content = message.content[0];
   if (content.type !== "text") throw new Error("Unexpected response type from Claude");
 
-  const raw = content.text.trim().replace(/^```(?:json)?\n?/, "").replace(/\n?```$/, "");
-  return JSON.parse(raw) as T;
+  const stripped = content.text.trim().replace(/^```(?:json)?\n?/, "").replace(/\n?```$/, "");
+  return JSON.parse(extractJsonPayload(stripped)) as T;
 }
