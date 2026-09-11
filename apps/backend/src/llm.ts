@@ -79,13 +79,16 @@ export async function streamAssist(
   systemPrompt: string,
   userMessage: string,
   onChunk: (text: string) => void,
-  model = "claude-haiku-4-5"
+  model = "claude-haiku-4-5",
+  maxTokens = 1024,
+  temperature?: number
 ): Promise<string> {
   const stream = anthropic.messages.stream({
     model,
-    max_tokens: 1024,
+    max_tokens: maxTokens,
     system: systemPrompt,
     messages: [{ role: "user", content: userMessage }],
+    ...(temperature !== undefined ? { temperature } : {}),
   });
 
   let fullText = "";
