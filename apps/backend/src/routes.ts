@@ -7,6 +7,7 @@ import {
   extractPdfPages,
   analyzePdf,
   rewritePass2,
+  pdfAnalysisSchema,
   type Pass1Input,
   type Pass2Input,
 } from "@voxhelp/lecture";
@@ -165,6 +166,10 @@ export function registerRoutes(app: FastifyInstance): void {
       return reply.code(400).send({ error: "Failed to parse PDF content" });
     }
 
+    if (pages.length === 0 || pages.every((page) => page.text.trim().length === 0)) {
+      return reply.code(400).send({ error: "No extractable text in PDF — is it a scanned/image-only document?" });
+    }
+
     try {
       const analysis = await analyzePdf(file.filename, pages, (system, user) =>
         callClaudeJSON(system, user, "claude-sonnet-4-6", 8192, 0)
@@ -194,6 +199,13 @@ export function registerRoutes(app: FastifyInstance): void {
       return reply.code(400).send({ error: "Missing transcript, course context, or plan" });
     }
 
+    if (body.pdfAnalysis !== undefined) {
+      const pdfAnalysisResult = pdfAnalysisSchema.safeParse(body.pdfAnalysis);
+      if (!pdfAnalysisResult.success) {
+        return reply.code(400).send({ error: "Invalid pdfAnalysis" });
+      }
+    }
+
     const input: Pass2Input = {
       transcript: body.transcript,
       course: body.course,
@@ -204,22 +216,39 @@ export function registerRoutes(app: FastifyInstance): void {
       pdfAnalysis: body.pdfAnalysis,
     };
 
-    reply.hijack();
-    reply.raw.writeHead(200, {
-      "Content-Type": "text/plain; charset=utf-8",
-      "Transfer-Encoding": "chunked",
-    });
+    let hijacked = false;
+    function ensureHijacked() {
+      if (!hijacked) {
+        hijacked = true;
+        reply.hijack();
+        reply.raw.writeHead(200, {
+          "Content-Type": "text/plain; charset=utf-8",
+          "Transfer-Encoding": "chunked",
+        });
+      }
+    }
 
     try {
       await rewritePass2(
         input,
-        (system, user, onChunk) => streamAssist(system, user, onChunk, "claude-sonnet-4-6", 8192, 0.3),
-        (chunk) => reply.raw.write(chunk)
+        (system, user, onChunk) => streamAssist(system, user, onChunk, "claude-sonnet-4-6", 32000, 0.3),
+        (chunk) => {
+          ensureHijacked();
+          reply.raw.write(chunk);
+        }
       );
+      if (hijacked) {
+        reply.raw.end();
+      } else {
+        reply.send("");
+      }
     } catch (err) {
       console.error("[Routes] Lecture pass2 rewrite failed:", err instanceof Error ? err.message : err);
-    } finally {
-      reply.raw.end();
+      if (hijacked) {
+        reply.raw.destroy();
+      } else {
+        reply.code(502).send({ error: "Lecture pass2 rewrite failed" });
+      }
     }
   });
 }

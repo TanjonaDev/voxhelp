@@ -82,6 +82,19 @@ describe("POST /api/lecture/analyze-pdf", () => {
     expect(res.status).toBe(400);
   });
 
+  it("returns 400 when the PDF has no extractable text", async () => {
+    server = await createTestHttpServer();
+    mockExtractPdfPages.mockResolvedValueOnce([{ page: 1, text: "   " }, { page: 2, text: "" }]);
+
+    const res = await fetch(`http://127.0.0.1:${server.port}/api/lecture/analyze-pdf`, {
+      method: "POST",
+      body: buildForm("application/pdf", "cours.pdf"),
+    });
+
+    expect(res.status).toBe(400);
+    expect(mockCallClaudeJSON).not.toHaveBeenCalled();
+  });
+
   it("returns 502 when the analysis fails validation twice", async () => {
     server = await createTestHttpServer();
     mockExtractPdfPages.mockResolvedValueOnce([{ page: 1, text: "Introduction" }]);

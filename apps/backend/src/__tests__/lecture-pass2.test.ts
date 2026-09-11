@@ -52,7 +52,7 @@ describe("POST /api/lecture/rewrite-pass2", () => {
       expect.any(String),
       expect.any(Function),
       "claude-sonnet-4-6",
-      8192,
+      32000,
       0.3
     );
   });
@@ -83,5 +83,75 @@ describe("POST /api/lecture/rewrite-pass2", () => {
 
     expect(res.status).toBe(400);
     expect(mockStreamAssist).not.toHaveBeenCalled();
+  });
+
+  it("returns 502 with a JSON error body when streamAssist rejects before any chunk", async () => {
+    server = await createTestHttpServer();
+    mockStreamAssist.mockRejectedValueOnce(new Error("provider unavailable"));
+
+    const res = await fetch(`http://127.0.0.1:${server.port}/api/lecture/rewrite-pass2`, {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify(validBody()),
+    });
+
+    expect(res.status).toBe(502);
+    const body = await res.json();
+    expect(body).toEqual({ error: "Lecture pass2 rewrite failed" });
+  });
+
+  it("destroys the connection instead of returning a clean 200 when streamAssist fails mid-stream", async () => {
+    server = await createTestHttpServer();
+    mockStreamAssist.mockImplementation(async (_system, _user, onChunk) => {
+      onChunk("# Partial\n");
+      throw new Error("provider dropped mid-stream");
+    });
+
+    await expect(
+      fetch(`http://127.0.0.1:${server.port}/api/lecture/rewrite-pass2`, {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify(validBody()),
+      }).then((res) => res.text())
+    ).rejects.toThrow();
+  });
+
+  it("returns 400 with an invalid pdfAnalysis and never calls streamAssist", async () => {
+    server = await createTestHttpServer();
+
+    const res = await fetch(`http://127.0.0.1:${server.port}/api/lecture/rewrite-pass2`, {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ ...validBody(), pdfAnalysis: { blocks: "not an array" } }),
+    });
+
+    expect(res.status).toBe(400);
+    expect(mockStreamAssist).not.toHaveBeenCalled();
+  });
+
+  it("streams 200 successfully with a valid pdfAnalysis and forwards it to the prompt", async () => {
+    server = await createTestHttpServer();
+    let receivedUserPrompt = "";
+    mockStreamAssist.mockImplementation(async (_system, user, onChunk) => {
+      receivedUserPrompt = user;
+      onChunk("# Cours test\n");
+      return "# Cours test\n";
+    });
+
+    const pdfAnalysis = {
+      sourceFilename: "slides.pdf",
+      blocks: [{ page: 1, type: "heading", anchorTitle: "Intro", content: "Introduction aux slides" }],
+    };
+
+    const res = await fetch(`http://127.0.0.1:${server.port}/api/lecture/rewrite-pass2`, {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ ...validBody(), pdfAnalysis }),
+    });
+
+    expect(res.status).toBe(200);
+    const text = await res.text();
+    expect(text).toBe("# Cours test\n");
+    expect(receivedUserPrompt).toContain("Introduction aux slides");
   });
 });

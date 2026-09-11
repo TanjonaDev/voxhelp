@@ -100,6 +100,8 @@ export async function streamAssist(
       const chunk = event.delta.text;
       fullText += chunk;
       onChunk(chunk);
+    } else if (event.type === "message_delta" && event.delta.stop_reason === "max_tokens") {
+      console.warn("[LLM] streamAssist hit max_tokens — output was truncated");
     }
   }
   return fullText;
