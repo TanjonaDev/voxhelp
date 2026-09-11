@@ -1,8 +1,15 @@
 import type { FastifyInstance } from "fastify";
 import { supabaseAdmin } from "./supabase.js";
-import { callClaudeJSON } from "./llm.js";
+import { callClaudeJSON, streamAssist } from "./llm.js";
 import { extractTextFromCv, buildCvKeywordExtractionPrompt, type CvFormat } from "@voxhelp/recruit";
-import { analyzePass1, extractPdfPages, analyzePdf, type Pass1Input } from "@voxhelp/lecture";
+import {
+  analyzePass1,
+  extractPdfPages,
+  analyzePdf,
+  rewritePass2,
+  type Pass1Input,
+  type Pass2Input,
+} from "@voxhelp/lecture";
 
 const MIMETYPE_TO_FORMAT: Record<string, CvFormat> = {
   "application/pdf": "pdf",
@@ -166,6 +173,53 @@ export function registerRoutes(app: FastifyInstance): void {
     } catch (err) {
       console.error("[Routes] PDF analysis failed:", err instanceof Error ? err.message : err);
       return reply.code(502).send({ error: "PDF analysis failed" });
+    }
+  });
+
+  app.post("/api/lecture/rewrite-pass2", async (request, reply) => {
+    if (supabaseAdmin) {
+      const auth = request.headers.authorization;
+      const token = auth?.startsWith("Bearer ") ? auth.slice(7) : null;
+      if (!token) {
+        return reply.code(401).send({ error: "Missing token" });
+      }
+      const { data, error } = await supabaseAdmin.auth.getUser(token);
+      if (error || !data.user) {
+        return reply.code(401).send({ error: "Invalid token" });
+      }
+    }
+
+    const body = request.body as Partial<Pass2Input> | undefined;
+    if (!body || !Array.isArray(body.transcript) || body.transcript.length === 0 || !body.course || !Array.isArray(body.plan)) {
+      return reply.code(400).send({ error: "Missing transcript, course context, or plan" });
+    }
+
+    const input: Pass2Input = {
+      transcript: body.transcript,
+      course: body.course,
+      plan: body.plan,
+      glossary: Array.isArray(body.glossary) ? body.glossary : [],
+      references: Array.isArray(body.references) ? body.references : [],
+      uncertainZones: Array.isArray(body.uncertainZones) ? body.uncertainZones : [],
+      pdfAnalysis: body.pdfAnalysis,
+    };
+
+    reply.hijack();
+    reply.raw.writeHead(200, {
+      "Content-Type": "text/plain; charset=utf-8",
+      "Transfer-Encoding": "chunked",
+    });
+
+    try {
+      await rewritePass2(
+        input,
+        (system, user, onChunk) => streamAssist(system, user, onChunk, "claude-sonnet-4-6", 8192, 0.3),
+        (chunk) => reply.raw.write(chunk)
+      );
+    } catch (err) {
+      console.error("[Routes] Lecture pass2 rewrite failed:", err instanceof Error ? err.message : err);
+    } finally {
+      reply.raw.end();
     }
   });
 }
