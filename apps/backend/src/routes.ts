@@ -2,7 +2,7 @@ import type { FastifyInstance } from "fastify";
 import { supabaseAdmin } from "./supabase.js";
 import { callClaudeJSON } from "./llm.js";
 import { extractTextFromCv, buildCvKeywordExtractionPrompt, type CvFormat } from "@voxhelp/recruit";
-import { analyzePass1, type Pass1Input } from "@voxhelp/lecture";
+import { analyzePass1, extractPdfPages, analyzePdf, type Pass1Input } from "@voxhelp/lecture";
 
 const MIMETYPE_TO_FORMAT: Record<string, CvFormat> = {
   "application/pdf": "pdf",
@@ -117,6 +117,55 @@ export function registerRoutes(app: FastifyInstance): void {
     } catch (err) {
       console.error("[Routes] Lecture pass1 analysis failed:", err instanceof Error ? err.message : err);
       return reply.code(502).send({ error: "Lecture analysis failed" });
+    }
+  });
+
+  app.post("/api/lecture/analyze-pdf", async (request, reply) => {
+    if (supabaseAdmin) {
+      const auth = request.headers.authorization;
+      const token = auth?.startsWith("Bearer ") ? auth.slice(7) : null;
+      if (!token) {
+        return reply.code(401).send({ error: "Missing token" });
+      }
+      const { data, error } = await supabaseAdmin.auth.getUser(token);
+      if (error || !data.user) {
+        return reply.code(401).send({ error: "Invalid token" });
+      }
+    }
+
+    let file: Awaited<ReturnType<typeof request.file>>;
+    try {
+      file = await request.file();
+    } catch {
+      return reply.code(400).send({ error: "Unsupported or missing file (PDF only)" });
+    }
+    const isPdf = file && (file.mimetype === "application/pdf" || file.filename.toLowerCase().endsWith(".pdf"));
+    if (!file || !isPdf) {
+      return reply.code(400).send({ error: "Unsupported or missing file (PDF only)" });
+    }
+
+    let buffer: Buffer;
+    try {
+      buffer = await file.toBuffer();
+    } catch {
+      return reply.code(400).send({ error: "Failed to read uploaded file" });
+    }
+
+    let pages: Awaited<ReturnType<typeof extractPdfPages>>;
+    try {
+      pages = await extractPdfPages(buffer);
+    } catch {
+      return reply.code(400).send({ error: "Failed to parse PDF content" });
+    }
+
+    try {
+      const analysis = await analyzePdf(file.filename, pages, (system, user) =>
+        callClaudeJSON(system, user, "claude-sonnet-4-6", 8192, 0)
+      );
+      return reply.send(analysis);
+    } catch (err) {
+      console.error("[Routes] PDF analysis failed:", err instanceof Error ? err.message : err);
+      return reply.code(502).send({ error: "PDF analysis failed" });
     }
   });
 }
