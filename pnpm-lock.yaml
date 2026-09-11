@@ -109,6 +109,9 @@ importers:
 
   packages/lecture:
     dependencies:
+      unpdf:
+        specifier: ^1.8.0
+        version: 1.8.0
       zod:
         specifier: ^3.24.0
         version: 3.25.76
