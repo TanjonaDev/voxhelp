@@ -1,8 +1,16 @@
 import type { FastifyInstance } from "fastify";
 import { supabaseAdmin } from "./supabase.js";
-import { callClaudeJSON } from "./llm.js";
+import { callClaudeJSON, streamAssist } from "./llm.js";
 import { extractTextFromCv, buildCvKeywordExtractionPrompt, type CvFormat } from "@voxhelp/recruit";
-import { analyzePass1, type Pass1Input } from "@voxhelp/lecture";
+import {
+  analyzePass1,
+  extractPdfPages,
+  analyzePdf,
+  rewritePass2,
+  pdfAnalysisSchema,
+  type Pass1Input,
+  type Pass2Input,
+} from "@voxhelp/lecture";
 
 const MIMETYPE_TO_FORMAT: Record<string, CvFormat> = {
   "application/pdf": "pdf",
@@ -117,6 +125,130 @@ export function registerRoutes(app: FastifyInstance): void {
     } catch (err) {
       console.error("[Routes] Lecture pass1 analysis failed:", err instanceof Error ? err.message : err);
       return reply.code(502).send({ error: "Lecture analysis failed" });
+    }
+  });
+
+  app.post("/api/lecture/analyze-pdf", async (request, reply) => {
+    if (supabaseAdmin) {
+      const auth = request.headers.authorization;
+      const token = auth?.startsWith("Bearer ") ? auth.slice(7) : null;
+      if (!token) {
+        return reply.code(401).send({ error: "Missing token" });
+      }
+      const { data, error } = await supabaseAdmin.auth.getUser(token);
+      if (error || !data.user) {
+        return reply.code(401).send({ error: "Invalid token" });
+      }
+    }
+
+    let file: Awaited<ReturnType<typeof request.file>>;
+    try {
+      file = await request.file();
+    } catch {
+      return reply.code(400).send({ error: "Unsupported or missing file (PDF only)" });
+    }
+    const isPdf = file && (file.mimetype === "application/pdf" || file.filename.toLowerCase().endsWith(".pdf"));
+    if (!file || !isPdf) {
+      return reply.code(400).send({ error: "Unsupported or missing file (PDF only)" });
+    }
+
+    let buffer: Buffer;
+    try {
+      buffer = await file.toBuffer();
+    } catch {
+      return reply.code(400).send({ error: "Failed to read uploaded file" });
+    }
+
+    let pages: Awaited<ReturnType<typeof extractPdfPages>>;
+    try {
+      pages = await extractPdfPages(buffer);
+    } catch {
+      return reply.code(400).send({ error: "Failed to parse PDF content" });
+    }
+
+    if (pages.length === 0 || pages.every((page) => page.text.trim().length === 0)) {
+      return reply.code(400).send({ error: "No extractable text in PDF — is it a scanned/image-only document?" });
+    }
+
+    try {
+      const analysis = await analyzePdf(file.filename, pages, (system, user) =>
+        callClaudeJSON(system, user, "claude-sonnet-4-6", 8192, 0)
+      );
+      return reply.send(analysis);
+    } catch (err) {
+      console.error("[Routes] PDF analysis failed:", err instanceof Error ? err.message : err);
+      return reply.code(502).send({ error: "PDF analysis failed" });
+    }
+  });
+
+  app.post("/api/lecture/rewrite-pass2", async (request, reply) => {
+    if (supabaseAdmin) {
+      const auth = request.headers.authorization;
+      const token = auth?.startsWith("Bearer ") ? auth.slice(7) : null;
+      if (!token) {
+        return reply.code(401).send({ error: "Missing token" });
+      }
+      const { data, error } = await supabaseAdmin.auth.getUser(token);
+      if (error || !data.user) {
+        return reply.code(401).send({ error: "Invalid token" });
+      }
+    }
+
+    const body = request.body as Partial<Pass2Input> | undefined;
+    if (!body || !Array.isArray(body.transcript) || body.transcript.length === 0 || !body.course || !Array.isArray(body.plan)) {
+      return reply.code(400).send({ error: "Missing transcript, course context, or plan" });
+    }
+
+    if (body.pdfAnalysis !== undefined) {
+      const pdfAnalysisResult = pdfAnalysisSchema.safeParse(body.pdfAnalysis);
+      if (!pdfAnalysisResult.success) {
+        return reply.code(400).send({ error: "Invalid pdfAnalysis" });
+      }
+    }
+
+    const input: Pass2Input = {
+      transcript: body.transcript,
+      course: body.course,
+      plan: body.plan,
+      glossary: Array.isArray(body.glossary) ? body.glossary : [],
+      references: Array.isArray(body.references) ? body.references : [],
+      uncertainZones: Array.isArray(body.uncertainZones) ? body.uncertainZones : [],
+      pdfAnalysis: body.pdfAnalysis,
+    };
+
+    let hijacked = false;
+    function ensureHijacked() {
+      if (!hijacked) {
+        hijacked = true;
+        reply.hijack();
+        reply.raw.writeHead(200, {
+          "Content-Type": "text/plain; charset=utf-8",
+          "Transfer-Encoding": "chunked",
+        });
+      }
+    }
+
+    try {
+      await rewritePass2(
+        input,
+        (system, user, onChunk) => streamAssist(system, user, onChunk, "claude-sonnet-4-6", 32000, 0.3),
+        (chunk) => {
+          ensureHijacked();
+          reply.raw.write(chunk);
+        }
+      );
+      if (hijacked) {
+        reply.raw.end();
+      } else {
+        reply.send("");
+      }
+    } catch (err) {
+      console.error("[Routes] Lecture pass2 rewrite failed:", err instanceof Error ? err.message : err);
+      if (hijacked) {
+        reply.raw.destroy();
+      } else {
+        reply.code(502).send({ error: "Lecture pass2 rewrite failed" });
+      }
     }
   });
 }
