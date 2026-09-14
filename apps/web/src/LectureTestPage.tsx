@@ -43,34 +43,6 @@ async function postJson<T>(url: string, body: unknown, token: string): Promise<T
   return json;
 }
 
-// Sends the file as a raw request body (streamed from disk by the browser),
-// never wrapped in FormData: multipart/form-data forces the browser to build
-// the entire encoded body in memory first, which crashes the tab on large
-// (multi-hundred-MB) course recordings. Non-file params travel as query
-// params instead of multipart fields.
-async function postRawFile<T>(url: string, file: File, token: string, params: Record<string, string>): Promise<T> {
-  const fullUrl = new URL(url, window.location.origin);
-  for (const [key, value] of Object.entries(params)) fullUrl.searchParams.set(key, value);
-  console.log(`${LOG} POST (raw body, ${file.size} bytes) ${fullUrl.toString()}`);
-  const res = await fetch(fullUrl.toString(), {
-    method: "POST",
-    headers: {
-      authorization: `Bearer ${token}`,
-      "content-type": file.type || "application/octet-stream",
-    },
-    body: file,
-  });
-  console.log(`${LOG} ${url} -> ${res.status}`);
-  if (!res.ok) {
-    const err = await res.json().catch(() => ({ error: res.statusText }));
-    console.error(`${LOG} ${url} error body:`, err);
-    throw new Error(err.error ?? `HTTP ${res.status}`);
-  }
-  const json = await res.json();
-  console.log(`${LOG} ${url} response:`, json);
-  return json;
-}
-
 async function postFile<T>(url: string, form: FormData, token: string): Promise<T> {
   console.log(`${LOG} POST (multipart) ${url}`);
   const res = await fetch(url, {
@@ -127,11 +99,14 @@ export function LectureTestPage() {
     setError(null);
     setTranscribing(true);
     try {
-      const result = await postRawFile<{ transcript: TranscriptSegment[] }>(
+      const form = new FormData();
+      form.append("file", audioFile);
+      form.append("language", course.language);
+      form.append("existingGlossary", JSON.stringify(existingGlossary));
+      const result = await postFile<{ transcript: TranscriptSegment[] }>(
         "/api/lecture/transcribe-audio",
-        audioFile,
-        session!.access_token,
-        { language: course.language, existingGlossary: JSON.stringify(existingGlossary) }
+        form,
+        session!.access_token
       );
       console.log(`${LOG} handleTranscribe success, segments:`, result.transcript.length);
       setTranscript(result.transcript);

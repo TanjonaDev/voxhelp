@@ -42,14 +42,6 @@ function resolveCvFormat(mimetype: string, filename: string): CvFormat | null {
 }
 
 export function registerRoutes(app: FastifyInstance): void {
-  // Audio/video uploads are read as a raw request body (never multipart/FormData):
-  // FormData forces the browser to materialize the entire encoded body in memory
-  // before sending, which crashes the tab on large course recordings. A raw body
-  // is streamed from disk instead.
-  app.addContentTypeParser(/^(audio|video)\//, { parseAs: "buffer" }, (_request, body, done) => {
-    done(null, body);
-  });
-
   app.post("/api/extract-cv-keywords", async (request, reply) => {
     if (supabaseAdmin) {
       const auth = request.headers.authorization;
@@ -153,20 +145,20 @@ export function registerRoutes(app: FastifyInstance): void {
       }
     }
 
-    const contentType = request.headers["content-type"] ?? "";
-    if (!contentType.startsWith("audio/") && !contentType.startsWith("video/")) {
-      return reply.code(400).send({ error: "Unsupported or missing content-type (audio or video only)" });
+    let file: Awaited<ReturnType<typeof request.file>>;
+    try {
+      file = await request.file();
+    } catch {
+      return reply.code(400).send({ error: "Unsupported or missing file (audio only)" });
+    }
+    const isMedia = file && (file.mimetype.startsWith("audio/") || file.mimetype.startsWith("video/"));
+    if (!file || !isMedia) {
+      return reply.code(400).send({ error: "Unsupported or missing file (audio or video only)" });
     }
 
-    const buffer = request.body as Buffer;
-    if (!buffer || buffer.length === 0) {
-      return reply.code(400).send({ error: "Empty request body" });
-    }
+    const language = (file.fields.language as { value?: string } | undefined)?.value ?? "fr";
 
-    const query = request.query as Record<string, string | undefined>;
-    const language = query.language ?? "fr";
-
-    const existingGlossaryRaw = query.existingGlossary;
+    const existingGlossaryRaw = (file.fields.existingGlossary as { value?: string } | undefined)?.value;
     let existingGlossary: GlossaryEntry[] = [];
     if (existingGlossaryRaw !== undefined) {
       try {
@@ -176,6 +168,13 @@ export function registerRoutes(app: FastifyInstance): void {
       } catch {
         return reply.code(400).send({ error: "Invalid existingGlossary JSON" });
       }
+    }
+
+    let buffer: Buffer;
+    try {
+      buffer = await file.toBuffer();
+    } catch {
+      return reply.code(400).send({ error: "Failed to read uploaded file" });
     }
 
     try {
