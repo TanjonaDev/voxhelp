@@ -15,7 +15,7 @@ async function main() {
 
   await app.register(cors, { origin: CORS_ORIGIN });
   await app.register(websocket);
-  await app.register(multipart, { limits: { fileSize: 5 * 1024 * 1024 } });
+  await app.register(multipart, { limits: { fileSize: 200 * 1024 * 1024 } });
   registerRoutes(app);
 
   app.get("/health", async () => ({ status: "ok", timestamp: Date.now() }));
