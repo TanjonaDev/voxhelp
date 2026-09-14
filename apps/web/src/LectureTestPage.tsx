@@ -25,6 +25,16 @@ function formatSegments(segments: TranscriptSegment[]): string {
   return segments.map((s) => `[${s.startMs}–${s.endMs}] ${s.text}`).join("\n");
 }
 
+function downloadJson(filename: string, data: unknown) {
+  const blob = new Blob([JSON.stringify(data, null, 2)], { type: "application/json" });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement("a");
+  a.href = url;
+  a.download = filename;
+  a.click();
+  URL.revokeObjectURL(url);
+}
+
 async function postJson<T>(url: string, body: unknown, token: string): Promise<T> {
   console.log(`${LOG} POST ${url}`, body);
   const res = await fetch(url, {
@@ -115,6 +125,26 @@ export function LectureTestPage() {
       setError(e instanceof Error ? e.message : String(e));
     } finally {
       setTranscribing(false);
+    }
+  }
+
+  function handleDownloadTranscript() {
+    if (!transcript) return;
+    downloadJson(`transcript-${Date.now()}.json`, transcript);
+  }
+
+  async function handleImportTranscript(file: File | undefined) {
+    if (!file) return;
+    setError(null);
+    try {
+      const text = await file.text();
+      const parsed = JSON.parse(text);
+      if (!Array.isArray(parsed)) throw new Error("Le fichier ne contient pas un tableau de segments");
+      console.log(`${LOG} handleImportTranscript success, segments:`, parsed.length);
+      setTranscript(parsed as TranscriptSegment[]);
+    } catch (e) {
+      console.error(`${LOG} handleImportTranscript failed:`, e);
+      setError(e instanceof Error ? e.message : String(e));
     }
   }
 
@@ -270,6 +300,24 @@ export function LectureTestPage() {
           >
             {transcribing ? "Transcription…" : "Transcrire"}
           </button>
+          {transcript && (
+            <button
+              className="rounded border border-black px-3 py-1"
+              onClick={handleDownloadTranscript}
+            >
+              Télécharger le transcript (JSON)
+            </button>
+          )}
+        </div>
+        <div className="flex items-center gap-2 mb-2">
+          <label className="text-xs text-gray-600">
+            Ou réimporter un transcript déjà exporté (évite de retranscrire) :
+          </label>
+          <input
+            type="file"
+            accept="application/json"
+            onChange={(e) => handleImportTranscript(e.target.files?.[0])}
+          />
         </div>
         {transcript && (
           <pre className="max-h-48 overflow-auto whitespace-pre-wrap rounded bg-gray-100 p-2">
