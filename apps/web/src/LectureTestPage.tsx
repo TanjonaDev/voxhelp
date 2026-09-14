@@ -6,15 +6,18 @@ import type {
   PdfAnalysis,
   GlossaryEntry,
 } from "@voxhelp/lecture";
+import { useAuth } from "./hooks/useAuth";
+import { LoginPage } from "./components/LoginPage";
+import { isSupabaseConfigured } from "./lib/supabase.js";
 
 function formatSegments(segments: TranscriptSegment[]): string {
   return segments.map((s) => `[${s.startMs}–${s.endMs}] ${s.text}`).join("\n");
 }
 
-async function postJson<T>(url: string, body: unknown): Promise<T> {
+async function postJson<T>(url: string, body: unknown, token: string): Promise<T> {
   const res = await fetch(url, {
     method: "POST",
-    headers: { "content-type": "application/json" },
+    headers: { "content-type": "application/json", authorization: `Bearer ${token}` },
     body: JSON.stringify(body),
   });
   if (!res.ok) {
@@ -24,8 +27,12 @@ async function postJson<T>(url: string, body: unknown): Promise<T> {
   return res.json();
 }
 
-async function postFile<T>(url: string, form: FormData): Promise<T> {
-  const res = await fetch(url, { method: "POST", body: form });
+async function postFile<T>(url: string, form: FormData, token: string): Promise<T> {
+  const res = await fetch(url, {
+    method: "POST",
+    headers: { authorization: `Bearer ${token}` },
+    body: form,
+  });
   if (!res.ok) {
     const err = await res.json().catch(() => ({ error: res.statusText }));
     throw new Error(err.error ?? `HTTP ${res.status}`);
@@ -34,6 +41,7 @@ async function postFile<T>(url: string, form: FormData): Promise<T> {
 }
 
 export function LectureTestPage() {
+  const { session, loading } = useAuth();
   const [course, setCourse] = useState<CourseContext>({
     title: "",
     discipline: "",
@@ -69,7 +77,8 @@ export function LectureTestPage() {
       form.append("existingGlossary", JSON.stringify(existingGlossary));
       const result = await postFile<{ transcript: TranscriptSegment[] }>(
         "/api/lecture/transcribe-audio",
-        form
+        form,
+        session!.access_token
       );
       setTranscript(result.transcript);
     } catch (e) {
@@ -84,11 +93,11 @@ export function LectureTestPage() {
     setError(null);
     setAnalyzing(true);
     try {
-      const result = await postJson<Pass1Output>("/api/lecture/analyze-pass1", {
-        transcript,
-        course,
-        existingGlossary,
-      });
+      const result = await postJson<Pass1Output>(
+        "/api/lecture/analyze-pass1",
+        { transcript, course, existingGlossary },
+        session!.access_token
+      );
       setPass1(result);
     } catch (e) {
       setError(e instanceof Error ? e.message : String(e));
@@ -104,7 +113,7 @@ export function LectureTestPage() {
     try {
       const form = new FormData();
       form.append("file", pdfFile);
-      const result = await postFile<PdfAnalysis>("/api/lecture/analyze-pdf", form);
+      const result = await postFile<PdfAnalysis>("/api/lecture/analyze-pdf", form, session!.access_token);
       setPdfAnalysis(result);
     } catch (e) {
       setError(e instanceof Error ? e.message : String(e));
@@ -121,7 +130,7 @@ export function LectureTestPage() {
     try {
       const res = await fetch("/api/lecture/rewrite-pass2", {
         method: "POST",
-        headers: { "content-type": "application/json" },
+        headers: { "content-type": "application/json", authorization: `Bearer ${session!.access_token}` },
         body: JSON.stringify({
           transcript,
           course,
@@ -151,6 +160,16 @@ export function LectureTestPage() {
     } finally {
       setRewriting(false);
     }
+  }
+
+  if (!isSupabaseConfigured) {
+    return <div className="p-6 text-gray-900">Configuration Supabase manquante (apps/web/.env).</div>;
+  }
+  if (loading) {
+    return <div className="p-6 text-gray-900">Chargement…</div>;
+  }
+  if (!session) {
+    return <LoginPage />;
   }
 
   return (
