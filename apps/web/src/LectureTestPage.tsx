@@ -154,7 +154,7 @@ export function LectureTestPage() {
   }
 
   return (
-    <div className="min-h-screen bg-gray-50 p-6 font-mono text-sm">
+    <div className="min-h-screen bg-gray-50 p-6 font-mono text-sm text-gray-900">
       <h1 className="text-lg font-bold mb-4">VoxHelp — Lecture pipeline test</h1>
 
       {error && (
