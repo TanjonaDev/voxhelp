@@ -66,6 +66,16 @@ ${formatPages(pages)}
 Produis ta segmentation au format JSON défini.`;
 }
 
+export function buildPdfOcrAnalysisUserPrompt(sourceFilename: string, pageCount: number): string {
+  return `FICHIER : ${sourceFilename} (${pageCount} page${pageCount > 1 ? "s" : ""})
+
+Ce PDF est un document scanné : aucun texte n'a pu en être extrait automatiquement.
+Le fichier PDF original est joint à ce message — lis chaque page comme une image et
+transcris fidèlement son contenu (retranscription, pas de résumé).
+
+Produis ta segmentation au format JSON défini, en te basant sur ce que tu lis sur les pages jointes.`;
+}
+
 export function buildPdfAnalysisRetryPrompt(previousUserPrompt: string, zodErrorMessage: string): string {
   return `${previousUserPrompt}
 

@@ -3,12 +3,13 @@ import { createTestHttpServer, type TestHttpServer } from "./helpers/http-server
 
 const mockExtractPdfPages = vi.hoisted(() => vi.fn());
 const mockCallClaudeJSON = vi.hoisted(() => vi.fn());
+const mockCallClaudeJSONWithPdf = vi.hoisted(() => vi.fn());
 
 vi.mock("@voxhelp/lecture", async (importOriginal) => ({
   ...(await importOriginal<typeof import("@voxhelp/lecture")>()),
   extractPdfPages: mockExtractPdfPages,
 }));
-vi.mock("../llm.js", () => ({ callClaudeJSON: mockCallClaudeJSON }));
+vi.mock("../llm.js", () => ({ callClaudeJSON: mockCallClaudeJSON, callClaudeJSONWithPdf: mockCallClaudeJSONWithPdf }));
 vi.mock("../supabase.js", () => ({ supabaseAdmin: null }));
 
 function buildForm(mimetype: string, filename: string): FormData {
@@ -30,6 +31,7 @@ describe("POST /api/lecture/analyze-pdf", () => {
   beforeEach(() => {
     mockExtractPdfPages.mockReset();
     mockCallClaudeJSON.mockReset();
+    mockCallClaudeJSONWithPdf.mockReset();
   });
 
   afterEach(async () => {
@@ -82,17 +84,26 @@ describe("POST /api/lecture/analyze-pdf", () => {
     expect(res.status).toBe(400);
   });
 
-  it("returns 400 when the PDF has no extractable text", async () => {
+  it("falls back to vision OCR (document attachment) when the PDF has no extractable text", async () => {
     server = await createTestHttpServer();
     mockExtractPdfPages.mockResolvedValueOnce([{ page: 1, text: "   " }, { page: 2, text: "" }]);
+    mockCallClaudeJSONWithPdf.mockResolvedValueOnce(validPdfAnalysis());
 
     const res = await fetch(`http://127.0.0.1:${server.port}/api/lecture/analyze-pdf`, {
       method: "POST",
       body: buildForm("application/pdf", "cours.pdf"),
     });
 
-    expect(res.status).toBe(400);
+    expect(res.status).toBe(200);
     expect(mockCallClaudeJSON).not.toHaveBeenCalled();
+    expect(mockCallClaudeJSONWithPdf).toHaveBeenCalledWith(
+      expect.any(String),
+      expect.any(String),
+      Buffer.from("fake pdf content").toString("base64"),
+      "claude-sonnet-4-6",
+      16000,
+      0
+    );
   });
 
   it("returns 502 when the analysis fails validation twice", async () => {

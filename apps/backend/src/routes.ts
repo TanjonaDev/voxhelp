@@ -1,11 +1,12 @@
 import type { FastifyInstance } from "fastify";
 import { supabaseAdmin } from "./supabase.js";
-import { callClaudeJSON, streamAssist } from "./llm.js";
+import { callClaudeJSON, callClaudeJSONWithPdf, streamAssist } from "./llm.js";
 import { extractTextFromCv, buildCvKeywordExtractionPrompt, type CvFormat } from "@voxhelp/recruit";
 import {
   analyzePass1,
   extractPdfPages,
   analyzePdf,
+  analyzePdfOcr,
   rewritePass2,
   pdfAnalysisSchema,
   selectKeyterms,
@@ -228,14 +229,16 @@ export function registerRoutes(app: FastifyInstance): void {
       return reply.code(400).send({ error: "Failed to parse PDF content" });
     }
 
-    if (pages.length === 0 || pages.every((page) => page.text.trim().length === 0)) {
-      return reply.code(400).send({ error: "No extractable text in PDF — is it a scanned/image-only document?" });
-    }
+    const hasExtractableText = pages.some((page) => page.text.trim().length > 0);
 
     try {
-      const analysis = await analyzePdf(file.filename, pages, (system, user) =>
-        callClaudeJSON(system, user, "claude-sonnet-4-6", 16000, 0)
-      );
+      const analysis = hasExtractableText
+        ? await analyzePdf(file.filename, pages, (system, user) =>
+            callClaudeJSON(system, user, "claude-sonnet-4-6", 16000, 0)
+          )
+        : await analyzePdfOcr(file.filename, Math.max(pages.length, 1), (system, user) =>
+            callClaudeJSONWithPdf(system, user, buffer.toString("base64"), "claude-sonnet-4-6", 16000, 0)
+          );
       return reply.send(analysis);
     } catch (err) {
       console.error("[Routes] PDF analysis failed:", err instanceof Error ? err.message : err);

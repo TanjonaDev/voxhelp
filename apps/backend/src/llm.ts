@@ -107,6 +107,14 @@ export async function streamAssist(
   return fullText;
 }
 
+function parseClaudeJsonResponse<T>(message: Anthropic.Message): T {
+  const content = message.content[0];
+  if (content.type !== "text") throw new Error("Unexpected response type from Claude");
+
+  const stripped = content.text.trim().replace(/^```(?:json)?\n?/, "").replace(/\n?```$/, "");
+  return JSON.parse(extractJsonPayload(stripped)) as T;
+}
+
 export async function callClaudeJSON<T>(
   systemPrompt: string,
   userMessage: string,
@@ -122,9 +130,37 @@ export async function callClaudeJSON<T>(
     ...(temperature !== undefined ? { temperature } : {}),
   });
 
-  const content = message.content[0];
-  if (content.type !== "text") throw new Error("Unexpected response type from Claude");
+  return parseClaudeJsonResponse<T>(message);
+}
 
-  const stripped = content.text.trim().replace(/^```(?:json)?\n?/, "").replace(/\n?```$/, "");
-  return JSON.parse(extractJsonPayload(stripped)) as T;
+/**
+ * Same as callClaudeJSON, but attaches a PDF as a native document content
+ * block so Claude reads it directly (including scanned/image-only pages via
+ * vision) instead of relying on pre-extracted text.
+ */
+export async function callClaudeJSONWithPdf<T>(
+  systemPrompt: string,
+  userMessage: string,
+  pdfBase64: string,
+  model = "claude-haiku-4-5",
+  maxTokens = 4096,
+  temperature?: number
+): Promise<T> {
+  const message = await anthropic.messages.create({
+    model,
+    max_tokens: maxTokens,
+    system: systemPrompt,
+    messages: [
+      {
+        role: "user",
+        content: [
+          { type: "document", source: { type: "base64", media_type: "application/pdf", data: pdfBase64 } },
+          { type: "text", text: userMessage },
+        ],
+      },
+    ],
+    ...(temperature !== undefined ? { temperature } : {}),
+  });
+
+  return parseClaudeJsonResponse<T>(message);
 }
