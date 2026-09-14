@@ -7,7 +7,8 @@ export function buildPass2SystemPrompt(): string {
 automatique brute d'un cours, déjà analysée : un plan de sections, un
 glossaire des termes spécialisés, les références citées, et les zones où
 la transcription est incertaine. Tu reçois aussi, si disponible, le
-contenu structuré d'un support PDF utilisé pendant le cours.
+contenu structuré d'un ou plusieurs supports PDF utilisés pendant le
+cours (slides, polycopié), chacun identifié par son nom de fichier.
 
 Ton rôle est de RÉÉCRIRE le cours en un document de cours propre et
 lisible, fidèle à ce qui a été dit.
@@ -31,7 +32,7 @@ RÈGLES DE RÉÉCRITURE :
   section, insère à l'endroit correspondant le marqueur littéral
   [passage incertain — {reason}]. N'invente jamais de texte pour combler
   le trou.
-- Si un support PDF est fourni : les blocs de type "citation", "table" et
+- Si un ou plusieurs supports PDF sont fournis : les blocs de type "citation", "table" et
   "exercise" dont le "anchorTitle" ou le contenu se rapproche du titre
   d'une section doivent être insérés dans cette section, sous forme de
   citation Markdown (précédée de ">"), verbatim, sans reformulation. Les
@@ -76,14 +77,19 @@ function formatUncertainZones(zones: UncertainZone[]): string {
   return zones.map((zone) => `[${zone.startMs}–${zone.endMs}] ${zone.reason} — extrait : "${zone.excerpt}"`).join("\n");
 }
 
-function formatPdfBlocks(pdfAnalysis?: PdfAnalysis): string {
-  if (!pdfAnalysis || pdfAnalysis.blocks.length === 0) return "(aucun support PDF fourni)";
-  return pdfAnalysis.blocks
-    .map((block) => {
-      const anchor = block.anchorTitle ? `, ancre : "${block.anchorTitle}"` : "";
-      const reference = block.reference ? `, réf : ${block.reference}` : "";
-      return `[page ${block.page}] (${block.type}${anchor}${reference}) ${block.content}`;
-    })
+function formatPdfBlocks(pdfAnalyses?: PdfAnalysis[]): string {
+  const nonEmpty = (pdfAnalyses ?? []).filter((analysis) => analysis.blocks.length > 0);
+  if (nonEmpty.length === 0) return "(aucun support PDF fourni)";
+  return nonEmpty
+    .map((analysis) =>
+      analysis.blocks
+        .map((block) => {
+          const anchor = block.anchorTitle ? `, ancre : "${block.anchorTitle}"` : "";
+          const reference = block.reference ? `, réf : ${block.reference}` : "";
+          return `[${analysis.sourceFilename}, page ${block.page}] (${block.type}${anchor}${reference}) ${block.content}`;
+        })
+        .join("\n---\n")
+    )
     .join("\n---\n");
 }
 
@@ -92,7 +98,7 @@ function formatSegments(transcript: TranscriptSegment[]): string {
 }
 
 export function buildPass2UserPrompt(input: Pass2Input): string {
-  const { course, transcript, plan, glossary, references, uncertainZones, pdfAnalysis } = input;
+  const { course, transcript, plan, glossary, references, uncertainZones, pdfAnalyses } = input;
   return `CONTEXTE DU COURS
 Intitulé : ${course.title}
 Discipline : ${course.discipline ?? "non précisée"}
@@ -111,8 +117,8 @@ ${formatReferences(references)}
 ZONES INCERTAINES
 ${formatUncertainZones(uncertainZones)}
 
-SUPPORT PDF (blocs structurés)
-${formatPdfBlocks(pdfAnalysis)}
+SUPPORT PDF (blocs structurés, un ou plusieurs documents)
+${formatPdfBlocks(pdfAnalyses)}
 
 TRANSCRIPTION BRUTE
 Format : [début_ms–fin_ms] texte

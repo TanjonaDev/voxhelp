@@ -24,12 +24,14 @@ const baseInput: Pass2Input = {
   uncertainZones: [
     { startMs: 30000, endMs: 32000, excerpt: "[inaudible]", reason: "audio dégradé" },
   ],
-  pdfAnalysis: {
-    sourceFilename: "theologie-nt.pdf",
-    blocks: [
-      { page: 7, type: "citation", reference: "Romains 1,1-4", content: "1. Paul, serviteur de Jésus Christ..." },
-    ],
-  },
+  pdfAnalyses: [
+    {
+      sourceFilename: "theologie-nt.pdf",
+      blocks: [
+        { page: 7, type: "citation", reference: "Romains 1,1-4", content: "1. Paul, serviteur de Jésus Christ..." },
+      ],
+    },
+  ],
 };
 
 describe("buildPass2SystemPrompt", () => {
@@ -69,8 +71,33 @@ describe("buildPass2UserPrompt", () => {
   });
 
   it("reports an explicit placeholder when there is no PDF support", () => {
-    const { pdfAnalysis, ...withoutPdf } = baseInput;
+    const { pdfAnalyses, ...withoutPdf } = baseInput;
     const prompt = buildPass2UserPrompt(withoutPdf);
     expect(prompt).toContain("aucun support PDF fourni");
+  });
+
+  it("reports an explicit placeholder when pdfAnalyses is an empty array", () => {
+    const prompt = buildPass2UserPrompt({ ...baseInput, pdfAnalyses: [] });
+    expect(prompt).toContain("aucun support PDF fourni");
+  });
+
+  it("includes blocks from every PDF, each tagged with its source filename", () => {
+    const prompt = buildPass2UserPrompt({
+      ...baseInput,
+      pdfAnalyses: [
+        {
+          sourceFilename: "slides-semaine1.pdf",
+          blocks: [{ page: 1, type: "heading", anchorTitle: "Introduction", content: "Introduction" }],
+        },
+        {
+          sourceFilename: "slides-semaine2.pdf",
+          blocks: [{ page: 3, type: "table", content: "Tableau comparatif des évangiles" }],
+        },
+      ],
+    });
+    expect(prompt).toContain("slides-semaine1.pdf");
+    expect(prompt).toContain("Introduction");
+    expect(prompt).toContain("slides-semaine2.pdf");
+    expect(prompt).toContain("Tableau comparatif des évangiles");
   });
 });

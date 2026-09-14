@@ -15,5 +15,5 @@ export interface Pass2Input {
   glossary: GlossaryEntry[];
   references: Reference[];
   uncertainZones: UncertainZone[];
-  pdfAnalysis?: PdfAnalysis;
+  pdfAnalyses?: PdfAnalysis[];
 }
