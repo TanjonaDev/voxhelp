@@ -116,20 +116,33 @@ describe("POST /api/lecture/rewrite-pass2", () => {
     ).rejects.toThrow();
   });
 
-  it("returns 400 with an invalid pdfAnalysis and never calls streamAssist", async () => {
+  it("returns 400 with an invalid pdfAnalyses entry and never calls streamAssist", async () => {
     server = await createTestHttpServer();
 
     const res = await fetch(`http://127.0.0.1:${server.port}/api/lecture/rewrite-pass2`, {
       method: "POST",
       headers: { "content-type": "application/json" },
-      body: JSON.stringify({ ...validBody(), pdfAnalysis: { blocks: "not an array" } }),
+      body: JSON.stringify({ ...validBody(), pdfAnalyses: [{ blocks: "not an array" }] }),
     });
 
     expect(res.status).toBe(400);
     expect(mockStreamAssist).not.toHaveBeenCalled();
   });
 
-  it("streams 200 successfully with a valid pdfAnalysis and forwards it to the prompt", async () => {
+  it("returns 400 when pdfAnalyses is not an array", async () => {
+    server = await createTestHttpServer();
+
+    const res = await fetch(`http://127.0.0.1:${server.port}/api/lecture/rewrite-pass2`, {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ ...validBody(), pdfAnalyses: { blocks: [] } }),
+    });
+
+    expect(res.status).toBe(400);
+    expect(mockStreamAssist).not.toHaveBeenCalled();
+  });
+
+  it("streams 200 successfully with a single valid pdfAnalyses entry and forwards it to the prompt", async () => {
     server = await createTestHttpServer();
     let receivedUserPrompt = "";
     mockStreamAssist.mockImplementation(async (_system, user, onChunk) => {
@@ -138,20 +151,53 @@ describe("POST /api/lecture/rewrite-pass2", () => {
       return "# Cours test\n";
     });
 
-    const pdfAnalysis = {
-      sourceFilename: "slides.pdf",
-      blocks: [{ page: 1, type: "heading", anchorTitle: "Intro", content: "Introduction aux slides" }],
-    };
+    const pdfAnalyses = [
+      {
+        sourceFilename: "slides.pdf",
+        blocks: [{ page: 1, type: "heading", anchorTitle: "Intro", content: "Introduction aux slides" }],
+      },
+    ];
 
     const res = await fetch(`http://127.0.0.1:${server.port}/api/lecture/rewrite-pass2`, {
       method: "POST",
       headers: { "content-type": "application/json" },
-      body: JSON.stringify({ ...validBody(), pdfAnalysis }),
+      body: JSON.stringify({ ...validBody(), pdfAnalyses }),
     });
 
     expect(res.status).toBe(200);
     const text = await res.text();
     expect(text).toBe("# Cours test\n");
     expect(receivedUserPrompt).toContain("Introduction aux slides");
+  });
+
+  it("streams 200 with multiple pdfAnalyses entries, all forwarded to the prompt", async () => {
+    server = await createTestHttpServer();
+    let receivedUserPrompt = "";
+    mockStreamAssist.mockImplementation(async (_system, user, onChunk) => {
+      receivedUserPrompt = user;
+      onChunk("# Cours test\n");
+      return "# Cours test\n";
+    });
+
+    const pdfAnalyses = [
+      {
+        sourceFilename: "slides-semaine1.pdf",
+        blocks: [{ page: 1, type: "heading", anchorTitle: "Intro", content: "Contenu semaine 1" }],
+      },
+      {
+        sourceFilename: "slides-semaine2.pdf",
+        blocks: [{ page: 2, type: "table", content: "Contenu semaine 2" }],
+      },
+    ];
+
+    const res = await fetch(`http://127.0.0.1:${server.port}/api/lecture/rewrite-pass2`, {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ ...validBody(), pdfAnalyses }),
+    });
+
+    expect(res.status).toBe(200);
+    expect(receivedUserPrompt).toContain("Contenu semaine 1");
+    expect(receivedUserPrompt).toContain("Contenu semaine 2");
   });
 });

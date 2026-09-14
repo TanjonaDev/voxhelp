@@ -262,10 +262,14 @@ export function registerRoutes(app: FastifyInstance): void {
       return reply.code(400).send({ error: "Missing transcript, course context, or plan" });
     }
 
-    if (body.pdfAnalysis !== undefined) {
-      const pdfAnalysisResult = pdfAnalysisSchema.safeParse(body.pdfAnalysis);
-      if (!pdfAnalysisResult.success) {
-        return reply.code(400).send({ error: "Invalid pdfAnalysis" });
+    if (body.pdfAnalyses !== undefined) {
+      if (!Array.isArray(body.pdfAnalyses)) {
+        return reply.code(400).send({ error: "Invalid pdfAnalyses" });
+      }
+      for (const entry of body.pdfAnalyses) {
+        if (!pdfAnalysisSchema.safeParse(entry).success) {
+          return reply.code(400).send({ error: "Invalid pdfAnalyses" });
+        }
       }
     }
 
@@ -276,7 +280,7 @@ export function registerRoutes(app: FastifyInstance): void {
       glossary: Array.isArray(body.glossary) ? body.glossary : [],
       references: Array.isArray(body.references) ? body.references : [],
       uncertainZones: Array.isArray(body.uncertainZones) ? body.uncertainZones : [],
-      pdfAnalysis: body.pdfAnalysis,
+      pdfAnalyses: body.pdfAnalyses,
     };
 
     let hijacked = false;
