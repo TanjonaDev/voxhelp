@@ -112,8 +112,8 @@ export function LectureTestPage() {
   const [pass1, setPass1] = useState<Pass1Output | null>(null);
   const [analyzing, setAnalyzing] = useState(false);
 
-  const [pdfFile, setPdfFile] = useState<File | null>(null);
-  const [pdfAnalysis, setPdfAnalysis] = useState<PdfAnalysis | null>(null);
+  const [pdfFiles, setPdfFiles] = useState<File[]>([]);
+  const [pdfAnalyses, setPdfAnalyses] = useState<PdfAnalysis[]>([]);
   const [analyzingPdf, setAnalyzingPdf] = useState(false);
 
   const [finalDocument, setFinalDocument] = useState("");
@@ -164,19 +164,23 @@ export function LectureTestPage() {
     }
   }
 
-  async function handleAnalyzePdf() {
-    console.log(`${LOG} handleAnalyzePdf`, { pdfFile: pdfFile && { name: pdfFile.name, size: pdfFile.size } });
-    if (!pdfFile) return;
+  async function handleAnalyzePdfs() {
+    console.log(`${LOG} handleAnalyzePdfs`, { files: pdfFiles.map((f) => ({ name: f.name, size: f.size })) });
+    if (pdfFiles.length === 0) return;
     setError(null);
     setAnalyzingPdf(true);
     try {
-      const form = new FormData();
-      form.append("file", pdfFile);
-      const result = await postFile<PdfAnalysis>("/api/lecture/analyze-pdf", form, session!.access_token);
-      console.log(`${LOG} handleAnalyzePdf success`, result);
-      setPdfAnalysis(result);
+      const results: PdfAnalysis[] = [];
+      for (const pdfFile of pdfFiles) {
+        const form = new FormData();
+        form.append("file", pdfFile);
+        const result = await postFile<PdfAnalysis>("/api/lecture/analyze-pdf", form, session!.access_token);
+        console.log(`${LOG} handleAnalyzePdfs success for ${pdfFile.name}`, result);
+        results.push(result);
+      }
+      setPdfAnalyses(results);
     } catch (e) {
-      console.error(`${LOG} handleAnalyzePdf failed:`, e);
+      console.error(`${LOG} handleAnalyzePdfs failed:`, e);
       setError(e instanceof Error ? e.message : String(e));
     } finally {
       setAnalyzingPdf(false);
@@ -184,7 +188,7 @@ export function LectureTestPage() {
   }
 
   async function handleRewritePass2() {
-    console.log(`${LOG} handleRewritePass2`, { hasPdfAnalysis: Boolean(pdfAnalysis) });
+    console.log(`${LOG} handleRewritePass2`, { pdfAnalysesCount: pdfAnalyses.length });
     if (!transcript || !pass1) return;
     setError(null);
     setRewriting(true);
@@ -200,7 +204,7 @@ export function LectureTestPage() {
           glossary: pass1.glossary,
           references: pass1.references,
           uncertainZones: pass1.uncertainZones,
-          pdfAnalysis: pdfAnalysis ?? undefined,
+          pdfAnalyses: pdfAnalyses.length > 0 ? pdfAnalyses : undefined,
         }),
       });
       console.log(`${LOG} rewrite-pass2 -> ${res.status}`);
@@ -300,24 +304,28 @@ export function LectureTestPage() {
       </section>
 
       <section className="mb-6 rounded border bg-white p-4">
-        <h2 className="font-bold mb-2">2. Support PDF (optionnel)</h2>
+        <h2 className="font-bold mb-2">2. Supports PDF (optionnel, un ou plusieurs)</h2>
         <div className="flex items-center gap-2 mb-2">
           <input
             type="file"
             accept="application/pdf"
-            onChange={(e) => setPdfFile(e.target.files?.[0] ?? null)}
+            multiple
+            onChange={(e) => setPdfFiles(Array.from(e.target.files ?? []))}
           />
           <button
             className="rounded bg-black text-white px-3 py-1 disabled:opacity-40"
-            disabled={!pdfFile || analyzingPdf}
-            onClick={handleAnalyzePdf}
+            disabled={pdfFiles.length === 0 || analyzingPdf}
+            onClick={handleAnalyzePdfs}
           >
-            {analyzingPdf ? "Analyse…" : "Analyser le PDF"}
+            {analyzingPdf ? "Analyse…" : `Analyser ${pdfFiles.length > 1 ? `les ${pdfFiles.length} PDF` : "le PDF"}`}
           </button>
         </div>
-        {pdfAnalysis && (
+        {pdfFiles.length > 0 && (
+          <p className="text-xs text-gray-600 mb-2">{pdfFiles.map((f) => f.name).join(", ")}</p>
+        )}
+        {pdfAnalyses.length > 0 && (
           <pre className="max-h-48 overflow-auto whitespace-pre-wrap rounded bg-gray-100 p-2">
-            {JSON.stringify(pdfAnalysis, null, 2)}
+            {JSON.stringify(pdfAnalyses, null, 2)}
           </pre>
         )}
       </section>
