@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import type {
   CourseContext,
   TranscriptSegment,
@@ -10,38 +10,65 @@ import { useAuth } from "./hooks/useAuth";
 import { LoginPage } from "./components/LoginPage";
 import { isSupabaseConfigured } from "./lib/supabase.js";
 
+const LOG = "[LectureTest]";
+
+if (typeof window !== "undefined") {
+  window.addEventListener("error", (e) => {
+    console.error(`${LOG} window error:`, e.error ?? e.message, e);
+  });
+  window.addEventListener("unhandledrejection", (e) => {
+    console.error(`${LOG} unhandled promise rejection:`, e.reason);
+  });
+}
+
 function formatSegments(segments: TranscriptSegment[]): string {
   return segments.map((s) => `[${s.startMs}–${s.endMs}] ${s.text}`).join("\n");
 }
 
 async function postJson<T>(url: string, body: unknown, token: string): Promise<T> {
+  console.log(`${LOG} POST ${url}`, body);
   const res = await fetch(url, {
     method: "POST",
     headers: { "content-type": "application/json", authorization: `Bearer ${token}` },
     body: JSON.stringify(body),
   });
+  console.log(`${LOG} ${url} -> ${res.status}`);
   if (!res.ok) {
     const err = await res.json().catch(() => ({ error: res.statusText }));
+    console.error(`${LOG} ${url} error body:`, err);
     throw new Error(err.error ?? `HTTP ${res.status}`);
   }
-  return res.json();
+  const json = await res.json();
+  console.log(`${LOG} ${url} response:`, json);
+  return json;
 }
 
 async function postFile<T>(url: string, form: FormData, token: string): Promise<T> {
+  console.log(`${LOG} POST (multipart) ${url}`);
   const res = await fetch(url, {
     method: "POST",
     headers: { authorization: `Bearer ${token}` },
     body: form,
   });
+  console.log(`${LOG} ${url} -> ${res.status}`);
   if (!res.ok) {
     const err = await res.json().catch(() => ({ error: res.statusText }));
+    console.error(`${LOG} ${url} error body:`, err);
     throw new Error(err.error ?? `HTTP ${res.status}`);
   }
-  return res.json();
+  const json = await res.json();
+  console.log(`${LOG} ${url} response:`, json);
+  return json;
 }
 
 export function LectureTestPage() {
+  console.log(`${LOG} render`);
   const { session, loading } = useAuth();
+
+  useEffect(() => {
+    console.log(`${LOG} auth state:`, { loading, hasSession: Boolean(session) });
+  }, [loading, session]);
+
   const [course, setCourse] = useState<CourseContext>({
     title: "",
     discipline: "",
@@ -61,12 +88,13 @@ export function LectureTestPage() {
   const [pdfAnalysis, setPdfAnalysis] = useState<PdfAnalysis | null>(null);
   const [analyzingPdf, setAnalyzingPdf] = useState(false);
 
-  const [document, setDocument] = useState("");
+  const [finalDocument, setFinalDocument] = useState("");
   const [rewriting, setRewriting] = useState(false);
 
   const [error, setError] = useState<string | null>(null);
 
   async function handleTranscribe() {
+    console.log(`${LOG} handleTranscribe`, { audioFile: audioFile && { name: audioFile.name, type: audioFile.type, size: audioFile.size } });
     if (!audioFile) return;
     setError(null);
     setTranscribing(true);
@@ -80,8 +108,10 @@ export function LectureTestPage() {
         form,
         session!.access_token
       );
+      console.log(`${LOG} handleTranscribe success, segments:`, result.transcript.length);
       setTranscript(result.transcript);
     } catch (e) {
+      console.error(`${LOG} handleTranscribe failed:`, e);
       setError(e instanceof Error ? e.message : String(e));
     } finally {
       setTranscribing(false);
@@ -89,6 +119,7 @@ export function LectureTestPage() {
   }
 
   async function handleAnalyzePass1() {
+    console.log(`${LOG} handleAnalyzePass1`, { segments: transcript?.length, course });
     if (!transcript) return;
     setError(null);
     setAnalyzing(true);
@@ -98,8 +129,10 @@ export function LectureTestPage() {
         { transcript, course, existingGlossary },
         session!.access_token
       );
+      console.log(`${LOG} handleAnalyzePass1 success`, result);
       setPass1(result);
     } catch (e) {
+      console.error(`${LOG} handleAnalyzePass1 failed:`, e);
       setError(e instanceof Error ? e.message : String(e));
     } finally {
       setAnalyzing(false);
@@ -107,6 +140,7 @@ export function LectureTestPage() {
   }
 
   async function handleAnalyzePdf() {
+    console.log(`${LOG} handleAnalyzePdf`, { pdfFile: pdfFile && { name: pdfFile.name, size: pdfFile.size } });
     if (!pdfFile) return;
     setError(null);
     setAnalyzingPdf(true);
@@ -114,8 +148,10 @@ export function LectureTestPage() {
       const form = new FormData();
       form.append("file", pdfFile);
       const result = await postFile<PdfAnalysis>("/api/lecture/analyze-pdf", form, session!.access_token);
+      console.log(`${LOG} handleAnalyzePdf success`, result);
       setPdfAnalysis(result);
     } catch (e) {
+      console.error(`${LOG} handleAnalyzePdf failed:`, e);
       setError(e instanceof Error ? e.message : String(e));
     } finally {
       setAnalyzingPdf(false);
@@ -123,10 +159,11 @@ export function LectureTestPage() {
   }
 
   async function handleRewritePass2() {
+    console.log(`${LOG} handleRewritePass2`, { hasPdfAnalysis: Boolean(pdfAnalysis) });
     if (!transcript || !pass1) return;
     setError(null);
     setRewriting(true);
-    setDocument("");
+    setFinalDocument("");
     try {
       const res = await fetch("/api/lecture/rewrite-pass2", {
         method: "POST",
@@ -141,8 +178,10 @@ export function LectureTestPage() {
           pdfAnalysis: pdfAnalysis ?? undefined,
         }),
       });
+      console.log(`${LOG} rewrite-pass2 -> ${res.status}`);
       if (!res.ok || !res.body) {
         const err = await res.json().catch(() => ({ error: res.statusText }));
+        console.error(`${LOG} rewrite-pass2 error body:`, err);
         throw new Error(err.error ?? `HTTP ${res.status}`);
       }
       const reader = res.body.getReader();
@@ -153,9 +192,11 @@ export function LectureTestPage() {
         const { done, value } = await reader.read();
         if (done) break;
         acc += decoder.decode(value, { stream: true });
-        setDocument(acc);
+        setFinalDocument(acc);
       }
+      console.log(`${LOG} handleRewritePass2 done, ${acc.length} chars`);
     } catch (e) {
+      console.error(`${LOG} handleRewritePass2 failed:`, e);
       setError(e instanceof Error ? e.message : String(e));
     } finally {
       setRewriting(false);
@@ -281,9 +322,9 @@ export function LectureTestPage() {
         >
           {rewriting ? "Génération…" : "Réécrire"}
         </button>
-        {document && (
+        {finalDocument && (
           <pre className="mt-2 max-h-[32rem] overflow-auto whitespace-pre-wrap rounded bg-gray-100 p-3">
-            {document}
+            {finalDocument}
           </pre>
         )}
       </section>
