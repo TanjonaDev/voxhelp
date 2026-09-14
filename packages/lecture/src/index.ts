@@ -7,3 +7,4 @@ export * from "./analyze.js";
 export * from "./pdf/index.js";
 export type { CallJSON } from "./analyze.js";
 export * from "./pass2/index.js";
+export * from "./stt/index.js";
