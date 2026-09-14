@@ -53,7 +53,7 @@ describe("POST /api/lecture/analyze-pass1", () => {
       expect.any(String),
       expect.any(String),
       "claude-sonnet-4-6",
-      8192,
+      16000,
       0
     );
   });

@@ -131,7 +131,7 @@ export function registerRoutes(app: FastifyInstance): void {
 
     try {
       const output = await analyzePass1(input, (system, user) =>
-        callClaudeJSON(system, user, "claude-sonnet-4-6", 8192, 0)
+        callClaudeJSON(system, user, "claude-sonnet-4-6", 16000, 0)
       );
       return reply.send(output);
     } catch (err) {
@@ -235,7 +235,7 @@ export function registerRoutes(app: FastifyInstance): void {
 
     try {
       const analysis = await analyzePdf(file.filename, pages, (system, user) =>
-        callClaudeJSON(system, user, "claude-sonnet-4-6", 8192, 0)
+        callClaudeJSON(system, user, "claude-sonnet-4-6", 16000, 0)
       );
       return reply.send(analysis);
     } catch (err) {
