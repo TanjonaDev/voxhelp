@@ -151,8 +151,9 @@ export function registerRoutes(app: FastifyInstance): void {
     } catch {
       return reply.code(400).send({ error: "Unsupported or missing file (audio only)" });
     }
-    if (!file || !file.mimetype.startsWith("audio/")) {
-      return reply.code(400).send({ error: "Unsupported or missing file (audio only)" });
+    const isMedia = file && (file.mimetype.startsWith("audio/") || file.mimetype.startsWith("video/"));
+    if (!file || !isMedia) {
+      return reply.code(400).send({ error: "Unsupported or missing file (audio or video only)" });
     }
 
     const language = (file.fields.language as { value?: string } | undefined)?.value ?? "fr";

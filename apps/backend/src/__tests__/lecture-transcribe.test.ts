@@ -86,7 +86,20 @@ describe("POST /api/lecture/transcribe-audio", () => {
     });
   });
 
-  it("rejects a non-audio upload with 400", async () => {
+  it("accepts a video container upload (e.g. .m4v screen/lecture recordings)", async () => {
+    server = await createTestHttpServer();
+    mockTranscribeAudioBatch.mockResolvedValueOnce([]);
+
+    const res = await fetch(`http://127.0.0.1:${server.port}/api/lecture/transcribe-audio`, {
+      method: "POST",
+      body: buildForm({ mimetype: "video/x-m4v", filename: "cours.m4v" }),
+    });
+
+    expect(res.status).toBe(200);
+    expect(mockTranscribeAudioBatch).toHaveBeenCalledTimes(1);
+  });
+
+  it("rejects a non-audio, non-video upload with 400", async () => {
     server = await createTestHttpServer();
 
     const res = await fetch(`http://127.0.0.1:${server.port}/api/lecture/transcribe-audio`, {
