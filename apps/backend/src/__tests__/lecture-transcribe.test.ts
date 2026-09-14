@@ -6,23 +6,13 @@ const mockTranscribeAudioBatch = vi.hoisted(() => vi.fn());
 vi.mock("../deepgram-batch.js", () => ({ transcribeAudioBatch: mockTranscribeAudioBatch }));
 vi.mock("../supabase.js", () => ({ supabaseAdmin: null }));
 
-function buildForm(options: {
-  mimetype?: string;
-  filename?: string;
-  language?: string;
-  existingGlossary?: unknown;
-}): FormData {
-  const form = new FormData();
-  form.append(
-    "file",
-    new Blob([Buffer.from("fake audio content")], { type: options.mimetype ?? "audio/mpeg" }),
-    options.filename ?? "cours.mp3"
-  );
-  if (options.language !== undefined) form.append("language", options.language);
-  if (options.existingGlossary !== undefined) {
-    form.append("existingGlossary", JSON.stringify(options.existingGlossary));
+function buildUrl(port: number, params: { language?: string; existingGlossary?: unknown } = {}): string {
+  const url = new URL(`http://127.0.0.1:${port}/api/lecture/transcribe-audio`);
+  if (params.language !== undefined) url.searchParams.set("language", params.language);
+  if (params.existingGlossary !== undefined) {
+    url.searchParams.set("existingGlossary", JSON.stringify(params.existingGlossary));
   }
-  return form;
+  return url.toString();
 }
 
 describe("POST /api/lecture/transcribe-audio", () => {
@@ -36,15 +26,16 @@ describe("POST /api/lecture/transcribe-audio", () => {
     await server.close();
   });
 
-  it("returns the mapped transcript for a valid audio upload", async () => {
+  it("streams the raw request body to Deepgram and returns the mapped transcript", async () => {
     server = await createTestHttpServer();
     mockTranscribeAudioBatch.mockResolvedValueOnce([
       { start: 0, end: 4.5, confidence: 0.92, transcript: "Alors, on commence." },
     ]);
 
-    const res = await fetch(`http://127.0.0.1:${server.port}/api/lecture/transcribe-audio`, {
+    const res = await fetch(buildUrl(server.port, { language: "fr" }), {
       method: "POST",
-      body: buildForm({ language: "fr" }),
+      headers: { "content-type": "audio/mpeg" },
+      body: Buffer.from("fake audio content"),
     });
 
     expect(res.status).toBe(200);
@@ -52,15 +43,17 @@ describe("POST /api/lecture/transcribe-audio", () => {
     expect(body.transcript).toEqual([
       { startMs: 0, endMs: 4500, text: "Alors, on commence.", confidence: 0.92 },
     ]);
+    expect(mockTranscribeAudioBatch).toHaveBeenCalledWith(expect.any(Buffer), { language: "fr", keyterms: [] });
   });
 
   it("defaults language to fr when not provided", async () => {
     server = await createTestHttpServer();
     mockTranscribeAudioBatch.mockResolvedValueOnce([]);
 
-    await fetch(`http://127.0.0.1:${server.port}/api/lecture/transcribe-audio`, {
+    await fetch(buildUrl(server.port), {
       method: "POST",
-      body: buildForm({}),
+      headers: { "content-type": "audio/mpeg" },
+      body: Buffer.from("fake audio content"),
     });
 
     expect(mockTranscribeAudioBatch).toHaveBeenCalledWith(expect.any(Buffer), { language: "fr", keyterms: [] });
@@ -70,15 +63,19 @@ describe("POST /api/lecture/transcribe-audio", () => {
     server = await createTestHttpServer();
     mockTranscribeAudioBatch.mockResolvedValueOnce([]);
 
-    await fetch(`http://127.0.0.1:${server.port}/api/lecture/transcribe-audio`, {
-      method: "POST",
-      body: buildForm({
+    await fetch(
+      buildUrl(server.port, {
         existingGlossary: [
           { term: "Septante", heardVariants: [], category: "proper_noun", occurrences: 3, confidence: 0.9 },
           { term: "truc", heardVariants: [], category: "concept", occurrences: 1, confidence: 0.3 },
         ],
       }),
-    });
+      {
+        method: "POST",
+        headers: { "content-type": "audio/mpeg" },
+        body: Buffer.from("fake audio content"),
+      }
+    );
 
     expect(mockTranscribeAudioBatch).toHaveBeenCalledWith(expect.any(Buffer), {
       language: "fr",
@@ -90,21 +87,23 @@ describe("POST /api/lecture/transcribe-audio", () => {
     server = await createTestHttpServer();
     mockTranscribeAudioBatch.mockResolvedValueOnce([]);
 
-    const res = await fetch(`http://127.0.0.1:${server.port}/api/lecture/transcribe-audio`, {
+    const res = await fetch(buildUrl(server.port), {
       method: "POST",
-      body: buildForm({ mimetype: "video/x-m4v", filename: "cours.m4v" }),
+      headers: { "content-type": "video/x-m4v" },
+      body: Buffer.from("fake video content"),
     });
 
     expect(res.status).toBe(200);
     expect(mockTranscribeAudioBatch).toHaveBeenCalledTimes(1);
   });
 
-  it("rejects a non-audio, non-video upload with 400", async () => {
+  it("rejects a non-audio, non-video content-type with 400", async () => {
     server = await createTestHttpServer();
 
-    const res = await fetch(`http://127.0.0.1:${server.port}/api/lecture/transcribe-audio`, {
+    const res = await fetch(buildUrl(server.port), {
       method: "POST",
-      body: buildForm({ mimetype: "text/plain", filename: "notes.txt" }),
+      headers: { "content-type": "text/plain" },
+      body: Buffer.from("notes"),
     });
 
     expect(res.status).toBe(400);
@@ -113,13 +112,13 @@ describe("POST /api/lecture/transcribe-audio", () => {
 
   it("returns 400 for malformed existingGlossary JSON", async () => {
     server = await createTestHttpServer();
-    const form = new FormData();
-    form.append("file", new Blob([Buffer.from("fake audio")], { type: "audio/mpeg" }), "cours.mp3");
-    form.append("existingGlossary", "{not valid json");
+    const url = new URL(`http://127.0.0.1:${server.port}/api/lecture/transcribe-audio`);
+    url.searchParams.set("existingGlossary", "{not valid json");
 
-    const res = await fetch(`http://127.0.0.1:${server.port}/api/lecture/transcribe-audio`, {
+    const res = await fetch(url.toString(), {
       method: "POST",
-      body: form,
+      headers: { "content-type": "audio/mpeg" },
+      body: Buffer.from("fake audio"),
     });
 
     expect(res.status).toBe(400);
@@ -130,9 +129,10 @@ describe("POST /api/lecture/transcribe-audio", () => {
     server = await createTestHttpServer();
     mockTranscribeAudioBatch.mockRejectedValueOnce(new Error("Deepgram error"));
 
-    const res = await fetch(`http://127.0.0.1:${server.port}/api/lecture/transcribe-audio`, {
+    const res = await fetch(buildUrl(server.port), {
       method: "POST",
-      body: buildForm({}),
+      headers: { "content-type": "audio/mpeg" },
+      body: Buffer.from("fake audio content"),
     });
 
     expect(res.status).toBe(502);

@@ -11,7 +11,7 @@ const PORT = Number(process.env.PORT) || 3001;
 const CORS_ORIGIN = process.env.CORS_ORIGIN || "http://localhost:5173";
 
 async function main() {
-  const app = Fastify({ logger: true });
+  const app = Fastify({ logger: true, bodyLimit: 200 * 1024 * 1024 });
 
   await app.register(cors, { origin: CORS_ORIGIN });
   await app.register(websocket);
