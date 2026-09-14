@@ -8,9 +8,13 @@ import {
   analyzePdf,
   rewritePass2,
   pdfAnalysisSchema,
+  selectKeyterms,
+  mapUtterancesToSegments,
   type Pass1Input,
   type Pass2Input,
+  type GlossaryEntry,
 } from "@voxhelp/lecture";
+import { transcribeAudioBatch } from "./deepgram-batch.js";
 
 const MIMETYPE_TO_FORMAT: Record<string, CvFormat> = {
   "application/pdf": "pdf",
@@ -125,6 +129,63 @@ export function registerRoutes(app: FastifyInstance): void {
     } catch (err) {
       console.error("[Routes] Lecture pass1 analysis failed:", err instanceof Error ? err.message : err);
       return reply.code(502).send({ error: "Lecture analysis failed" });
+    }
+  });
+
+  app.post("/api/lecture/transcribe-audio", async (request, reply) => {
+    if (supabaseAdmin) {
+      const auth = request.headers.authorization;
+      const token = auth?.startsWith("Bearer ") ? auth.slice(7) : null;
+      if (!token) {
+        return reply.code(401).send({ error: "Missing token" });
+      }
+      const { data, error } = await supabaseAdmin.auth.getUser(token);
+      if (error || !data.user) {
+        return reply.code(401).send({ error: "Invalid token" });
+      }
+    }
+
+    let file: Awaited<ReturnType<typeof request.file>>;
+    try {
+      file = await request.file();
+    } catch {
+      return reply.code(400).send({ error: "Unsupported or missing file (audio only)" });
+    }
+    if (!file || !file.mimetype.startsWith("audio/")) {
+      return reply.code(400).send({ error: "Unsupported or missing file (audio only)" });
+    }
+
+    const language = (file.fields.language as { value?: string } | undefined)?.value ?? "fr";
+
+    const existingGlossaryRaw = (file.fields.existingGlossary as { value?: string } | undefined)?.value;
+    let existingGlossary: GlossaryEntry[] = [];
+    if (existingGlossaryRaw !== undefined) {
+      try {
+        const parsed = JSON.parse(existingGlossaryRaw);
+        if (!Array.isArray(parsed)) throw new Error("existingGlossary must be an array");
+        existingGlossary = parsed;
+      } catch {
+        return reply.code(400).send({ error: "Invalid existingGlossary JSON" });
+      }
+    }
+
+    let buffer: Buffer;
+    try {
+      buffer = await file.toBuffer();
+    } catch {
+      return reply.code(400).send({ error: "Failed to read uploaded file" });
+    }
+
+    try {
+      const utterances = await transcribeAudioBatch(buffer, {
+        language,
+        keyterms: selectKeyterms(existingGlossary),
+      });
+      const transcript = mapUtterancesToSegments(utterances);
+      return reply.send({ transcript });
+    } catch (err) {
+      console.error("[Routes] Audio transcription failed:", err instanceof Error ? err.message : err);
+      return reply.code(502).send({ error: "Audio transcription failed" });
     }
   });
 
