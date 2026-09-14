@@ -47,6 +47,12 @@ describe("buildPass1SystemPrompt", () => {
     expect(prompt).toContain("EXACTEMENT");
     expect(prompt).toContain("jamais une traduction française");
   });
+
+  it("warns that glossary category and reference type don't share a vocabulary (regression: real run returned category \"work\")", () => {
+    const prompt = buildPass1SystemPrompt();
+    expect(prompt).toContain("ne partagent PAS\nle même vocabulaire");
+    expect(prompt).toContain('n\'existe QUE pour le champ "type" des références');
+  });
 });
 
 describe("buildPass1UserPrompt", () => {

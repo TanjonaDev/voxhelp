@@ -93,7 +93,13 @@ RÈGLES ABSOLUES :
 Les valeurs de "type" et "category" doivent être EXACTEMENT l'un des tokens
 anglais listés ci-dessus, jamais une traduction française. Les champs
 "sourceLanguage", "shortDefinition" et "normalized" sont à omettre
-entièrement (pas de null, pas de chaîne vide) quand ils ne s'appliquent pas.`;
+entièrement (pas de null, pas de chaîne vide) quand ils ne s'appliquent pas.
+
+ATTENTION : "category" (glossaire) et "type" (références) ne partagent PAS
+le même vocabulaire. Le titre d'une œuvre citée (livre, article, catéchisme)
+n'est jamais une "category" de glossaire valide : s'il t'intéresse comme
+terme récurrent mal transcrit, classe-le en "proper_noun" ; le type "work"
+n'existe QUE pour le champ "type" des références.`;
 }
 
 function formatExistingGlossary(glossary: GlossaryEntry[]): string {
