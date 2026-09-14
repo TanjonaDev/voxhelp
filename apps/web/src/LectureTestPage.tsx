@@ -148,12 +148,37 @@ export function LectureTestPage() {
     }
   }
 
+  // Re-analyzes the selected PDFs only if they haven't been analyzed yet
+  // (i.e. the count still matches), so Pass 1 can be re-run freely without
+  // re-hitting analyze-pdf every time.
+  async function ensurePdfAnalyses(): Promise<PdfAnalysis[]> {
+    if (pdfFiles.length === 0) return [];
+    if (pdfAnalyses.length === pdfFiles.length) return pdfAnalyses;
+    console.log(`${LOG} ensurePdfAnalyses`, { files: pdfFiles.map((f) => ({ name: f.name, size: f.size })) });
+    setAnalyzingPdf(true);
+    try {
+      const results: PdfAnalysis[] = [];
+      for (const pdfFile of pdfFiles) {
+        const form = new FormData();
+        form.append("file", pdfFile);
+        const result = await postFile<PdfAnalysis>("/api/lecture/analyze-pdf", form, session!.access_token);
+        console.log(`${LOG} ensurePdfAnalyses success for ${pdfFile.name}`, result);
+        results.push(result);
+      }
+      setPdfAnalyses(results);
+      return results;
+    } finally {
+      setAnalyzingPdf(false);
+    }
+  }
+
   async function handleAnalyzePass1() {
     console.log(`${LOG} handleAnalyzePass1`, { segments: transcript?.length, course });
     if (!transcript) return;
     setError(null);
     setAnalyzing(true);
     try {
+      await ensurePdfAnalyses();
       const result = await postJson<Pass1Output>(
         "/api/lecture/analyze-pass1",
         { transcript, course, existingGlossary },
@@ -166,29 +191,6 @@ export function LectureTestPage() {
       setError(e instanceof Error ? e.message : String(e));
     } finally {
       setAnalyzing(false);
-    }
-  }
-
-  async function handleAnalyzePdfs() {
-    console.log(`${LOG} handleAnalyzePdfs`, { files: pdfFiles.map((f) => ({ name: f.name, size: f.size })) });
-    if (pdfFiles.length === 0) return;
-    setError(null);
-    setAnalyzingPdf(true);
-    try {
-      const results: PdfAnalysis[] = [];
-      for (const pdfFile of pdfFiles) {
-        const form = new FormData();
-        form.append("file", pdfFile);
-        const result = await postFile<PdfAnalysis>("/api/lecture/analyze-pdf", form, session!.access_token);
-        console.log(`${LOG} handleAnalyzePdfs success for ${pdfFile.name}`, result);
-        results.push(result);
-      }
-      setPdfAnalyses(results);
-    } catch (e) {
-      console.error(`${LOG} handleAnalyzePdfs failed:`, e);
-      setError(e instanceof Error ? e.message : String(e));
-    } finally {
-      setAnalyzingPdf(false);
     }
   }
 
@@ -328,20 +330,20 @@ export function LectureTestPage() {
 
       <section className="mb-6 rounded border bg-white p-4">
         <h2 className="font-bold mb-2">2. Supports PDF (optionnel, un ou plusieurs)</h2>
+        <p className="text-xs text-gray-600 mb-2">
+          Analysés automatiquement au lancement du Pass 1 ci-dessous.
+        </p>
         <div className="flex items-center gap-2 mb-2">
           <input
             type="file"
             accept="application/pdf"
             multiple
-            onChange={(e) => setPdfFiles(Array.from(e.target.files ?? []))}
+            onChange={(e) => {
+              setPdfFiles(Array.from(e.target.files ?? []));
+              setPdfAnalyses([]);
+            }}
           />
-          <button
-            className="rounded bg-black text-white px-3 py-1 disabled:opacity-40"
-            disabled={pdfFiles.length === 0 || analyzingPdf}
-            onClick={handleAnalyzePdfs}
-          >
-            {analyzingPdf ? "Analyse…" : `Analyser ${pdfFiles.length > 1 ? `les ${pdfFiles.length} PDF` : "le PDF"}`}
-          </button>
+          {analyzingPdf && <span className="text-xs text-gray-600">Analyse des PDF…</span>}
         </div>
         {pdfFiles.length > 0 && (
           <p className="text-xs text-gray-600 mb-2">{pdfFiles.map((f) => f.name).join(", ")}</p>
