@@ -11,7 +11,10 @@ const PORT = Number(process.env.PORT) || 3001;
 const CORS_ORIGIN = process.env.CORS_ORIGIN || "http://localhost:5173";
 
 async function main() {
-  const app = Fastify({ logger: true, bodyLimit: 200 * 1024 * 1024 });
+  // 2GB: covers a ~2h course recording (audio/video, raw-body upload for
+  // /api/lecture/transcribe-audio). The multipart plugin below has its own,
+  // much smaller limit for CV/PDF uploads.
+  const app = Fastify({ logger: true, bodyLimit: 2 * 1024 * 1024 * 1024 });
 
   await app.register(cors, { origin: CORS_ORIGIN });
   await app.register(websocket);

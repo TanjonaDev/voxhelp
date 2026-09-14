@@ -8,7 +8,7 @@ export interface TestHttpServer {
 }
 
 export async function createTestHttpServer(): Promise<TestHttpServer> {
-  const app = Fastify({ logger: false, bodyLimit: 200 * 1024 * 1024 });
+  const app = Fastify({ logger: false, bodyLimit: 2 * 1024 * 1024 * 1024 });
   await app.register(multipart, { limits: { fileSize: 200 * 1024 * 1024 } });
   registerRoutes(app);
 
