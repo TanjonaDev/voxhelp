@@ -10,6 +10,9 @@ export interface TestHttpServer {
 export async function createTestHttpServer(): Promise<TestHttpServer> {
   const app = Fastify({ logger: false, bodyLimit: 2 * 1024 * 1024 * 1024 });
   await app.register(multipart, { limits: { fileSize: 200 * 1024 * 1024 } });
+  app.addContentTypeParser("application/octet-stream", { parseAs: "buffer" }, (_req, body, done) => {
+    done(null, body);
+  });
   registerRoutes(app);
 
   await app.listen({ port: 0, host: "127.0.0.1" });

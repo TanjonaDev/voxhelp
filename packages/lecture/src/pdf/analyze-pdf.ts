@@ -10,17 +10,41 @@ import { formatZodError } from "../schemas.js";
 
 export type CallJSON = (system: string, user: string) => Promise<unknown>;
 
+type ValidationOutcome = { success: true; data: PdfAnalysis } | { success: false; errorMessage: string };
+
+/**
+ * callJSON can throw instead of returning invalid data — e.g. a response
+ * truncated at maxTokens breaks JSON.parse before schema validation even
+ * runs (real run: a dense Word-exported PDF hit this). Without this, that
+ * exception would skip the retry entirely and fail outright on the first
+ * attempt. Treat a thrown parse error the same as a validation failure, and
+ * nudge the retry toward brevity since truncation, not shape, was the cause.
+ */
+async function callAndValidate(system: string, prompt: string, callJSON: CallJSON): Promise<ValidationOutcome> {
+  let raw: unknown;
+  try {
+    raw = await callJSON(system, prompt);
+  } catch (err) {
+    const message = err instanceof Error ? err.message : String(err);
+    return {
+      success: false,
+      errorMessage: `Réponse illisible (${message}) — probablement tronquée avant la fin du JSON. Sois plus concis (moins de blocs, contenu plus court par bloc) pour tenir dans la limite de tokens.`,
+    };
+  }
+  const result = pdfAnalysisSchema.safeParse(raw);
+  if (result.success) return { success: true, data: result.data };
+  return { success: false, errorMessage: formatZodError(result.error) };
+}
+
 async function runAnalysisWithRetry(system: string, userPrompt: string, callJSON: CallJSON): Promise<PdfAnalysis> {
-  const first = await callJSON(system, userPrompt);
-  const firstResult = pdfAnalysisSchema.safeParse(first);
-  if (firstResult.success) return firstResult.data;
+  const first = await callAndValidate(system, userPrompt, callJSON);
+  if (first.success) return first.data;
 
-  const retryPrompt = buildPdfAnalysisRetryPrompt(userPrompt, formatZodError(firstResult.error));
-  const second = await callJSON(system, retryPrompt);
-  const secondResult = pdfAnalysisSchema.safeParse(second);
-  if (secondResult.success) return secondResult.data;
+  const retryPrompt = buildPdfAnalysisRetryPrompt(userPrompt, first.errorMessage);
+  const second = await callAndValidate(system, retryPrompt, callJSON);
+  if (second.success) return second.data;
 
-  throw new Error(`PDF analysis failed after retry: ${formatZodError(secondResult.error)}`);
+  throw new Error(`PDF analysis failed after retry: ${second.errorMessage}`);
 }
 
 export async function analyzePdf(

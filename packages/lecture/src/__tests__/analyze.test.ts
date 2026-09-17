@@ -44,6 +44,29 @@ describe("analyzePass1 — single call", () => {
     expect(retryUserPrompt).toContain("N'A PAS PU ÊTRE VALIDÉE");
   });
 
+  it("clamps an oversized oneLineSummary instead of retrying/failing (regression: real run went over 120 chars)", async () => {
+    const oversized = "x".repeat(140);
+    const callJSON = vi.fn().mockResolvedValueOnce(
+      validOutput({
+        plan: [
+          {
+            index: 0,
+            title: "Section",
+            startMs: 0,
+            endMs: 1000,
+            oneLineSummary: oversized,
+            type: "content",
+            confidence: 0.9,
+          },
+        ],
+      })
+    );
+    const result = await analyzePass1(baseInput, callJSON);
+    expect(callJSON).toHaveBeenCalledTimes(1);
+    expect(result.plan[0].oneLineSummary.length).toBe(120);
+    expect(result.plan[0].oneLineSummary.endsWith("…")).toBe(true);
+  });
+
   it("throws an explicit error when the retry also fails validation", async () => {
     const callJSON = vi
       .fn()

@@ -52,9 +52,10 @@ describe("POST /api/lecture/analyze-pass1", () => {
     expect(mockCallClaudeJSON).toHaveBeenCalledWith(
       expect.any(String),
       expect.any(String),
-      "claude-sonnet-4-6",
+      "claude-sonnet-5",
       16000,
-      0
+      undefined,
+      true
     );
   });
 

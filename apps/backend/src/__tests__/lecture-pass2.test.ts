@@ -51,9 +51,10 @@ describe("POST /api/lecture/rewrite-pass2", () => {
       expect.any(String),
       expect.any(String),
       expect.any(Function),
-      "claude-sonnet-4-6",
+      "claude-sonnet-5",
       32000,
-      0.3
+      undefined,
+      true
     );
   });
 

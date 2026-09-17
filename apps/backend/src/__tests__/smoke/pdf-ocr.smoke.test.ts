@@ -30,7 +30,8 @@ describe.skipIf(!process.env.ANTHROPIC_API_KEY)("smoke: PDF OCR fallback (real C
     const analysis = await analyzePdfOcr(
       "scanned-page.pdf",
       Math.max(pages.length, 1),
-      (system, user) => callClaudeJSONWithPdf(system, user, buffer.toString("base64"), "claude-sonnet-4-6", 16000, 0)
+      (system, user) =>
+        callClaudeJSONWithPdf(system, user, buffer.toString("base64"), "claude-sonnet-5", 16000, undefined, true)
     );
 
     console.log(`\n--- OCR blocks ---\n${JSON.stringify(analysis.blocks, null, 2)}`);

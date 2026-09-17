@@ -1,5 +1,6 @@
 // VoxHelp overlay — UI primitives
-import { useState, useRef } from "react";
+import { useState, useRef, forwardRef } from "react";
+import type { ButtonHTMLAttributes, HTMLAttributes, InputHTMLAttributes, ReactNode, SelectHTMLAttributes } from "react";
 import type { Insight } from "@voxhelp/shared";
 
 // ---------------------------------------------------------------------------
@@ -285,5 +286,260 @@ export function GhostBtn({ icon, label, onClick, active, fill, size = 30, iconSi
     >
       <VIcon name={icon} size={iconSize} fill={fill} />
     </button>
+  );
+}
+
+// ═══════════════════════════════════════════════════════════════════════════
+// "transcript de cours" screens primitives — theme-agnostic class-name
+// wrappers (.input, .field, .seg, .card, …). Styled by whichever scoped
+// theme stylesheet is the current ancestor (theme-v2.css under
+// "cours-theme"); unrelated to the dark glass primitives above (VIcon,
+// VHMark, GhostBtn, ...), which back the Prep/Live/Report overlay and are
+// untouched.
+// ═══════════════════════════════════════════════════════════════════════════
+
+function cx(...parts: Array<string | false | undefined>): string {
+  return parts.filter(Boolean).join(" ");
+}
+
+// ---------------------------------------------------------------------------
+// VoxHelpGlyph — the brand mark's "V" glyph (assets/logo/voxhelp-glyph.svg),
+// inlined so it can take `currentColor` and sit in any background square.
+// ---------------------------------------------------------------------------
+interface VoxHelpGlyphProps {
+  size?: number;
+  className?: string;
+}
+
+export function VoxHelpGlyph({ size = 14, className = "" }: VoxHelpGlyphProps) {
+  return (
+    <svg
+      width={size}
+      height={(size * 32) / 28}
+      viewBox="18 16 28 32"
+      role="img"
+      aria-label="VoxHelp"
+      className={className}
+    >
+      <path d="M18 16h9l5 20.5L37 16h9l-10.5 32h-7z" fill="currentColor" />
+    </svg>
+  );
+}
+
+// ---------------------------------------------------------------------------
+// Input / Select / Field — form controls, styled by the active theme's
+// .input/.field rules (theme-v2.css under .cours-theme).
+// ---------------------------------------------------------------------------
+export const Input = forwardRef<HTMLInputElement, InputHTMLAttributes<HTMLInputElement>>(
+  function Input({ className = "", ...rest }, ref) {
+    return <input ref={ref} className={cx("input", className)} {...rest} />;
+  }
+);
+
+export const Select = forwardRef<HTMLSelectElement, SelectHTMLAttributes<HTMLSelectElement>>(
+  function Select({ className = "", children, ...rest }, ref) {
+    return (
+      <select ref={ref} className={cx("input", className)} {...rest}>
+        {children}
+      </select>
+    );
+  }
+);
+
+interface FieldProps extends HTMLAttributes<HTMLDivElement> {
+  label: string;
+  htmlFor?: string;
+}
+
+export function Field({ label, htmlFor, className = "", children, ...rest }: FieldProps) {
+  return (
+    <div className={cx("field", className)} {...rest}>
+      <label htmlFor={htmlFor}>{label}</label>
+      {children}
+    </div>
+  );
+}
+
+// ---------------------------------------------------------------------------
+// Segmented — control built on native radio inputs (arrow-key navigation,
+// native :focus-visible). Never render this as a row of <button>s.
+// ---------------------------------------------------------------------------
+interface SegmentedOption<T extends string> {
+  value: T;
+  label: string;
+}
+
+interface SegmentedProps<T extends string> {
+  name: string;
+  options: SegmentedOption<T>[];
+  value: T;
+  onChange: (value: T) => void;
+  className?: string;
+}
+
+export function Segmented<T extends string>({ name, options, value, onChange, className = "" }: SegmentedProps<T>) {
+  return (
+    <div className={cx("seg", className)} role="radiogroup">
+      {options.map((option) => (
+        <label key={option.value} className="seg-opt">
+          <input
+            type="radio"
+            name={name}
+            value={option.value}
+            checked={value === option.value}
+            onChange={() => onChange(option.value)}
+          />
+          {option.label}
+        </label>
+      ))}
+    </div>
+  );
+}
+
+// ---------------------------------------------------------------------------
+// Card — transparent hairline-bordered box.
+// ---------------------------------------------------------------------------
+type CardProps = HTMLAttributes<HTMLDivElement>;
+
+export function Card({ className = "", children, ...rest }: CardProps) {
+  return (
+    <div className={cx("card", className)} {...rest}>
+      {children}
+    </div>
+  );
+}
+
+// ═══════════════════════════════════════════════════════════════════════════
+// v2 "Arrondi" primitives — for the transcript-de-cours screens, replacing
+// the angular Industry direction. Render classes from theme-v2.css (.pill-*,
+// .file-chip, .progress-card) and only take effect inside an ancestor
+// carrying the "cours-theme" class. Card/Field/Input/Select/Segmented above
+// are theme-agnostic (pure class-name wrappers) and are reused unchanged —
+// theme-v2.css redefines .card/.field/.input/.seg under .cours-theme.
+// ═══════════════════════════════════════════════════════════════════════════
+
+// ---------------------------------------------------------------------------
+// PillButton — default (bordered pill) / primary (Analyser) / ghost, with an
+// optional round icon-only shape.
+// ---------------------------------------------------------------------------
+type PillButtonVariant = "default" | "primary" | "ghost";
+
+interface PillButtonProps extends ButtonHTMLAttributes<HTMLButtonElement> {
+  variant?: PillButtonVariant;
+  round?: boolean;
+  small?: boolean;
+  running?: boolean;
+}
+
+export function PillButton({
+  variant = "default",
+  round = false,
+  small = false,
+  running = false,
+  className = "",
+  children,
+  ...rest
+}: PillButtonProps) {
+  const base = variant === "primary" ? "pill-btn-primary" : cx("pill-btn", variant === "ghost" && "pill-btn-ghost");
+  return (
+    <button
+      className={cx(base, round && "pill-btn-round", round && small && "pill-btn-sm", className)}
+      data-running={variant === "primary" && running ? "true" : undefined}
+      {...rest}
+    >
+      {children}
+    </button>
+  );
+}
+
+// ---------------------------------------------------------------------------
+// PillTabs — floating screen-navigation tabs (Nouveau cours / Lecture).
+// ---------------------------------------------------------------------------
+interface PillTabsOption<T extends string> {
+  value: T;
+  label: string;
+  disabled?: boolean;
+}
+
+interface PillTabsProps<T extends string> {
+  options: PillTabsOption<T>[];
+  value: T;
+  onChange: (value: T) => void;
+  className?: string;
+}
+
+export function PillTabs<T extends string>({ options, value, onChange, className = "" }: PillTabsProps<T>) {
+  return (
+    <div className={cx("pill-tabs", className)} role="tablist">
+      {options.map((option) => (
+        <button
+          key={option.value}
+          type="button"
+          role="tab"
+          aria-selected={value === option.value}
+          data-active={value === option.value ? "true" : undefined}
+          disabled={option.disabled}
+          onClick={() => onChange(option.value)}
+          className="pill-tab"
+        >
+          {option.label}
+        </button>
+      ))}
+    </div>
+  );
+}
+
+// ---------------------------------------------------------------------------
+// FileChip — pill-shaped row for an attached PDF (leading icon, truncated
+// name, round remove button).
+// ---------------------------------------------------------------------------
+interface FileChipProps {
+  icon: ReactNode;
+  name: string;
+  onRemove: () => void;
+  removeIcon: ReactNode;
+  removeLabel?: string;
+  className?: string;
+}
+
+export function FileChip({ icon, name, onRemove, removeIcon, removeLabel = "Retirer", className = "" }: FileChipProps) {
+  return (
+    <div className={cx("file-chip", className)}>
+      {icon}
+      <span className="file-chip-name min-w-0 flex-1 truncate">{name}</span>
+      <button type="button" className="file-chip-remove" onClick={onRemove} aria-label={removeLabel}>
+        {removeIcon}
+      </button>
+    </div>
+  );
+}
+
+// ---------------------------------------------------------------------------
+// ProgressCard — analysis progress (title, percentage, pill track, pulsing
+// dot, status line).
+// ---------------------------------------------------------------------------
+interface ProgressCardProps {
+  title: string;
+  percent: number;
+  running: boolean;
+  statusText: string;
+  className?: string;
+}
+
+export function ProgressCard({ title, percent, running, statusText, className = "" }: ProgressCardProps) {
+  return (
+    <div className={cx("progress-card", className)}>
+      <div className="flex items-center justify-between">
+        <h3 className="font-cours-heading text-[18px] font-semibold">{title}</h3>
+        <span className="tabular-nums text-[13px]">{Math.round(percent)}%</span>
+      </div>
+      <div className="progress-track mt-[12px]">
+        <div className="progress-fill" style={{ width: `${percent}%` }} />
+      </div>
+      <div className="mt-[12px] flex items-center gap-[8px]">
+        <span className={cx("progress-dot", running && "pulsing")} />
+        <span className="text-[13px] text-cours-text-tertiary">{statusText}</span>
+      </div>
+    </div>
   );
 }

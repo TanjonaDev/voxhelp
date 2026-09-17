@@ -19,6 +19,11 @@ async function main() {
   await app.register(cors, { origin: CORS_ORIGIN });
   await app.register(websocket);
   await app.register(multipart, { limits: { fileSize: 2 * 1024 * 1024 * 1024 } });
+  // Raw body for chunked audio uploads (/api/lecture/audio-chunk) — each
+  // chunk is sent as a plain octet-stream, not multipart/JSON.
+  app.addContentTypeParser("application/octet-stream", { parseAs: "buffer" }, (_req, body, done) => {
+    done(null, body);
+  });
   registerRoutes(app);
 
   app.get("/health", async () => ({ status: "ok", timestamp: Date.now() }));

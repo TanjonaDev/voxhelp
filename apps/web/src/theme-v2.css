@@ -1,0 +1,296 @@
+/* "Arrondi" theme — v2 of the "transcript de cours" screens
+   (design_handoff_v2_arrondi/). Replaces the earlier angular "Industry"
+   direction (theme-industry.css). Everything is scoped under .cours-theme
+   so it never leaks into the dark glass theme used by the Prep/Live/Report
+   overlay (apps/web/src/index.css, bare :root). */
+@import url('https://fonts.googleapis.com/css2?family=Barlow:wght@400;500;600&family=Barlow+Condensed:wght@600&display=swap');
+
+.cours-theme {
+  --color-accent: #5980a6;
+  --color-accent-dark: #2c455d;
+  --color-accent-tint: #eef3f8;
+  --color-ink: #1d1f20;
+  --color-text-secondary: #6b6a67;
+  --color-text-tertiary: #8a8885;
+  --color-text-faint: #a3a09c;
+  --color-text-faint-2: #b5b2ae;
+
+  --color-surface: #ffffff;
+  --color-surface-soft: #faf9f7;
+  --color-chip: #f2f1ee;
+  --color-chip-2: #f6f5f3;
+  --color-hairline: #ecebe8;
+  --color-field-border: #e0dedb;
+  --color-field-border-hover: #cfccc7;
+  --color-dropzone-bg: #f7fafc;
+  --color-tab-active-bg: #1d1f20;
+
+  --font-heading: "Barlow Condensed", system-ui, sans-serif;
+  --font-heading-weight: 600;
+  --font-body: "Barlow", system-ui, sans-serif;
+
+  --radius-card: 22px;
+  --radius-lg: 18px;
+  --radius-chapter: 12px;
+  --radius-field: 11px;
+  --radius-audio-row: 14px;
+  --radius-pill: 999px;
+
+  --shadow-card: 0 1px 2px rgba(29, 31, 32, 0.05), 0 18px 48px -16px rgba(29, 31, 32, 0.28);
+  --shadow-tabs: 0 1px 2px rgba(29, 31, 32, 0.06);
+  --shadow-toggle-active: 0 1px 2px rgba(29, 31, 32, 0.1);
+  --shadow-btn-primary: 0 6px 18px -8px rgba(89, 128, 166, 0.8);
+
+  min-height: 100vh;
+  margin: 0;
+  padding: 28px 24px 44px;
+  color: var(--color-ink);
+  font-family: var(--font-body);
+  font-size: 15px;
+  line-height: 1.55;
+  font-weight: 400;
+  background:
+    radial-gradient(120% 90% at 12% 8%, #cfd6dc 0%, rgba(207, 214, 220, 0) 58%),
+    radial-gradient(100% 80% at 88% 14%, #e8d7bd 0%, rgba(232, 215, 189, 0) 62%),
+    radial-gradient(130% 110% at 50% 100%, #b9bfc4 0%, rgba(185, 191, 196, 0) 55%),
+    linear-gradient(170deg, #dfdcd6 0%, #cdd1d3 100%);
+  background-color: #e8e6e1;
+}
+
+.cours-theme, .cours-theme *, .cours-theme *::before, .cours-theme *::after {
+  box-sizing: border-box;
+}
+
+.cours-theme h1, .cours-theme h2, .cours-theme h3,
+.cours-theme h4, .cours-theme h5, .cours-theme h6 {
+  font-family: var(--font-heading); font-weight: var(--font-heading-weight);
+  line-height: 1.12; margin: 0;
+}
+.cours-theme p { margin: 0; }
+.cours-theme :focus { outline: none; }
+.cours-theme :focus-visible { outline: 2px solid var(--color-accent); outline-offset: 2px; }
+.cours-theme ::selection { background: #d6ebff; }
+
+/* — application card: radius is carried by children, never by an
+   overflow:hidden wrapper (that would make the card the scroll ancestor and
+   break every sticky element inside — header, rail, toolbar). — */
+.cours-theme .app-card {
+  max-width: 1120px; margin: 0 auto;
+  background: var(--color-surface);
+  border-radius: var(--radius-card);
+  box-shadow: var(--shadow-card);
+  /* NEVER add overflow:hidden here to clip the radius: it would make this
+     card the scroll ancestor of its sticky descendants (header, rail,
+     toolbar), which would then stop sticking. The radius is carried by the
+     children instead (app-header/app-rail/app-text-column/app-upload-body
+     below) and their backgrounds tile flush into this card's rounded shape
+     without needing any clipping. */
+}
+.cours-theme .app-header {
+  border-radius: var(--radius-card) var(--radius-card) 0 0;
+}
+.cours-theme .app-rail {
+  border-radius: 0 0 0 var(--radius-card);
+}
+.cours-theme .app-text-column {
+  border-radius: 0 0 var(--radius-card) 0;
+}
+.cours-theme .app-upload-body {
+  border-radius: 0 0 var(--radius-card) var(--radius-card);
+}
+
+/* — floating pill tabs (screen navigation) — */
+.cours-theme .pill-tabs {
+  display: inline-flex; gap: 4px; padding: 5px; border-radius: var(--radius-pill);
+  background: rgba(255, 255, 255, 0.62);
+  backdrop-filter: blur(10px);
+  box-shadow: var(--shadow-tabs);
+}
+.cours-theme .pill-tab {
+  display: inline-flex; align-items: center; justify-content: center;
+  height: 34px; padding: 0 20px; border-radius: var(--radius-pill);
+  font-family: var(--font-heading); font-weight: var(--font-heading-weight);
+  font-size: 13.5px; color: var(--color-text-tertiary);
+  background: transparent; border: none; cursor: pointer;
+}
+.cours-theme .pill-tab[data-active="true"] {
+  background: var(--color-tab-active-bg); color: #ffffff;
+}
+.cours-theme .pill-tab:disabled { opacity: 0.5; cursor: not-allowed; }
+
+/* — pill buttons — */
+.cours-theme .pill-btn {
+  display: inline-flex; align-items: center; justify-content: center; gap: 6px;
+  height: 34px; padding: 0 18px; border-radius: var(--radius-pill);
+  font-family: var(--font-heading); font-weight: var(--font-heading-weight);
+  font-size: 14px; cursor: pointer; border: 1px solid var(--color-field-border);
+  background: transparent; color: var(--color-ink);
+  transition: background-color 0.15s, border-color 0.15s, color 0.15s;
+}
+.cours-theme .pill-btn:hover { border-color: var(--color-field-border-hover); }
+.cours-theme .pill-btn:disabled { opacity: 0.45; cursor: not-allowed; }
+.cours-theme .pill-btn-ghost {
+  border-color: transparent; background: transparent; color: var(--color-text-tertiary);
+}
+.cours-theme .pill-btn-ghost:hover { background: #e8e6e2; color: var(--color-ink); }
+.cours-theme .pill-btn-round {
+  width: 28px; height: 28px; padding: 0; border-radius: 50%;
+}
+.cours-theme .pill-btn-round.pill-btn-sm { width: 24px; height: 24px; }
+
+/* — primary Analyser button — */
+.cours-theme .pill-btn-primary {
+  height: 44px; padding: 0 30px; border-radius: var(--radius-pill);
+  font-family: var(--font-heading); font-weight: var(--font-heading-weight);
+  font-size: 18px; letter-spacing: 0.02em; cursor: pointer; border: none;
+  background: var(--color-accent); color: #ffffff;
+  box-shadow: var(--shadow-btn-primary);
+  transition: background-color 0.15s, box-shadow 0.15s;
+}
+.cours-theme .pill-btn-primary:disabled {
+  opacity: 0.45; cursor: not-allowed; box-shadow: none;
+}
+.cours-theme .pill-btn-primary[data-running="true"] {
+  background: var(--color-chip); color: #5d5d60; box-shadow: none;
+}
+
+/* — form fields — */
+.cours-theme .field > label {
+  display: block; font-size: 12.5px; font-weight: 500; margin-bottom: 6px;
+  color: var(--color-text-secondary);
+}
+.cours-theme .input {
+  width: 100%; height: 38px; padding: 0 12px; font: inherit;
+  font-size: 14px; color: var(--color-ink);
+  background: var(--color-surface);
+  border: 1px solid var(--color-field-border); border-radius: var(--radius-field);
+}
+.cours-theme .input:hover { border-color: var(--color-field-border-hover); }
+.cours-theme .input:focus-visible { border-color: var(--color-accent); outline-offset: 0; }
+
+/* — segmented toggle (Réécrit / Brut / …), built on native radios — */
+.cours-theme .seg {
+  display: inline-flex; padding: 4px; gap: 3px; border-radius: var(--radius-pill);
+  background: var(--color-chip);
+}
+.cours-theme .seg-opt {
+  display: inline-flex; align-items: center; justify-content: center;
+  height: 30px; padding: 0 16px; border-radius: var(--radius-pill);
+  font-size: 13.5px; font-weight: 500; color: var(--color-text-tertiary);
+  cursor: pointer;
+}
+.cours-theme .seg-opt input {
+  position: absolute; opacity: 0; width: 0; height: 0; pointer-events: none;
+}
+.cours-theme .seg-opt:has(input:checked) {
+  background: var(--color-surface); color: var(--color-ink); font-weight: 600;
+  box-shadow: var(--shadow-toggle-active);
+}
+.cours-theme .seg-opt:has(input:focus-visible) { outline: 2px solid var(--color-accent); outline-offset: 2px; }
+
+/* — cards (Supports PDF, Contexte du cours) — */
+.cours-theme .card {
+  border-radius: var(--radius-lg);
+  border: 1px solid var(--color-hairline);
+  background: var(--color-surface);
+  padding: 20px;
+}
+.cours-theme .card-title {
+  font-family: var(--font-heading); font-weight: var(--font-heading-weight);
+  font-size: 20px; line-height: 1.1;
+}
+
+/* — file chips (PDF list entries) — */
+.cours-theme .file-chip {
+  display: flex; align-items: center; gap: 10px;
+  border-radius: var(--radius-pill); background: var(--color-chip-2);
+  padding: 7px 8px 7px 14px;
+}
+.cours-theme .file-chip-name { font-size: 13.5px; }
+
+/* — audio dropzone + attached file row — */
+.cours-theme .dropzone {
+  display: flex; flex-direction: column; align-items: center; justify-content: center;
+  border-radius: var(--radius-lg);
+  border: 1.5px dashed var(--color-accent);
+  background: var(--color-dropzone-bg);
+  padding: 30px 22px; text-align: center; cursor: pointer;
+}
+.cours-theme .dropzone[data-attached="true"] {
+  border-color: var(--color-field-border-hover);
+  background: var(--color-surface);
+}
+.cours-theme .audio-row {
+  display: flex; align-items: center; gap: 12px;
+  border-radius: var(--radius-audio-row); background: var(--color-chip-2);
+  padding: 12px 14px;
+}
+.cours-theme .file-chip-remove, .cours-theme .audio-row-remove {
+  display: grid; place-items: center; flex: none; cursor: pointer;
+  border: none; background: transparent; border-radius: 50%;
+  color: var(--color-text-tertiary);
+}
+.cours-theme .file-chip-remove:hover, .cours-theme .audio-row-remove:hover {
+  background: #e8e6e2; color: var(--color-ink);
+}
+.cours-theme .file-chip-remove { width: 24px; height: 24px; }
+.cours-theme .audio-row-remove { width: 28px; height: 28px; }
+
+/* — progress card — */
+.cours-theme .progress-card {
+  border-radius: var(--radius-lg); background: var(--color-surface-soft);
+  padding: 20px;
+}
+.cours-theme .progress-track {
+  height: 6px; border-radius: var(--radius-pill); background: #e8e6e2;
+  overflow: hidden;
+}
+.cours-theme .progress-fill {
+  height: 100%; border-radius: var(--radius-pill); background: var(--color-accent);
+}
+.cours-theme .progress-dot {
+  width: 7px; height: 7px; border-radius: 50%; background: var(--color-accent);
+}
+.cours-theme .progress-dot.pulsing {
+  animation: cours-dot-pulse 1.2s ease-in-out infinite;
+}
+@keyframes cours-dot-pulse {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.4; }
+}
+
+/* — condensed content fade-in — */
+/* Synthèse/fiche de révision are buffered and pushed to the DOM as a whole
+   (no progressive streaming) so the reader isn't scrolled along by growing
+   text. Appearing instantly still reads as abrupt, so it fades+lifts in
+   once instead of popping in unstyled. */
+.cours-theme .cours-fade-in {
+  animation: cours-fade-in 0.35s ease-out;
+}
+@keyframes cours-fade-in {
+  from { opacity: 0; transform: translateY(4px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+/* — rail chapter buttons — */
+.cours-theme .chapter-btn {
+  display: block; width: 100%; text-align: left; cursor: pointer;
+  border: none; background: transparent;
+  border-radius: var(--radius-chapter); padding: 9px 12px;
+  font-size: 13.5px; color: var(--color-ink);
+}
+.cours-theme .chapter-btn[data-active="true"] {
+  background: var(--color-accent-tint); color: var(--color-accent-dark); font-weight: 600;
+}
+
+/* — avatar — */
+.cours-theme .avatar {
+  display: grid; place-items: center; border-radius: var(--radius-pill);
+  background: #f0efec; font-family: var(--font-heading); font-weight: var(--font-heading-weight);
+}
+
+/* — print export: only the reading column prints — */
+@media print {
+  .cours-theme [data-print-hide] { display: none !important; }
+  .cours-theme [data-print-area] { padding: 0 !important; }
+}

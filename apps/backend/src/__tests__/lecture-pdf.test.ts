@@ -54,9 +54,10 @@ describe("POST /api/lecture/analyze-pdf", () => {
     expect(mockCallClaudeJSON).toHaveBeenCalledWith(
       expect.any(String),
       expect.any(String),
-      "claude-sonnet-4-6",
-      16000,
-      0
+      "claude-sonnet-5",
+      32000,
+      undefined,
+      true
     );
   });
 
@@ -100,9 +101,10 @@ describe("POST /api/lecture/analyze-pdf", () => {
       expect.any(String),
       expect.any(String),
       Buffer.from("fake pdf content").toString("base64"),
-      "claude-sonnet-4-6",
-      16000,
-      0
+      "claude-sonnet-5",
+      32000,
+      undefined,
+      true
     );
   });
 

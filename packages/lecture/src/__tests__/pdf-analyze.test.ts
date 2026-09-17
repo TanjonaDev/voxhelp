@@ -40,4 +40,26 @@ describe("analyzePdf — single call", () => {
     await expect(analyzePdf("cours.pdf", pages, callJSON)).rejects.toThrow(/PDF analysis failed/);
     expect(callJSON).toHaveBeenCalledTimes(2);
   });
+
+  it("retries when callJSON throws (truncated response breaking JSON.parse) instead of failing outright (regression: real run hit this on a dense PDF)", async () => {
+    const callJSON = vi
+      .fn()
+      .mockRejectedValueOnce(new Error("Unterminated string in JSON at position 61216"))
+      .mockResolvedValueOnce(validOutput());
+    const result = await analyzePdf("cours.pdf", pages, callJSON);
+    expect(result.blocks).toHaveLength(1);
+    expect(callJSON).toHaveBeenCalledTimes(2);
+    const retryUserPrompt = callJSON.mock.calls[1][1] as string;
+    expect(retryUserPrompt).toContain("tronquée");
+    expect(retryUserPrompt).toContain("Sois plus concis");
+  });
+
+  it("throws an explicit error when callJSON throws on both attempts", async () => {
+    const callJSON = vi
+      .fn()
+      .mockRejectedValueOnce(new Error("Unterminated string in JSON"))
+      .mockRejectedValueOnce(new Error("Unterminated string in JSON"));
+    await expect(analyzePdf("cours.pdf", pages, callJSON)).rejects.toThrow(/PDF analysis failed/);
+    expect(callJSON).toHaveBeenCalledTimes(2);
+  });
 });

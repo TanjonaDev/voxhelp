@@ -15,6 +15,7 @@ export interface CourseContext {
   discipline?: string;
   instructor?: string;
   language: string;
+  date?: string;
 }
 
 export interface GlossaryEntry {

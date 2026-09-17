@@ -75,43 +75,59 @@ Exemples de corrections :
   }
 }
 
+// Anthropic's SDK requires streaming for requests estimated to run past ~10
+// minutes — a plain messages.create() throws instead of returning
+// ("Streaming is strongly recommended for operations that may take longer
+// than 10 minutes") once maxTokens is high enough (real run: hit this at
+// 32000 maxTokens on a dense PDF). Every call below streams internally and
+// accumulates the full text, even the JSON-returning ones that don't need
+// incremental chunks — this sidesteps the limit instead of tuning maxTokens
+// under it, which would just resurface the same failure on a bigger input.
+async function collectStreamedText(
+  params: Parameters<typeof anthropic.messages.stream>[0],
+  onChunk?: (text: string) => void
+): Promise<string> {
+  const stream = anthropic.messages.stream(params);
+  let fullText = "";
+  for await (const event of stream) {
+    if (event.type === "content_block_delta" && event.delta.type === "text_delta") {
+      fullText += event.delta.text;
+      onChunk?.(event.delta.text);
+    } else if (event.type === "message_delta" && event.delta.stop_reason === "max_tokens") {
+      console.warn("[LLM] hit max_tokens — output was truncated");
+    }
+  }
+  return fullText;
+}
+
 export async function streamAssist(
   systemPrompt: string,
   userMessage: string,
   onChunk: (text: string) => void,
   model = "claude-haiku-4-5",
   maxTokens = 1024,
-  temperature?: number
+  temperature?: number,
+  // Sonnet 5 / Opus 5 run adaptive thinking by default when `thinking` is
+  // omitted (4.6 ran thinking-off by default) — that eats into maxTokens
+  // and changes cost/latency. Callers migrating from 4.6 pass this to keep
+  // the old thinking-off behavior instead of inheriting adaptive thinking.
+  disableThinking = false
 ): Promise<string> {
-  const stream = anthropic.messages.stream({
-    model,
-    max_tokens: maxTokens,
-    system: systemPrompt,
-    messages: [{ role: "user", content: userMessage }],
-    ...(temperature !== undefined ? { temperature } : {}),
-  });
-
-  let fullText = "";
-  for await (const event of stream) {
-    if (
-      event.type === "content_block_delta" &&
-      event.delta.type === "text_delta"
-    ) {
-      const chunk = event.delta.text;
-      fullText += chunk;
-      onChunk(chunk);
-    } else if (event.type === "message_delta" && event.delta.stop_reason === "max_tokens") {
-      console.warn("[LLM] streamAssist hit max_tokens — output was truncated");
-    }
-  }
-  return fullText;
+  return collectStreamedText(
+    {
+      model,
+      max_tokens: maxTokens,
+      system: systemPrompt,
+      messages: [{ role: "user", content: userMessage }],
+      ...(temperature !== undefined ? { temperature } : {}),
+      ...(disableThinking ? { thinking: { type: "disabled" as const } } : {}),
+    },
+    onChunk
+  );
 }
 
-function parseClaudeJsonResponse<T>(message: Anthropic.Message): T {
-  const content = message.content[0];
-  if (content.type !== "text") throw new Error("Unexpected response type from Claude");
-
-  const stripped = content.text.trim().replace(/^```(?:json)?\n?/, "").replace(/\n?```$/, "");
+function parseClaudeJsonText<T>(text: string): T {
+  const stripped = text.trim().replace(/^```(?:json)?\n?/, "").replace(/\n?```$/, "");
   return JSON.parse(extractJsonPayload(stripped)) as T;
 }
 
@@ -120,17 +136,19 @@ export async function callClaudeJSON<T>(
   userMessage: string,
   model = "claude-haiku-4-5",
   maxTokens = 4096,
-  temperature?: number
+  temperature?: number,
+  disableThinking = false
 ): Promise<T> {
-  const message = await anthropic.messages.create({
+  const text = await collectStreamedText({
     model,
     max_tokens: maxTokens,
     system: systemPrompt,
     messages: [{ role: "user", content: userMessage }],
     ...(temperature !== undefined ? { temperature } : {}),
+    ...(disableThinking ? { thinking: { type: "disabled" as const } } : {}),
   });
 
-  return parseClaudeJsonResponse<T>(message);
+  return parseClaudeJsonText<T>(text);
 }
 
 /**
@@ -144,9 +162,10 @@ export async function callClaudeJSONWithPdf<T>(
   pdfBase64: string,
   model = "claude-haiku-4-5",
   maxTokens = 4096,
-  temperature?: number
+  temperature?: number,
+  disableThinking = false
 ): Promise<T> {
-  const message = await anthropic.messages.create({
+  const text = await collectStreamedText({
     model,
     max_tokens: maxTokens,
     system: systemPrompt,
@@ -160,7 +179,8 @@ export async function callClaudeJSONWithPdf<T>(
       },
     ],
     ...(temperature !== undefined ? { temperature } : {}),
+    ...(disableThinking ? { thinking: { type: "disabled" as const } } : {}),
   });
 
-  return parseClaudeJsonResponse<T>(message);
+  return parseClaudeJsonText<T>(text);
 }
