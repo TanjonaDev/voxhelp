@@ -8,9 +8,9 @@ vi.mock("@deepgram/sdk", () => ({
   },
 }));
 
-const { transcribeAudioBatch } = await import("../deepgram-batch.js");
+const { deepgramBatchStt } = await import("../stt/providers/deepgram-batch.js");
 
-describe("transcribeAudioBatch", () => {
+describe("deepgramBatchStt.transcribe", () => {
   beforeEach(() => {
     mockTranscribeFile.mockReset();
   });
@@ -21,7 +21,7 @@ describe("transcribeAudioBatch", () => {
       results: { channels: [], utterances: [] },
     });
 
-    await transcribeAudioBatch(Buffer.from("fake audio"), { language: "fr" });
+    await deepgramBatchStt.transcribe(Buffer.from("fake audio"), { language: "fr" });
 
     expect(mockTranscribeFile).toHaveBeenCalledTimes(1);
     const [buffer, options] = mockTranscribeFile.mock.calls[0];
@@ -42,7 +42,7 @@ describe("transcribeAudioBatch", () => {
       results: { channels: [], utterances: [] },
     });
 
-    await transcribeAudioBatch(Buffer.from("fake audio"), { language: "fr", keyterms: ["berakhah", "Septante"] });
+    await deepgramBatchStt.transcribe(Buffer.from("fake audio"), { language: "fr", keyterms: ["berakhah", "Septante"] });
 
     const [, options] = mockTranscribeFile.mock.calls[0];
     expect(options.keyterm).toEqual(["berakhah", "Septante"]);
@@ -54,7 +54,7 @@ describe("transcribeAudioBatch", () => {
       results: { channels: [], utterances: [] },
     });
 
-    await transcribeAudioBatch(Buffer.from("fake audio"), { language: "fr", keyterms: [] });
+    await deepgramBatchStt.transcribe(Buffer.from("fake audio"), { language: "fr", keyterms: [] });
 
     const [, options] = mockTranscribeFile.mock.calls[0];
     expect(options).not.toHaveProperty("keyterm");
@@ -67,7 +67,7 @@ describe("transcribeAudioBatch", () => {
       results: { channels: [], utterances },
     });
 
-    const result = await transcribeAudioBatch(Buffer.from("fake audio"), { language: "fr" });
+    const result = await deepgramBatchStt.transcribe(Buffer.from("fake audio"), { language: "fr" });
 
     expect(result).toEqual(utterances);
   });
@@ -78,7 +78,7 @@ describe("transcribeAudioBatch", () => {
       results: { channels: [] },
     });
 
-    const result = await transcribeAudioBatch(Buffer.from("fake audio"), { language: "fr" });
+    const result = await deepgramBatchStt.transcribe(Buffer.from("fake audio"), { language: "fr" });
 
     expect(result).toEqual([]);
   });
@@ -86,7 +86,7 @@ describe("transcribeAudioBatch", () => {
   it("throws when Deepgram returns an async/accepted response instead of a synchronous result", async () => {
     mockTranscribeFile.mockResolvedValueOnce({ request_id: "abc123" });
 
-    await expect(transcribeAudioBatch(Buffer.from("fake audio"), { language: "fr" })).rejects.toThrow(
+    await expect(deepgramBatchStt.transcribe(Buffer.from("fake audio"), { language: "fr" })).rejects.toThrow(
       /accepted/i
     );
   });

@@ -19,7 +19,7 @@ import {
   type CourseContext,
   type GlossaryEntry,
 } from "@voxhelp/lecture";
-import { transcribeAudioBatch } from "./deepgram-batch.js";
+import { getBatchStt } from "./stt/index.js";
 import { startUploadSession, writeChunk, assembleUpload, cleanupUpload } from "./audio-upload-sessions.js";
 import type { TranscriptSegment } from "@voxhelp/lecture";
 
@@ -53,7 +53,7 @@ async function runTranscription(
   language: string,
   existingGlossary: GlossaryEntry[]
 ): Promise<TranscriptSegment[]> {
-  const utterances = await transcribeAudioBatch(buffer, {
+  const utterances = await getBatchStt().transcribe(buffer, {
     language,
     keyterms: selectKeyterms(existingGlossary),
   });

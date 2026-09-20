@@ -3,7 +3,9 @@ import { createTestHttpServer, type TestHttpServer } from "./helpers/http-server
 
 const mockTranscribeAudioBatch = vi.hoisted(() => vi.fn());
 
-vi.mock("../deepgram-batch.js", () => ({ transcribeAudioBatch: mockTranscribeAudioBatch }));
+vi.mock("../stt/index.js", () => ({
+  getBatchStt: () => ({ transcribe: mockTranscribeAudioBatch }),
+}));
 vi.mock("../supabase.js", () => ({ supabaseAdmin: null }));
 
 function buildForm(options: {

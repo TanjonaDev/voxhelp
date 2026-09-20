@@ -6,11 +6,14 @@ import multipart from "@fastify/multipart";
 import { Session } from "./session.js";
 import { supabaseAdmin } from "./supabase.js";
 import { registerRoutes } from "./routes.js";
+import { assertSttConfig } from "./stt/index.js";
 
 const PORT = Number(process.env.PORT) || 3001;
 const CORS_ORIGIN = process.env.CORS_ORIGIN || "http://localhost:5173";
 
 async function main() {
+  assertSttConfig();
+
   // 2GB: covers a ~2h course recording (audio/video) uploaded as multipart
   // via /api/lecture/transcribe-audio. CV/PDF uploads are far smaller but
   // share the same plugin limit.
