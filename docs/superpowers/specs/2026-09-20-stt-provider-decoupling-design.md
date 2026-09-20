@@ -142,3 +142,34 @@ getBatchStt(): BatchStt
 2. **Adapter Inworld** avec ses tests unitaires, config d'env, `.env.example`, `CLAUDE.md`.
 3. **Validation réelle** avec la clé : trancher les questions ouvertes, régler les seuils.
 4. **Optionnel (à confirmer)** : `apps/backend/scripts/stt-compare.ts`, qui envoie un même fichier audio en temps réel à chaque fournisseur live et affiche transcripts et nombre de tours, pour comparer Flux et Inworld sans passer par Google Meet.
+
+## Résultats du test réel (2026-09-20)
+
+Enregistrement : cours de 103 min en français (monologue, un seul locuteur). Extrait 0:00–10:00 rejoué en temps réel (16 kHz mono) avec `scripts/stt-compare.ts`, Flux et Inworld en parallèle, `language=fr`, sans keyterms, avec 4 s de silence diffusé en fin de flux. Aucune erreur des deux côtés.
+
+**Réponses aux questions ouvertes**
+1. Format de `language` : `fr` est accepté. `fr-FR` non testé.
+2. Placement des seuils : la config (`endOfTurnConfidenceThreshold` à la racine de `transcribeConfig`, `minEndOfTurnSilenceWhenConfident` / `maxTurnSilence` sous `inworldSttV1Config`) est acceptée sans erreur. Inférence : le serveur rejette normalement les champs inconnus, donc le placement est valide ; l'effet réel des valeurs reste à mesurer.
+3. Sens de `isFinal` : un seul final par tour, avec le texte complet du tour ; les interim sont des révisions cumulatives du tour en cours. En parole continue, les finals arrivent à cadence quasi fixe (~30,6 s : 32,0 / 62,6 / 93,2 / 123,9 s…), ce qui correspond au plafond de durée de tour, et coupent parfois au milieu d'un groupe syntaxique. Avec les seuils de départ (0.7 / 300 ms / 1200 ms), la fin de tour par silence ne se déclenche presque jamais sur ce cours.
+4. FR/EN mélangé : non testé (enregistrement quasi exclusivement français).
+5. Chinois : non testé.
+Autres constats : auth `Basic <clé>` OK ; formes des messages conformes à l'adapter (`result.transcription`, `speechStarted`, `usage`) ; aucune erreur serveur observée, donc la forme `{ error: { message } }` reste non vérifiée.
+
+**Comparaison (10 min)**
+
+| | Flux | Inworld |
+|---|---|---|
+| Tours | 18 | 25 |
+| Mots (couverture) | 1193 | 1171 |
+| Mots par tour (médiane / max) | 28 / 276 | 58 / 71 |
+| Intervalle entre tours (médiane / max) | 13 s / 133 s | 31 s / 31 s |
+| Tours ne finissant pas par `. ? ! …` | 2/18 | 0/25 |
+| Disfluences « euh » conservées | 0 | 3 |
+| Premier tour livré | 19,9 s | 32,0 s |
+
+Qualité du texte comparable (mêmes erreurs de vocabulaire sur les sigles). Flux segmente sur les pauses (tours de 1 à 276 mots) ; Inworld segmente surtout sur la durée (~30 s), ce qui ajoute de la latence sur une parole continue et coupe des phrases.
+
+**Limites et suite**
+- Un cours n'est pas un entretien : peu de pauses, un seul locuteur. La segmentation Inworld peut être meilleure sur un audio avec alternance de locuteurs.
+- Pistes : rejouer avec un enregistrement d'entretien réel ; essayer des seuils plus courts (`maxTurnSilence` 500–800 ms, `endOfTurnConfidenceThreshold` plus bas) pour que la fin de tour se déclenche sur les pauses ; tester `language` omis pour le FR/EN mélangé.
+- Conclusion provisoire : ne pas basculer le défaut sur Inworld sur la base de ce test.
