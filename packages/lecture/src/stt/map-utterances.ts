@@ -1,7 +1,7 @@
 import type { TranscriptSegment } from "../types.js";
-import type { DeepgramUtterance } from "./types.js";
+import type { SttUtterance } from "./types.js";
 
-export function mapUtterancesToSegments(utterances: DeepgramUtterance[] | undefined): TranscriptSegment[] {
+export function mapUtterancesToSegments(utterances: SttUtterance[] | undefined): TranscriptSegment[] {
   if (!utterances) return [];
 
   const segments: TranscriptSegment[] = [];

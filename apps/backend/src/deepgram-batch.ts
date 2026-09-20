@@ -1,5 +1,5 @@
 import { DeepgramClient } from "@deepgram/sdk";
-import type { DeepgramUtterance } from "@voxhelp/lecture";
+import type { SttUtterance } from "@voxhelp/lecture";
 
 export interface TranscribeBatchOptions {
   language: string;
@@ -9,7 +9,7 @@ export interface TranscribeBatchOptions {
 export async function transcribeAudioBatch(
   buffer: Buffer,
   options: TranscribeBatchOptions
-): Promise<DeepgramUtterance[]> {
+): Promise<SttUtterance[]> {
   const client = new DeepgramClient();
 
   const response = await client.listen.v1.media.transcribeFile(

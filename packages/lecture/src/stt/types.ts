@@ -1,4 +1,4 @@
-export interface DeepgramUtterance {
+export interface SttUtterance {
   start?: number;
   end?: number;
   confidence?: number;
