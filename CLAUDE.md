@@ -42,7 +42,7 @@ pnpm --filter @voxhelp/shared add <package>
 - **Langage** : TypeScript strict, ESM (`"type": "module"`)
 - **Frontend** : React 19, Vite 6, Tailwind CSS 3.4
 - **Backend** : Fastify 5, @fastify/websocket
-- **STT** : Deepgram Flux Multilingual streaming v2 (PCM 16kHz mono) + correction Haiku
+- **STT** : ports `LiveStt` / `BatchStt` (`apps/backend/src/stt/`), fournisseur choisi par env — live : Deepgram Flux Multilingual streaming v2 (défaut) ou Inworld STT (PCM 16kHz mono) + correction Haiku ; batch (cours) : Deepgram Nova-3
 - **LLM** : Claude Sonnet 4.6 via @anthropic-ai/sdk (JSON)
 
 ## Conventions
@@ -57,7 +57,10 @@ pnpm --filter @voxhelp/shared add <package>
 ## Variables d'environnement
 
 Fichier `apps/backend/.env` (copier `.env.example`) :
-- `DEEPGRAM_API_KEY` — STT streaming
+- `DEEPGRAM_API_KEY` — STT live (Flux) et batch (Nova-3)
+- `STT_LIVE_PROVIDER` — `deepgram` (défaut) ou `inworld`
+- `STT_BATCH_PROVIDER` — `deepgram` (seule valeur pour l'instant)
+- `INWORLD_API_KEY` — clé « Basic (Base64) » du portail Inworld (uniquement si `STT_LIVE_PROVIDER=inworld`)
 - `ANTHROPIC_API_KEY` — Claude Sonnet (assist + JSON)
 - `PORT` — port backend (default 3001)
 - `CORS_ORIGIN` — origin frontend (default http://localhost:5173)
@@ -70,7 +73,7 @@ Flux demo complet :
 
 **Live** :
 1. Frontend capture l'audio de l'onglet → PCM 16kHz mono base64 (ScriptProcessorNode + RMS VAD)
-2. `audio:chunk` via WebSocket → Deepgram Flux v2 streaming STT (end-of-turn detection intégré)
+2. `audio:chunk` via WebSocket → STT streaming via `createLiveStt` (Deepgram Flux v2 par défaut, détection de fin de tour intégrée)
 3. `transcript:final` → correction Haiku → Claude JSON live-assist
 4. Résultats poussés au frontend : `assist:chunk`, `tech:translation`
 5. Recruiter coche questions (`question:mark-asked`) et note critères (`criterion:score`)
@@ -81,6 +84,7 @@ Flux demo complet :
 
 - `packages/shared/src/index.ts` — Tous les types (ClientMessage, ServerMessage, domaine)
 - `apps/backend/src/session.ts` — Orchestrateur par connexion WebSocket
+- `apps/backend/src/stt/` — Ports STT (`types.ts`), sélection par env (`index.ts`), adapters (`providers/`)
 - `apps/backend/src/llm.ts` — `generateFromPrompt` (streaming) + `callClaudeJSON<T>` (JSON)
 - `apps/backend/src/routes.ts` — Routes REST (`/api/analyze-job`, `/api/generate-report`)
 - `apps/backend/src/prompts/` — Prompts métier (job-analysis, live-assist, tech-translate, report)

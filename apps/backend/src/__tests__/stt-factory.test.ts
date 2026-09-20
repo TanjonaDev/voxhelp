@@ -1,11 +1,20 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
 
 const flux = vi.hoisted(() => ({ ctorArgs: null as unknown[] | null }));
+const inworld = vi.hoisted(() => ({ ctorArgs: null as unknown[] | null }));
 
 vi.mock("../stt/providers/deepgram-flux.js", () => ({
   FluxSTT: class MockFluxSTT {
     constructor(...args: unknown[]) {
       flux.ctorArgs = args;
+    }
+  },
+}));
+
+vi.mock("../stt/providers/inworld-live.js", () => ({
+  InworldSTT: class MockInworldSTT {
+    constructor(...args: unknown[]) {
+      inworld.ctorArgs = args;
     }
   },
 }));
@@ -23,6 +32,7 @@ beforeEach(() => {
   delete process.env.STT_LIVE_PROVIDER;
   delete process.env.STT_BATCH_PROVIDER;
   flux.ctorArgs = null;
+  inworld.ctorArgs = null;
 });
 
 describe("createLiveStt", () => {
@@ -31,6 +41,16 @@ describe("createLiveStt", () => {
 
     expect(stt).toBeDefined();
     expect(flux.ctorArgs).toEqual(["fr", ["Kubernetes"], callbacks]);
+  });
+
+  it("creates the Inworld adapter when STT_LIVE_PROVIDER=inworld", () => {
+    process.env.STT_LIVE_PROVIDER = "inworld";
+
+    const stt = createLiveStt({ language: "en", keyterms: ["Cléo"] }, callbacks);
+
+    expect(stt).toBeDefined();
+    expect(inworld.ctorArgs).toEqual(["en", ["Cléo"], callbacks]);
+    expect(flux.ctorArgs).toBeNull();
   });
 
   it("throws on an unknown STT_LIVE_PROVIDER, listing the valid values", () => {

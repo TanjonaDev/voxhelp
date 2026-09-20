@@ -1,5 +1,6 @@
 import { FluxSTT } from "./providers/deepgram-flux.js";
 import { deepgramBatchStt } from "./providers/deepgram-batch.js";
+import { InworldSTT } from "./providers/inworld-live.js";
 import type { BatchStt, LiveStt, LiveSttCallbacks, LiveSttOptions } from "./types.js";
 
 type LiveSttFactory = (options: LiveSttOptions, callbacks: LiveSttCallbacks) => LiveStt;
@@ -8,6 +9,7 @@ const DEFAULT_PROVIDER = "deepgram";
 
 const LIVE_PROVIDERS: Record<string, LiveSttFactory> = {
   deepgram: (options, callbacks) => new FluxSTT(options.language, options.keyterms, callbacks),
+  inworld: (options, callbacks) => new InworldSTT(options.language, options.keyterms, callbacks),
 };
 
 const BATCH_PROVIDERS: Record<string, BatchStt> = {
