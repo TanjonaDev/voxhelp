@@ -77,7 +77,7 @@ interface BatchStt {
 getBatchStt(): BatchStt
 ```
 
-`DeepgramUtterance` est renommé `SttUtterance` dans `packages/lecture` (`stt/types.ts`, `stt/map-utterances.ts`, son test, et l'import backend). Même forme : `start`, `end`, `confidence`, `transcript`.
+`DeepgramUtterance` est renommé `SttUtterance` dans `packages/lecture` (`stt/types.ts`, `stt/map-utterances.ts`, son test, et l'import backend). Même forme, inchangée : tous les champs optionnels (`start`, `end`, `confidence`, `transcript`, `speaker`).
 
 ### Règles communes
 
