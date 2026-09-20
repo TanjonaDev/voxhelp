@@ -1,3 +1,16 @@
+// NON VÉRIFIÉ contre l'API Inworld réelle — voir la spec
+// docs/superpowers/specs/2026-09-20-stt-provider-decoupling-design.md,
+// section « Questions ouvertes ». Hypothèses à confirmer au premier test réel :
+// - `language` : "fr" vs "fr-FR", et FR/EN mélangés (auto-détection ?) (Q1, Q4)
+// - `endOfTurnConfidenceThreshold` : racine de transcribeConfig vs sous
+//   `inworldSttV1Config` (Q2) ; valeurs de seuils = simples valeurs de départ
+// - `isFinal` : un tour entier ou une phrase ? Conditionne le mapping 1:1
+//   final -> onTranscript (Q3)
+// - Authentification `Authorization: Basic <clé>` (clé du portail déjà en Base64)
+// - `inactivityTimeoutSeconds` volontairement omis : une longue pause pourrait
+//   fermer le flux
+// - Support streaming de `es` et `pt` (seul `zh` est bloqué explicitement) (Q5)
+// - Forme des messages d'erreur serveur (`error.message`)
 import WebSocket from "ws";
 import { AUDIO_SAMPLE_RATE } from "@voxhelp/shared";
 import type { InterviewLanguage } from "@voxhelp/shared";
@@ -145,12 +158,15 @@ export class InworldSTT implements LiveStt {
   private handleMessage(raw: string): void {
     if (this.closed) return;
 
-    let message: InworldServerMessage;
+    let parsed: unknown;
     try {
-      message = JSON.parse(raw) as InworldServerMessage;
+      parsed = JSON.parse(raw);
     } catch {
       return;
     }
+    // Donnée tierce non fiable : "null", un nombre, etc. sont du JSON valide.
+    if (typeof parsed !== "object" || parsed === null) return;
+    const message = parsed as InworldServerMessage;
 
     if (message.error) {
       this.callbacks.onError(message.error.message ?? "Inworld STT error");

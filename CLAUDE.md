@@ -58,7 +58,7 @@ pnpm --filter @voxhelp/shared add <package>
 
 Fichier `apps/backend/.env` (copier `.env.example`) :
 - `DEEPGRAM_API_KEY` — STT live (Flux) et batch (Nova-3)
-- `STT_LIVE_PROVIDER` — `deepgram` (défaut) ou `inworld`
+- `STT_LIVE_PROVIDER` — `deepgram` (défaut) ou `inworld` (expérimental : non validé contre l'API réelle, `zh` non supporté)
 - `STT_BATCH_PROVIDER` — `deepgram` (seule valeur pour l'instant)
 - `INWORLD_API_KEY` — clé « Basic (Base64) » du portail Inworld (uniquement si `STT_LIVE_PROVIDER=inworld`)
 - `ANTHROPIC_API_KEY` — Claude Sonnet (assist + JSON)

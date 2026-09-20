@@ -164,6 +164,19 @@ describe("InworldSTT", () => {
     expect(callbacks.onTranscript).toHaveBeenCalledWith("Bonjour tout le monde.");
   });
 
+  it("ignores non-object JSON payloads without throwing", async () => {
+    const callbacks = makeCallbacks();
+    const stt = new InworldSTT("fr", undefined, callbacks);
+    const socket = await startConnected(stt);
+
+    for (const payload of ["null", "42", '"text"', "true"]) {
+      expect(() => socket.emit("message", Buffer.from(payload))).not.toThrow();
+    }
+
+    expect(callbacks.onTranscript).not.toHaveBeenCalled();
+    expect(callbacks.onError).not.toHaveBeenCalled();
+  });
+
   it("sends closeStream and closes the socket on close()", async () => {
     const stt = new InworldSTT("fr", undefined, makeCallbacks());
     const socket = await startConnected(stt);
