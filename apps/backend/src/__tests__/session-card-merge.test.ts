@@ -13,14 +13,14 @@ interface STTCallbacks {
 const stt = vi.hoisted(() => ({ callbacks: null as STTCallbacks | null }));
 const mockLlm = vi.hoisted(() => ({ streamAssist: vi.fn() }));
 
-vi.mock("../deepgram-flux.js", () => ({
-  FluxSTT: class MockFluxSTT {
-    constructor(_lang: string, _keywords: string[] | undefined, callbacks: STTCallbacks) {
-      stt.callbacks = callbacks;
-    }
-    async start() { stt.callbacks?.onListening(); }
-    sendAudio() {}
-    close() {}
+vi.mock("../stt/index.js", () => ({
+  createLiveStt: (_options: unknown, callbacks: STTCallbacks) => {
+    stt.callbacks = callbacks;
+    return {
+      async start() { stt.callbacks?.onListening(); },
+      sendAudio() {},
+      close() {},
+    };
   },
 }));
 

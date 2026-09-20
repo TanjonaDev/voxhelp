@@ -1,10 +1,5 @@
 import { DeepgramClient } from "@deepgram/sdk";
-
-interface FluxSTTCallbacks {
-  onTranscript: (text: string) => void;
-  onListening: () => void;
-  onError: (error: string) => void;
-}
+import type { LiveStt, LiveSttCallbacks } from "../types.js";
 
 interface FluxConnection {
   on(event: "message", cb: (msg: { type?: string; event?: string; transcript?: string }) => void): void;
@@ -16,14 +11,14 @@ interface FluxConnection {
   close(): void;
 }
 
-export class FluxSTT {
+export class FluxSTT implements LiveStt {
   private connection: FluxConnection | null = null;
-  private callbacks: FluxSTTCallbacks;
+  private callbacks: LiveSttCallbacks;
   private language: string;
   private keywords: string[] | undefined;
   private closed = false;
 
-  constructor(language: string, keywords: string[] | undefined, callbacks: FluxSTTCallbacks) {
+  constructor(language: string, keywords: string[] | undefined, callbacks: LiveSttCallbacks) {
     this.callbacks = callbacks;
     this.language = language;
     this.keywords = keywords;

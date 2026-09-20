@@ -15,15 +15,15 @@ const stt = vi.hoisted(() => ({
 }));
 const mockLlm = vi.hoisted(() => ({ streamAssist: vi.fn(), callClaudeJSON: vi.fn() }));
 
-vi.mock("../deepgram-flux.js", () => ({
-  FluxSTT: class MockFluxSTT {
-    constructor(_lang: string, keywords: string[] | undefined, callbacks: STTCallbacks) {
-      stt.callbacks = callbacks;
-      stt.lastKeywords = keywords;
-    }
-    async start() { stt.callbacks?.onListening(); }
-    sendAudio() {}
-    close() {}
+vi.mock("../stt/index.js", () => ({
+  createLiveStt: (options: { keyterms?: string[] }, callbacks: STTCallbacks) => {
+    stt.callbacks = callbacks;
+    stt.lastKeywords = options.keyterms;
+    return {
+      async start() { stt.callbacks?.onListening(); },
+      sendAudio() {},
+      close() {},
+    };
   },
 }));
 
@@ -60,7 +60,7 @@ describe("Session keyword passthrough", () => {
     await server.close();
   });
 
-  it("passes SessionConfig.keywords to the FluxSTT constructor", async () => {
+  it("passes SessionConfig.keywords to createLiveStt as keyterms", async () => {
     server = await createTestServer();
     ws = await connectAndStart(server.port, ["Cléo", "RMC BFM", "Kubernetes"]);
 

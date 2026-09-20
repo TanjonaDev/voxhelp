@@ -8,7 +8,7 @@ vi.mock("@deepgram/sdk", () => ({
   },
 }));
 
-const { FluxSTT } = await import("../deepgram-flux.js");
+const { FluxSTT } = await import("../stt/providers/deepgram-flux.js");
 
 function fakeConnection() {
   return {

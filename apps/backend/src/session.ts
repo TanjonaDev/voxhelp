@@ -4,7 +4,8 @@ import type {
   Insight, CandidateReport, JobContext, TranscriptEntry,
 } from "@voxhelp/shared";
 import { createId } from "@voxhelp/shared";
-import { FluxSTT } from "./deepgram-flux.js";
+import { createLiveStt } from "./stt/index.js";
+import type { LiveStt } from "./stt/types.js";
 import { streamAssist, callClaudeJSON, correctTranscript } from "./llm.js";
 import { buildLiveAssistPrompt, buildFinalAnalysisPrompt } from "@voxhelp/recruit";
 import { supabaseAdmin } from "./supabase.js";
@@ -19,7 +20,7 @@ interface ProfileUsage {
 export class Session {
   private ws: WebSocket;
   private userId: string | null;
-  private stt: FluxSTT | null = null;
+  private stt: LiveStt | null = null;
   private config: SessionConfig | null = null;
   private jobContext: JobContext | undefined = undefined;
   private candidateName: string | undefined = undefined;
@@ -139,11 +140,14 @@ export class Session {
     this.sessionStartMs = Date.now();
 
     this.stt?.close();
-    this.stt = new FluxSTT(config.language, config.keywords, {
-      onTranscript: (text) => void this.handleFinalTranscript(text),
-      onListening: () => console.log("[Session] Deepgram Flux connected"),
-      onError: (err) => this.send({ type: "session:error", error: err }),
-    });
+    this.stt = createLiveStt(
+      { language: config.language, keyterms: config.keywords },
+      {
+        onTranscript: (text) => void this.handleFinalTranscript(text),
+        onListening: () => console.log("[Session] STT connected"),
+        onError: (err) => this.send({ type: "session:error", error: err }),
+      }
+    );
 
     void this.stt.start();
 
@@ -151,7 +155,7 @@ export class Session {
     this.send({ type: "session:ready", sessionId });
     console.log(`[Session] Started: language=${config.language}, jobContext=${config.jobContext ? config.jobContext.title : "none"}`);
     console.log(
-      `[Session] Keywords for Deepgram keyterm boosting: ${config.keywords && config.keywords.length > 0 ? `[${config.keywords.join(", ")}] (${config.keywords.length} termes)` : "aucun"}`
+      `[Session] Keyterms for STT boosting: ${config.keywords && config.keywords.length > 0 ? `[${config.keywords.join(", ")}] (${config.keywords.length} termes)` : "aucun"}`
     );
   }
 
