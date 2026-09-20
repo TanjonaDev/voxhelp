@@ -13,7 +13,10 @@ const execFileAsync = promisify(execFile);
 
 const CHUNK_MS = 100;
 const BYTES_PER_CHUNK = (AUDIO_SAMPLE_RATE * 2 * CHUNK_MS) / 1000;
-const TAIL_MS = 4000; // laisse les derniers tours se finaliser
+// Après le dernier chunk, on continue d'envoyer du silence pendant TAIL_MS : la détection de fin de tour
+// se base sur le silence reçu, sans lui le dernier tour ne se finaliserait jamais. Dans l'app, l'audio
+// est diffusé en continu, donc le silence arrive naturellement.
+const TAIL_MS = 4000;
 
 const USAGE =
   "Usage: STT_LIVE_PROVIDER=<deepgram|inworld> tsx scripts/stt-compare.ts <audio-file> [language]\n" +
@@ -119,7 +122,11 @@ async function main(): Promise<void> {
     stt.sendAudio(pcm.subarray(i, i + BYTES_PER_CHUNK));
     await sleep(CHUNK_MS);
   }
-  await sleep(TAIL_MS);
+  const silence = Buffer.alloc(BYTES_PER_CHUNK);
+  for (let elapsed = 0; elapsed < TAIL_MS; elapsed += CHUNK_MS) {
+    stt.sendAudio(silence);
+    await sleep(CHUNK_MS);
+  }
   stt.close();
   console.log(`--- ${turns} tour(s) en ${stamp()}`);
   process.exit(0);
