@@ -30,6 +30,8 @@ export class InworldSTT implements LiveStt {
   private keyterms: string[] | undefined;
   private configSent = false;
   private closed = false;
+  // Un échec de socket émet "error" puis "close" : un seul onError par connexion.
+  private connectionErrorReported = false;
 
   constructor(language: InterviewLanguage, keyterms: string[] | undefined, callbacks: LiveSttCallbacks) {
     this.language = language;
@@ -54,6 +56,7 @@ export class InworldSTT implements LiveStt {
     );
 
     // La clé du portail est déjà en Base64 : on ne la ré-encode pas.
+    this.connectionErrorReported = false;
     const socket = new WebSocket(INWORLD_STT_URL, {
       headers: { Authorization: `Basic ${apiKey}` },
     });
@@ -62,7 +65,8 @@ export class InworldSTT implements LiveStt {
     socket.on("message", (data) => this.handleMessage(data.toString()));
 
     socket.on("error", (err) => {
-      if (!this.closed) {
+      if (!this.closed && !this.connectionErrorReported) {
+        this.connectionErrorReported = true;
         this.callbacks.onError(err.message || "Inworld connection error");
       }
     });
@@ -72,7 +76,8 @@ export class InworldSTT implements LiveStt {
     socket.on("close", (code) => {
       const wasConnected = this.configSent;
       this.configSent = false;
-      if (wasConnected && !this.closed) {
+      if (wasConnected && !this.closed && !this.connectionErrorReported) {
+        this.connectionErrorReported = true;
         this.callbacks.onError(`Inworld STT connection closed unexpectedly (code ${code})`);
       }
     });

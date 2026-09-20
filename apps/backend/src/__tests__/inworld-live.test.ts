@@ -228,7 +228,20 @@ describe("InworldSTT", () => {
 
     socket.emit("close", 1006);
 
+    expect(callbacks.onError).toHaveBeenCalledTimes(1);
     expect(callbacks.onError).toHaveBeenCalledWith(expect.stringContaining("1006"));
+  });
+
+  it("reports a single onError when a connected socket emits error then close", async () => {
+    const callbacks = makeCallbacks();
+    const stt = new InworldSTT("fr", undefined, callbacks);
+    const socket = await startConnected(stt);
+
+    socket.emit("error", new Error("ECONNRESET"));
+    socket.emit("close", 1006);
+
+    expect(callbacks.onError).toHaveBeenCalledTimes(1);
+    expect(callbacks.onError).toHaveBeenCalledWith("ECONNRESET");
   });
 
   it("stays silent when the socket closes after close()", async () => {
