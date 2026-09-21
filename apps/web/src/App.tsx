@@ -2,6 +2,7 @@ import { useState } from "react";
 import { useAuth } from "./hooks/useAuth";
 import { useWebSocket } from "./hooks/useWebSocket";
 import { useAudioCapture } from "./hooks/useAudioCapture";
+import { useSttProviders } from "./hooks/useSttProviders";
 import { OverlayPanel } from "./components/OverlayPanel";
 import { LoginPage } from "./components/LoginPage";
 import { VHMark } from "./components/ui.js";
@@ -51,9 +52,10 @@ function SessionApp({ token }: SessionAppProps) {
   const [wsUrl] = useState(() => buildWsUrl(token));
   const ws = useWebSocket(wsUrl);
   const audio = useAudioCapture(ws.sendAudio);
+  const stt = useSttProviders(token);
 
   const handleStartAudio = async (jobContext?: JobContext, keywords?: string[], candidateName?: string) => {
-    ws.startSession({ language: "fr", jobContext, keywords, candidateName });
+    ws.startSession({ language: "fr", jobContext, keywords, candidateName, sttProvider: stt.selected ?? undefined });
     try {
       await audio.startTabCapture();
     } catch {
@@ -80,6 +82,9 @@ function SessionApp({ token }: SessionAppProps) {
       isCapturing={audio.isCapturing}
       isSpeaking={audio.isSpeaking}
       lastTranscript={ws.lastTranscript}
+      sttProviders={stt.providers}
+      sttProvider={stt.selected}
+      onSttProviderChange={stt.select}
       onStartAudio={handleStartAudio}
       onStop={handleStop}
       onSummarize={ws.summarize}

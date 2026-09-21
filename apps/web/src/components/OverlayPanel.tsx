@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef } from "react";
-import type { Insight, CandidateReport, JobContext, Citation } from "@voxhelp/shared";
+import type { Insight, CandidateReport, JobContext, Citation, SttProviderInfo } from "@voxhelp/shared";
 import { useCvKeywords } from "../hooks/useCvKeywords.js";
 import { deriveStackKeywords, mergeKeywords } from "../lib/mergeKeywords.js";
 import {
@@ -11,6 +11,7 @@ import {
   VERDICT_META,
 } from "../lib/formatReport.js";
 import { VIcon, VHMark, LiveWave, StatusBadge, CategoryTag, GhostBtn } from "./ui.js";
+import { SttProviderSelect } from "./SttProviderSelect.js";
 import type { PartialCard } from "../lib/parseAssistStream.js";
 
 type WsStatus = "disconnected" | "connecting" | "connected" | "error";
@@ -51,6 +52,9 @@ interface HeaderBarProps {
   onSummarize: () => void;
   isSummarizing: boolean;
   canSummarize: boolean;
+  sttProviders: SttProviderInfo[];
+  sttProvider: string | null;
+  onSttProviderChange: (id: string) => void;
 }
 
 function HeaderBar({
@@ -64,6 +68,9 @@ function HeaderBar({
   onSummarize,
   isSummarizing,
   canSummarize,
+  sttProviders,
+  sttProvider,
+  onSttProviderChange,
 }: HeaderBarProps) {
   const statusLabel =
     status === "listening" ? "En écoute" : status === "speaking" ? "Candidat parle" : "Analyse…";
@@ -112,6 +119,13 @@ function HeaderBar({
         </div>
 
         <span style={{ flex: 1 }} />
+
+        <SttProviderSelect
+          providers={sttProviders}
+          value={sttProvider}
+          onChange={onSttProviderChange}
+          disabled={isLive}
+        />
 
         {isLive && (
           <>
@@ -874,6 +888,9 @@ export interface OverlayPanelProps {
   isSpeaking: boolean;
   lastTranscript: string;
   lastError: string | null;
+  sttProviders: SttProviderInfo[];
+  sttProvider: string | null;
+  onSttProviderChange: (id: string) => void;
   onStartAudio: (jobContext?: JobContext, keywords?: string[], candidateName?: string) => Promise<void>;
   onStop: () => void;
   onSummarize: () => void;
@@ -895,6 +912,9 @@ export function OverlayPanel({
   isSpeaking,
   lastTranscript,
   lastError,
+  sttProviders,
+  sttProvider,
+  onSttProviderChange,
   onStartAudio,
   onStop,
   onSummarize,
@@ -974,6 +994,9 @@ export function OverlayPanel({
         onSummarize={onSummarize}
         isSummarizing={isSummarizing}
         canSummarize={insights.length > 0 && !finalReport}
+        sttProviders={sttProviders}
+        sttProvider={sttProvider}
+        onSttProviderChange={onSttProviderChange}
       />
 
       {/* Error banner */}

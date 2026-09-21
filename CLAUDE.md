@@ -58,7 +58,7 @@ pnpm --filter @voxhelp/shared add <package>
 
 Fichier `apps/backend/.env` (copier `.env.example`) :
 - `DEEPGRAM_API_KEY` — STT live (Flux) et batch (Nova-3)
-- `STT_LIVE_PROVIDER` — `deepgram` (défaut) ou `inworld` (expérimental : non validé contre l'API réelle, `zh` non supporté)
+- `STT_LIVE_PROVIDER` — modèle STT live **par défaut** : `deepgram` (défaut) ou `inworld` (expérimental : non validé contre l'API réelle sur un entretien, `zh` non supporté). L'utilisateur peut en choisir un autre par session via le menu en haut à droite.
 - `STT_BATCH_PROVIDER` — `deepgram` (seule valeur pour l'instant)
 - `INWORLD_API_KEY` — clé « Basic (Base64) » du portail Inworld (uniquement si `STT_LIVE_PROVIDER=inworld`)
 - `ANTHROPIC_API_KEY` — Claude Sonnet (assist + JSON)
@@ -85,6 +85,7 @@ Flux demo complet :
 - `packages/shared/src/index.ts` — Tous les types (ClientMessage, ServerMessage, domaine)
 - `apps/backend/src/session.ts` — Orchestrateur par connexion WebSocket
 - `apps/backend/src/stt/` — Ports STT (`types.ts`), sélection par env (`index.ts`), adapters (`providers/`)
+- `apps/web/src/hooks/useSttProviders.ts` + `components/SttProviderSelect.tsx` — Menu de choix du modèle STT (liste lue sur `GET /api/stt/providers`)
 - `apps/backend/src/llm.ts` — `generateFromPrompt` (streaming) + `callClaudeJSON<T>` (JSON)
 - `apps/backend/src/routes.ts` — Routes REST (`/api/analyze-job`, `/api/generate-report`)
 - `apps/backend/src/prompts/` — Prompts métier (job-analysis, live-assist, tech-translate, report)
