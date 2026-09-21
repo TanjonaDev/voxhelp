@@ -14,7 +14,7 @@ Objectif : pouvoir changer de modèle STT au moindre effort (une variable d'env 
 
 Hors périmètre :
 - Reconnexion WebSocket automatique (priorité n°4 du CLAUDE.md, bénéficiera à tous les adapters).
-- Sélection du fournisseur par utilisateur ou par session (l'env est global).
+- Sélection du fournisseur par utilisateur ou par session (l'env est global). **Levé le 2026-09-21** : voir `2026-09-21-stt-model-selector-design.md`.
 - Fournisseur batch autre que Deepgram (l'API sync d'Inworld est limitée à ~16 Mo, inutilisable pour un cours de 2h).
 - Exploitation des `voiceProfile`, `speechStarted/Stopped` et `usage` d'Inworld.
 
