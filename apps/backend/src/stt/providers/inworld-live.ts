@@ -1,20 +1,23 @@
-// NON VÉRIFIÉ contre l'API Inworld réelle — voir la spec
+// Vérifié contre l'API Inworld réelle (2026-09-20 / 2026-09-21), voir la spec
 // docs/superpowers/specs/2026-09-20-stt-provider-decoupling-design.md,
-// section « Questions ouvertes ». Hypothèses à confirmer au premier test réel :
-// - `language` : "fr" vs "fr-FR", et FR/EN mélangés (auto-détection ?) (Q1, Q4)
-// - `endOfTurnConfidenceThreshold` : racine de transcribeConfig vs sous
-//   `inworldSttV1Config` (Q2) ; valeurs de seuils = simples valeurs de départ
-// - `isFinal` : un tour entier ou une phrase ? Conditionne le mapping 1:1
-//   final -> onTranscript (Q3)
-// - Authentification `Authorization: Basic <clé>` (clé du portail déjà en Base64)
-// - `inactivityTimeoutSeconds` volontairement omis : une longue pause pourrait
-//   fermer le flux
-// - Support streaming de `es` et `pt` (seul `zh` est bloqué explicitement) (Q5)
-// - Forme des messages d'erreur serveur (`error.message`)
+// « Résultats du test réel », et docs/superpowers/specs/2026-09-21-stt-model-selector-design.md :
+// - authentification `Authorization: Basic <clé>` (clé du portail déjà en Base64)
+// - `language: "fr"` accepté ; config acceptée avec `endOfTurnConfidenceThreshold` à la
+//   racine de transcribeConfig et les silences sous `inworldSttV1Config`
+// - `isFinal` : un final par tour, texte complet du tour ; en parole continue les tours sont
+//   coupés à ~30 s (plafond de durée) et les seuils de silence se déclenchent rarement
+// - erreurs serveur : `{ "error": { "code": 3, "message": "..." } }` puis fermeture 1000
+// - `prompts` : caractères, 100 termes, 100 caractères par terme (voir inworld-prompts.ts)
+// Encore NON vérifié :
+// - `language: "fr-FR"` et FR/EN mélangés (auto-détection ?)
+// - réglage des seuils de fin de tour sur un vrai entretien (alternance de locuteurs)
+// - `inactivityTimeoutSeconds` volontairement omis : une longue pause pourrait fermer le flux
+// - support streaming de `es` et `pt` (seul `zh` est bloqué explicitement)
 import WebSocket from "ws";
 import { AUDIO_SAMPLE_RATE } from "@voxhelp/shared";
 import type { InterviewLanguage } from "@voxhelp/shared";
 import type { LiveStt, LiveSttCallbacks } from "../types.js";
+import { sanitizeInworldPrompts } from "./inworld-prompts.js";
 
 const INWORLD_STT_URL = "wss://api.inworld.ai/stt/v1/transcribe:streamBidirectional";
 const MODEL_ID = "inworld/inworld-stt-1";
@@ -32,7 +35,7 @@ const UNSUPPORTED_LANGUAGES: ReadonlySet<string> = new Set(["zh"]);
 
 interface InworldServerMessage {
   result?: { transcription?: { transcript?: string; isFinal?: boolean } };
-  // Forme non documentée : à confirmer au test réel.
+  // Forme confirmée : { "error": { "code": 3, "message": "...", "details": [] } }
   error?: { message?: string };
 }
 
@@ -41,9 +44,11 @@ export class InworldSTT implements LiveStt {
   private callbacks: LiveSttCallbacks;
   private language: InterviewLanguage;
   private keyterms: string[] | undefined;
+  private prompts: string[] = [];
   private configSent = false;
   private closed = false;
-  // Un échec de socket émet "error" puis "close" : un seul onError par connexion.
+  // Un échec émet plusieurs signaux (message serveur `error`, événement socket `error`, puis
+  // `close`) : un seul onError par connexion.
   private connectionErrorReported = false;
 
   constructor(language: InterviewLanguage, keyterms: string[] | undefined, callbacks: LiveSttCallbacks) {
@@ -63,9 +68,11 @@ export class InworldSTT implements LiveStt {
       return;
     }
 
-    const hasKeyterms = Boolean(this.keyterms && this.keyterms.length > 0);
+    const { prompts, adjusted, dropped } = sanitizeInworldPrompts(this.keyterms);
+    this.prompts = prompts;
     console.log(
-      `[InworldSTT] Connecting: language=${this.language} prompts=${hasKeyterms ? `[${this.keyterms!.join(", ")}]` : "none"}`
+      `[InworldSTT] Connecting: language=${this.language} prompts=${prompts.length > 0 ? `[${prompts.join(", ")}]` : "none"}` +
+        (adjusted > 0 || dropped > 0 ? ` (${adjusted} adapté(s), ${dropped} écarté(s))` : "")
     );
 
     // La clé du portail est déjà en Base64 : on ne la ré-encode pas.
@@ -78,10 +85,7 @@ export class InworldSTT implements LiveStt {
     socket.on("message", (data) => this.handleMessage(data.toString()));
 
     socket.on("error", (err) => {
-      if (!this.closed && !this.connectionErrorReported) {
-        this.connectionErrorReported = true;
-        this.callbacks.onError(err.message || "Inworld connection error");
-      }
+      this.reportConnectionError(err.message || "Inworld connection error");
     });
 
     // Un échec de connexion émet "error" puis "close" : seule une fermeture
@@ -89,9 +93,8 @@ export class InworldSTT implements LiveStt {
     socket.on("close", (code) => {
       const wasConnected = this.configSent;
       this.configSent = false;
-      if (wasConnected && !this.closed && !this.connectionErrorReported) {
-        this.connectionErrorReported = true;
-        this.callbacks.onError(`Inworld STT connection closed unexpectedly (code ${code})`);
+      if (wasConnected) {
+        this.reportConnectionError(`Inworld STT connection closed unexpectedly (code ${code})`);
       }
     });
 
@@ -135,7 +138,6 @@ export class InworldSTT implements LiveStt {
   }
 
   private sendConfig(socket: WebSocket): void {
-    const hasKeyterms = Boolean(this.keyterms && this.keyterms.length > 0);
     socket.send(
       JSON.stringify({
         transcribeConfig: {
@@ -143,7 +145,7 @@ export class InworldSTT implements LiveStt {
           audioEncoding: "LINEAR16",
           sampleRateHertz: AUDIO_SAMPLE_RATE,
           language: this.language,
-          ...(hasKeyterms ? { prompts: this.keyterms } : {}),
+          ...(this.prompts.length > 0 ? { prompts: this.prompts } : {}),
           endOfTurnConfidenceThreshold: END_OF_TURN_CONFIDENCE_THRESHOLD,
           inworldSttV1Config: {
             minEndOfTurnSilenceWhenConfident: MIN_END_OF_TURN_SILENCE_MS,
@@ -169,16 +171,23 @@ export class InworldSTT implements LiveStt {
     const message = parsed as InworldServerMessage;
 
     if (message.error) {
-      this.callbacks.onError(message.error.message ?? "Inworld STT error");
+      const detail = message.error.message;
+      this.reportConnectionError(typeof detail === "string" && detail !== "" ? detail : "Inworld STT error");
       return;
     }
 
     const transcription = message.result?.transcription;
     if (!transcription?.isFinal) return;
 
-    const text = transcription.transcript?.trim();
+    const text = typeof transcription.transcript === "string" ? transcription.transcript.trim() : "";
     if (text) {
       this.callbacks.onTranscript(text);
     }
+  }
+
+  private reportConnectionError(message: string): void {
+    if (this.closed || this.connectionErrorReported) return;
+    this.connectionErrorReported = true;
+    this.callbacks.onError(message);
   }
 }

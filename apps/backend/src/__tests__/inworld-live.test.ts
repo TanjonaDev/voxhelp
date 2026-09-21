@@ -277,4 +277,60 @@ describe("InworldSTT", () => {
 
     expect(callbacks.onError).toHaveBeenCalledWith("quota exceeded");
   });
+
+  it("sends sanitized prompts so a keyword like C# cannot break the session", async () => {
+    const stt = new InworldSTT("fr", ["C#", "CI/CD", "@angular/core", "l’agilité", "Genèse"], makeCallbacks());
+
+    const socket = await startConnected(stt);
+
+    expect(JSON.parse(socket.sent[0]).transcribeConfig.prompts).toEqual([
+      "C sharp",
+      "CI CD",
+      "angular core",
+      "l'agilité",
+      "Genèse",
+    ]);
+  });
+
+  it("omits prompts when every keyterm is dropped by the sanitizer", async () => {
+    const stt = new InworldSTT("fr", ["###", "   "], makeCallbacks());
+
+    const socket = await startConnected(stt);
+
+    expect(JSON.parse(socket.sent[0]).transcribeConfig).not.toHaveProperty("prompts");
+  });
+
+  it("reports a server error once even when the socket then closes", async () => {
+    const callbacks = makeCallbacks();
+    const stt = new InworldSTT("fr", undefined, callbacks);
+    const socket = await startConnected(stt);
+
+    serverSends(socket, { error: { code: 3, message: "invalid prompts", details: [] } });
+    socket.emit("close", 1000);
+
+    expect(callbacks.onError).toHaveBeenCalledTimes(1);
+    expect(callbacks.onError).toHaveBeenCalledWith("invalid prompts");
+  });
+
+  it("ignores a final result whose transcript is not a string", async () => {
+    const callbacks = makeCallbacks();
+    const stt = new InworldSTT("fr", undefined, callbacks);
+    const socket = await startConnected(stt);
+
+    expect(() =>
+      serverSends(socket, { result: { transcription: { transcript: 5, isFinal: true } } })
+    ).not.toThrow();
+
+    expect(callbacks.onTranscript).not.toHaveBeenCalled();
+  });
+
+  it("falls back to a generic message when the server error message is not a string", async () => {
+    const callbacks = makeCallbacks();
+    const stt = new InworldSTT("fr", undefined, callbacks);
+    const socket = await startConnected(stt);
+
+    serverSends(socket, { error: { message: { nested: true } } });
+
+    expect(callbacks.onError).toHaveBeenCalledWith("Inworld STT error");
+  });
 });
