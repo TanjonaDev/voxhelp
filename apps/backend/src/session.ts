@@ -11,6 +11,7 @@ import { buildLiveAssistPrompt, buildFinalAnalysisPrompt } from "@voxhelp/recrui
 import { supabaseAdmin } from "./supabase.js";
 import { extractThemeAndAngle, parseAssistText as parseAssistTextPure } from "./insight-parsing.js";
 import { normalizeSkillMatchStatus, normalizeVerdict } from "./report-normalize.js";
+import { parseSessionConfig } from "./session-config.js";
 
 interface ProfileUsage {
   session_count: number;
@@ -79,7 +80,7 @@ export class Session {
   private handleMessage(message: ClientMessage): void {
     switch (message.type) {
       case "session:start":
-        void this.startSession(message.config);
+        this.runAsync("startSession", this.startSession(message.config));
         break;
       case "session:stop":
         this.cleanup();
@@ -94,15 +95,34 @@ export class Session {
         this.triggerAnalysis();
         break;
       case "session:summarize":
-        void this.generateFinalReport();
+        this.runAsync("generateFinalReport", this.generateFinalReport());
         break;
       case "ask:question":
-        void this.handleAskQuestion(message.text);
+        this.runAsync("handleAskQuestion", this.handleAskQuestion(message.text));
         break;
     }
   }
 
-  private async startSession(config: SessionConfig): Promise<void> {
+  /**
+   * Filet de sécurité pour les handlers async lancés sans await : une promesse
+   * rejetée non attrapée ferait sortir le process Node (unhandledRejection).
+   */
+  private runAsync(label: string, task: Promise<void>): void {
+    task.catch((err: unknown) => {
+      console.error(`[Session] ${label} failed:`, err);
+      this.send({ type: "session:error", error: "Erreur interne, veuillez réessayer" });
+    });
+  }
+
+  // `rawConfig` vient du réseau : typé SessionConfig à l'appel, mais non fiable à l'exécution.
+  private async startSession(rawConfig: unknown): Promise<void> {
+    const parsed = parseSessionConfig(rawConfig);
+    if (!parsed.ok) {
+      this.send({ type: "session:error", error: parsed.error });
+      return;
+    }
+    const config = parsed.config;
+
     if (this.userId && supabaseAdmin) {
       try {
         const { data, error } = await supabaseAdmin
