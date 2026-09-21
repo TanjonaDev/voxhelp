@@ -1,3 +1,4 @@
+import type { SttProviderInfo } from "@voxhelp/shared";
 import { FluxSTT } from "./providers/deepgram-flux.js";
 import { deepgramBatchStt } from "./providers/deepgram-batch.js";
 import { InworldSTT } from "./providers/inworld-live.js";
@@ -5,16 +6,37 @@ import type { BatchStt, LiveStt, LiveSttCallbacks, LiveSttOptions } from "./type
 
 type LiveSttFactory = (options: LiveSttOptions, callbacks: LiveSttCallbacks) => LiveStt;
 
+interface LiveProviderEntry {
+  label: string;
+  /** Variable d'env dont la présence rend le fournisseur utilisable (clé API). */
+  requiredEnv: string;
+  create: LiveSttFactory;
+}
+
 const DEFAULT_PROVIDER = "deepgram";
 
-const LIVE_PROVIDERS: Record<string, LiveSttFactory> = {
-  deepgram: (options, callbacks) => new FluxSTT(options.language, options.keyterms, callbacks),
-  inworld: (options, callbacks) => new InworldSTT(options.language, options.keyterms, callbacks),
+// Source de vérité des modèles STT live : ajouter un fournisseur = un adapter +
+// une entrée ici, et le menu du front se met à jour tout seul
+// (GET /api/stt/providers).
+const LIVE_PROVIDERS: Record<string, LiveProviderEntry> = {
+  deepgram: {
+    label: "Deepgram Flux",
+    requiredEnv: "DEEPGRAM_API_KEY",
+    create: (options, callbacks) => new FluxSTT(options.language, options.keyterms, callbacks),
+  },
+  inworld: {
+    label: "Inworld",
+    requiredEnv: "INWORLD_API_KEY",
+    create: (options, callbacks) => new InworldSTT(options.language, options.keyterms, callbacks),
+  },
 };
 
 const BATCH_PROVIDERS: Record<string, BatchStt> = {
   deepgram: deepgramBatchStt,
 };
+
+/** Identifiant de modèle STT inconnu, demandé par un client. */
+export class SttProviderError extends Error {}
 
 function providerName(envVar: string): string {
   return process.env[envVar] || DEFAULT_PROVIDER;
@@ -28,8 +50,30 @@ function resolveProvider<T>(envVar: string, registry: Record<string, T>): T {
   return registry[name];
 }
 
-export function createLiveStt(options: LiveSttOptions, callbacks: LiveSttCallbacks): LiveStt {
-  return resolveProvider("STT_LIVE_PROVIDER", LIVE_PROVIDERS)(options, callbacks);
+export function defaultLiveProviderId(): string {
+  return providerName("STT_LIVE_PROVIDER");
+}
+
+export function listLiveProviders(): SttProviderInfo[] {
+  return Object.entries(LIVE_PROVIDERS).map(([id, entry]) => ({
+    id,
+    label: entry.label,
+    available: Boolean(process.env[entry.requiredEnv]),
+  }));
+}
+
+/**
+ * `providerId` (choisi par le client) l'emporte sur STT_LIVE_PROVIDER. Un modèle connu mais
+ * sans clé n'est pas bloqué ici : l'adapter le signale par onError.
+ */
+export function createLiveStt(options: LiveSttOptions, callbacks: LiveSttCallbacks, providerId?: string): LiveStt {
+  if (providerId === undefined || providerId === "") {
+    return resolveProvider("STT_LIVE_PROVIDER", LIVE_PROVIDERS).create(options, callbacks);
+  }
+  if (!Object.hasOwn(LIVE_PROVIDERS, providerId)) {
+    throw new SttProviderError(`Modèle STT inconnu : "${providerId}"`);
+  }
+  return LIVE_PROVIDERS[providerId].create(options, callbacks);
 }
 
 export function getBatchStt(): BatchStt {

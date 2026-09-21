@@ -1,4 +1,5 @@
 import type { FastifyInstance } from "fastify";
+import type { SttProvidersResponse } from "@voxhelp/shared";
 import { supabaseAdmin } from "./supabase.js";
 import { callClaudeJSON, callClaudeJSONWithPdf, streamAssist } from "./llm.js";
 import { extractTextFromCv, buildCvKeywordExtractionPrompt, type CvFormat } from "@voxhelp/recruit";
@@ -19,7 +20,7 @@ import {
   type CourseContext,
   type GlossaryEntry,
 } from "@voxhelp/lecture";
-import { getBatchStt } from "./stt/index.js";
+import { defaultLiveProviderId, getBatchStt, listLiveProviders } from "./stt/index.js";
 import { startUploadSession, writeChunk, assembleUpload, cleanupUpload } from "./audio-upload-sessions.js";
 import type { TranscriptSegment } from "@voxhelp/lecture";
 
@@ -61,6 +62,23 @@ async function runTranscription(
 }
 
 export function registerRoutes(app: FastifyInstance): void {
+  app.get("/api/stt/providers", async (request, reply) => {
+    if (supabaseAdmin) {
+      const auth = request.headers.authorization;
+      const token = auth?.startsWith("Bearer ") ? auth.slice(7) : null;
+      if (!token) {
+        return reply.code(401).send({ error: "Missing token" });
+      }
+      const { data, error } = await supabaseAdmin.auth.getUser(token);
+      if (error || !data.user) {
+        return reply.code(401).send({ error: "Invalid token" });
+      }
+    }
+
+    const body: SttProvidersResponse = { default: defaultLiveProviderId(), providers: listLiveProviders() };
+    return reply.send(body);
+  });
+
   app.post("/api/extract-cv-keywords", async (request, reply) => {
     if (supabaseAdmin) {
       const auth = request.headers.authorization;

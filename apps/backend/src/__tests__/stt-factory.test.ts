@@ -23,7 +23,8 @@ vi.mock("../stt/providers/deepgram-batch.js", () => ({
   deepgramBatchStt: { transcribe: vi.fn() },
 }));
 
-const { createLiveStt, getBatchStt, assertSttConfig } = await import("../stt/index.js");
+const { createLiveStt, getBatchStt, assertSttConfig, listLiveProviders, defaultLiveProviderId, SttProviderError } =
+  await import("../stt/index.js");
 const { deepgramBatchStt } = await import("../stt/providers/deepgram-batch.js");
 
 const callbacks = { onTranscript: vi.fn(), onListening: vi.fn(), onError: vi.fn() };
@@ -31,6 +32,8 @@ const callbacks = { onTranscript: vi.fn(), onListening: vi.fn(), onError: vi.fn(
 beforeEach(() => {
   delete process.env.STT_LIVE_PROVIDER;
   delete process.env.STT_BATCH_PROVIDER;
+  delete process.env.DEEPGRAM_API_KEY;
+  delete process.env.INWORLD_API_KEY;
   flux.ctorArgs = null;
   inworld.ctorArgs = null;
 });
@@ -60,6 +63,20 @@ describe("createLiveStt", () => {
       /STT_LIVE_PROVIDER "whisper".*deepgram/
     );
   });
+
+  it("uses an explicit provider id over STT_LIVE_PROVIDER", () => {
+    process.env.STT_LIVE_PROVIDER = "deepgram";
+
+    createLiveStt({ language: "en", keyterms: ["Cléo"] }, callbacks, "inworld");
+
+    expect(inworld.ctorArgs).toEqual(["en", ["Cléo"], callbacks]);
+    expect(flux.ctorArgs).toBeNull();
+  });
+
+  it("throws a SttProviderError for an unknown explicit provider id", () => {
+    expect(() => createLiveStt({ language: "fr" }, callbacks, "whisper")).toThrow(SttProviderError);
+    expect(() => createLiveStt({ language: "fr" }, callbacks, "whisper")).toThrow('Modèle STT inconnu : "whisper"');
+  });
 });
 
 describe("getBatchStt", () => {
@@ -79,5 +96,26 @@ describe("assertSttConfig", () => {
     process.env.STT_LIVE_PROVIDER = "whisper";
 
     expect(() => assertSttConfig()).toThrow(/STT_LIVE_PROVIDER/);
+  });
+});
+
+describe("listLiveProviders", () => {
+  it("lists every live provider with its label and whether its API key is configured", () => {
+    process.env.INWORLD_API_KEY = "test-key";
+
+    expect(listLiveProviders()).toEqual([
+      { id: "deepgram", label: "Deepgram Flux", available: false },
+      { id: "inworld", label: "Inworld", available: true },
+    ]);
+  });
+});
+
+describe("defaultLiveProviderId", () => {
+  it("is deepgram by default and follows STT_LIVE_PROVIDER", () => {
+    expect(defaultLiveProviderId()).toBe("deepgram");
+
+    process.env.STT_LIVE_PROVIDER = "inworld";
+
+    expect(defaultLiveProviderId()).toBe("inworld");
   });
 });

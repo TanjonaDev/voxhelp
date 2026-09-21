@@ -11,6 +11,21 @@ export interface SessionConfig {
   jobContext?: JobContext;
   keywords?: string[];
   candidateName?: string;
+  /** Identifiant du modèle STT live choisi dans l'interface ; absent = défaut du serveur. */
+  sttProvider?: string;
+}
+
+export interface SttProviderInfo {
+  id: string;
+  label: string;
+  /** Vrai quand la clé API du fournisseur est configurée côté serveur. */
+  available: boolean;
+}
+
+export interface SttProvidersResponse {
+  /** Identifiant du modèle utilisé quand le client n'en choisit pas. */
+  default: string;
+  providers: SttProviderInfo[];
 }
 
 export interface Insight {

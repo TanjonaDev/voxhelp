@@ -126,6 +126,26 @@ export class Session {
       }
     }
 
+    // Créé avant de toucher à l'état de la session : un modèle STT inconnu doit
+    // échouer proprement, sans session à moitié démarrée.
+    let stt: LiveStt;
+    try {
+      stt = createLiveStt(
+        { language: config.language, keyterms: config.keywords },
+        {
+          onTranscript: (text) => void this.handleFinalTranscript(text),
+          onListening: () => console.log("[Session] STT connected"),
+          onError: (err) => this.send({ type: "session:error", error: err }),
+        },
+        config.sttProvider
+      );
+    } catch (err) {
+      const error = err instanceof Error ? err.message : "Modèle STT indisponible";
+      console.error(`[Session] STT provider rejected: ${error}`);
+      this.send({ type: "session:error", error });
+      return;
+    }
+
     this.config = config;
     this.jobContext = config.jobContext;
     this.candidateName = config.candidateName;
@@ -140,20 +160,12 @@ export class Session {
     this.sessionStartMs = Date.now();
 
     this.stt?.close();
-    this.stt = createLiveStt(
-      { language: config.language, keyterms: config.keywords },
-      {
-        onTranscript: (text) => void this.handleFinalTranscript(text),
-        onListening: () => console.log("[Session] STT connected"),
-        onError: (err) => this.send({ type: "session:error", error: err }),
-      }
-    );
-
+    this.stt = stt;
     void this.stt.start();
 
     const sessionId = `session_${Date.now()}`;
     this.send({ type: "session:ready", sessionId });
-    console.log(`[Session] Started: language=${config.language}, jobContext=${config.jobContext ? config.jobContext.title : "none"}`);
+    console.log(`[Session] Started: language=${config.language}, stt=${config.sttProvider ?? "défaut"}, jobContext=${config.jobContext ? config.jobContext.title : "none"}`);
     console.log(
       `[Session] Keyterms for STT boosting: ${config.keywords && config.keywords.length > 0 ? `[${config.keywords.join(", ")}] (${config.keywords.length} termes)` : "aucun"}`
     );
