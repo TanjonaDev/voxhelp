@@ -26,13 +26,23 @@ function cleanTerm(raw: string): string {
     .trim();
 }
 
-export function sanitizeInworldPrompts(terms: readonly string[] | undefined): SanitizedPrompts {
+/**
+ * `terms` vient d'un client (SessionConfig.keywords) : rien ne garantit un tableau de
+ * chaînes. Un non-tableau donne un résultat vide, un élément non-chaîne est écarté.
+ */
+export function sanitizeInworldPrompts(terms: unknown): SanitizedPrompts {
   const prompts: string[] = [];
   const seen = new Set<string>();
   let adjusted = 0;
   let dropped = 0;
 
-  for (const raw of terms ?? []) {
+  const list: readonly unknown[] = Array.isArray(terms) ? terms : [];
+
+  for (const raw of list) {
+    if (typeof raw !== "string") {
+      dropped += 1;
+      continue;
+    }
     const cleaned = cleanTerm(raw);
     const key = cleaned.toLowerCase();
     if (cleaned === "" || cleaned.length > MAX_PROMPT_LENGTH || seen.has(key) || prompts.length >= MAX_PROMPTS) {

@@ -2,6 +2,7 @@ import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import WebSocket from "ws";
 import type { ServerMessage } from "@voxhelp/shared";
 import { createTestServer, type TestServer } from "./helpers/server.js";
+import { SttProviderError } from "../stt/index.js";
 
 interface STTCallbacks {
   onTranscript: (text: string) => void;
@@ -12,19 +13,30 @@ interface STTCallbacks {
 const stt = vi.hoisted(() => ({
   lastProviderId: undefined as string | undefined,
   throwWith: null as string | null,
+  throwProviderError: false,
+  rejectStart: false,
 }));
 
-vi.mock("../stt/index.js", () => ({
-  createLiveStt: (_options: unknown, callbacks: STTCallbacks, providerId?: string) => {
-    if (stt.throwWith) throw new Error(stt.throwWith);
-    stt.lastProviderId = providerId;
-    return {
-      async start() { callbacks.onListening(); },
-      sendAudio() {},
-      close() {},
-    };
-  },
-}));
+vi.mock("../stt/index.js", () => {
+  class MockSttProviderError extends Error {}
+  return {
+    SttProviderError: MockSttProviderError,
+    createLiveStt: (_options: unknown, callbacks: STTCallbacks, providerId?: string) => {
+      if (stt.throwWith) {
+        throw stt.throwProviderError ? new MockSttProviderError(stt.throwWith) : new Error(stt.throwWith);
+      }
+      stt.lastProviderId = providerId;
+      return {
+        async start() {
+          if (stt.rejectStart) throw new Error("boom");
+          callbacks.onListening();
+        },
+        sendAudio() {},
+        close() {},
+      };
+    },
+  };
+});
 
 vi.mock("../llm.js", () => ({
   streamAssist: vi.fn(),
@@ -60,6 +72,8 @@ describe("Session STT provider selection", () => {
   beforeEach(() => {
     stt.lastProviderId = undefined;
     stt.throwWith = null;
+    stt.throwProviderError = false;
+    stt.rejectStart = false;
   });
 
   afterEach(async () => {
@@ -89,6 +103,7 @@ describe("Session STT provider selection", () => {
 
   it("answers session:error and never session:ready when the STT provider is rejected", async () => {
     stt.throwWith = 'Modèle STT inconnu : "whisper"';
+    stt.throwProviderError = true;
     server = await createTestServer();
 
     const started = await startSession(server.port, "whisper");
@@ -97,5 +112,31 @@ describe("Session STT provider selection", () => {
 
     expect(started.reply).toEqual({ type: "session:error", error: 'Modèle STT inconnu : "whisper"' });
     expect(started.received.some((m) => m.type === "session:ready")).toBe(false);
+  });
+
+  it("hides internal errors behind a generic message", async () => {
+    stt.throwWith = 'Unknown STT_LIVE_PROVIDER "x"';
+    server = await createTestServer();
+
+    const started = await startSession(server.port, "whisper");
+    ws = started.ws;
+    await new Promise((resolve) => setTimeout(resolve, 150));
+
+    expect(started.reply).toEqual({ type: "session:error", error: "Modèle STT indisponible" });
+    expect(started.received.some((m) => m.type === "session:ready")).toBe(false);
+  });
+
+  it("answers session:error when the STT start() rejects", async () => {
+    stt.rejectStart = true;
+    server = await createTestServer();
+
+    const started = await startSession(server.port, "inworld");
+    ws = started.ws;
+    await new Promise((resolve) => setTimeout(resolve, 150));
+
+    expect(started.received).toContainEqual({
+      type: "session:error",
+      error: "Impossible de démarrer la transcription",
+    });
   });
 });

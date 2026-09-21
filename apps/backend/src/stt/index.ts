@@ -38,6 +38,11 @@ const BATCH_PROVIDERS: Record<string, BatchStt> = {
 /** Identifiant de modèle STT inconnu, demandé par un client. */
 export class SttProviderError extends Error {}
 
+/** L'identifiant vient du client : borné et sans caractère de contrôle avant d'être renvoyé ou journalisé. */
+function describeProviderId(providerId: unknown): string {
+  return String(providerId).replace(/[\u0000-\u001f\u007f]/g, " ").slice(0, 64);
+}
+
 function providerName(envVar: string): string {
   return process.env[envVar] || DEFAULT_PROVIDER;
 }
@@ -71,7 +76,7 @@ export function createLiveStt(options: LiveSttOptions, callbacks: LiveSttCallbac
     return resolveProvider("STT_LIVE_PROVIDER", LIVE_PROVIDERS).create(options, callbacks);
   }
   if (!Object.hasOwn(LIVE_PROVIDERS, providerId)) {
-    throw new SttProviderError(`Modèle STT inconnu : "${providerId}"`);
+    throw new SttProviderError(`Modèle STT inconnu : "${describeProviderId(providerId)}"`);
   }
   return LIVE_PROVIDERS[providerId].create(options, callbacks);
 }

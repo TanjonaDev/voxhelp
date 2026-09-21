@@ -11,7 +11,7 @@ export interface SessionConfig {
   jobContext?: JobContext;
   keywords?: string[];
   candidateName?: string;
-  /** Identifiant du modèle STT live choisi dans l'interface ; absent = défaut du serveur. */
+  /** Identifiant du modèle STT live choisi dans l'interface ; absent ou chaîne vide = défaut du serveur. */
   sttProvider?: string;
 }
 

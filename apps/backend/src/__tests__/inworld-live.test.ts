@@ -110,6 +110,14 @@ describe("InworldSTT", () => {
     }
   });
 
+  it("does not throw when keyterms contain non-string values", async () => {
+    const stt = new InworldSTT("fr", [null, 5] as unknown as string[], makeCallbacks());
+
+    const socket = await startConnected(stt);
+
+    expect(JSON.parse(socket.sent[0]).transcribeConfig).not.toHaveProperty("prompts");
+  });
+
   it("calls onListening only once the config has been sent", async () => {
     const callbacks = makeCallbacks();
     const stt = new InworldSTT("fr", undefined, callbacks);

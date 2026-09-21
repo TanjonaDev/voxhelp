@@ -84,6 +84,15 @@ describe("sanitizeInworldPrompts", () => {
     expect(result.dropped).toBe(1);
   });
 
+  it("ignores non-string terms and a non-array input", () => {
+    const result = sanitizeInworldPrompts([null, 5, {}, "ok"]);
+
+    expect(result.prompts).toEqual(["ok"]);
+    expect(result.dropped).toBe(3);
+    expect(sanitizeInworldPrompts(5)).toEqual({ prompts: [], adjusted: 0, dropped: 0 });
+    expect(sanitizeInworldPrompts({})).toEqual({ prompts: [], adjusted: 0, dropped: 0 });
+  });
+
   it("returns an empty result when there are no terms", () => {
     expect(sanitizeInworldPrompts(undefined)).toEqual({ prompts: [], adjusted: 0, dropped: 0 });
     expect(sanitizeInworldPrompts([])).toEqual({ prompts: [], adjusted: 0, dropped: 0 });

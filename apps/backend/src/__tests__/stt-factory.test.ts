@@ -79,6 +79,23 @@ describe("createLiveStt", () => {
   });
 });
 
+describe("createLiveStt provider id in the error", () => {
+  it("bounds and cleans the provider id echoed in the error", () => {
+    const message = (id: string): string => {
+      try {
+        createLiveStt({ language: "fr" }, callbacks, id);
+      } catch (err) {
+        return (err as Error).message;
+      }
+      return "";
+    };
+
+    expect(message("a".repeat(200))).toBe(`Modèle STT inconnu : "${"a".repeat(64)}"`);
+    expect(message("x\ny")).toBe('Modèle STT inconnu : "x y"');
+    expect(message(123 as unknown as string)).toBe('Modèle STT inconnu : "123"');
+  });
+});
+
 describe("getBatchStt", () => {
   it("returns the Deepgram batch adapter by default", () => {
     expect(getBatchStt()).toBe(deepgramBatchStt);

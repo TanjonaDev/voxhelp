@@ -58,9 +58,9 @@ pnpm --filter @voxhelp/shared add <package>
 
 Fichier `apps/backend/.env` (copier `.env.example`) :
 - `DEEPGRAM_API_KEY` — STT live (Flux) et batch (Nova-3)
-- `STT_LIVE_PROVIDER` — modèle STT live **par défaut** : `deepgram` (défaut) ou `inworld` (expérimental : non validé contre l'API réelle sur un entretien, `zh` non supporté). L'utilisateur peut en choisir un autre par session via le menu en haut à droite.
+- `STT_LIVE_PROVIDER` — modèle STT live **par défaut** : `deepgram` (défaut) ou `inworld` (expérimental : validé sur un cours, pas encore sur un entretien ; tours coupés à ~30 s en parole continue ; `zh` non supporté). L'utilisateur peut en choisir un autre par session via le menu en haut à droite.
 - `STT_BATCH_PROVIDER` — `deepgram` (seule valeur pour l'instant)
-- `INWORLD_API_KEY` — clé « Basic (Base64) » du portail Inworld (uniquement si `STT_LIVE_PROVIDER=inworld`)
+- `INWORLD_API_KEY` — clé « Basic (Base64) » du portail Inworld : rend Inworld sélectionnable dans le menu (requise aussi si `STT_LIVE_PROVIDER=inworld`)
 - `ANTHROPIC_API_KEY` — Claude Sonnet (assist + JSON)
 - `PORT` — port backend (default 3001)
 - `CORS_ORIGIN` — origin frontend (default http://localhost:5173)
@@ -87,7 +87,7 @@ Flux demo complet :
 - `apps/backend/src/stt/` — Ports STT (`types.ts`), sélection par env (`index.ts`), adapters (`providers/`)
 - `apps/web/src/hooks/useSttProviders.ts` + `components/SttProviderSelect.tsx` — Menu de choix du modèle STT (liste lue sur `GET /api/stt/providers`)
 - `apps/backend/src/llm.ts` — `generateFromPrompt` (streaming) + `callClaudeJSON<T>` (JSON)
-- `apps/backend/src/routes.ts` — Routes REST (`/api/analyze-job`, `/api/generate-report`)
+- `apps/backend/src/routes.ts` — Routes REST (`/api/analyze-job`, `/api/generate-report`, `GET /api/stt/providers`)
 - `apps/backend/src/prompts/` — Prompts métier (job-analysis, live-assist, tech-translate, report)
 - `apps/web/src/App.tsx` — Router 3 étapes (prep/live/report)
 - `apps/web/src/hooks/useAudioCapture.ts` — Capture audio (ScriptProcessorNode + amplitude VAD)

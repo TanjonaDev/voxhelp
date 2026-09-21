@@ -4,7 +4,7 @@ import type {
   Insight, CandidateReport, JobContext, TranscriptEntry,
 } from "@voxhelp/shared";
 import { createId } from "@voxhelp/shared";
-import { createLiveStt } from "./stt/index.js";
+import { createLiveStt, SttProviderError } from "./stt/index.js";
 import type { LiveStt } from "./stt/types.js";
 import { streamAssist, callClaudeJSON, correctTranscript } from "./llm.js";
 import { buildLiveAssistPrompt, buildFinalAnalysisPrompt } from "@voxhelp/recruit";
@@ -140,8 +140,9 @@ export class Session {
         config.sttProvider
       );
     } catch (err) {
-      const error = err instanceof Error ? err.message : "Modèle STT indisponible";
-      console.error(`[Session] STT provider rejected: ${error}`);
+      // Seul le message d'un identifiant inconnu est destiné au client ; le reste reste dans les logs.
+      const error = err instanceof SttProviderError ? err.message : "Modèle STT indisponible";
+      console.error("[Session] STT provider rejected:", err);
       this.send({ type: "session:error", error });
       return;
     }
@@ -161,7 +162,10 @@ export class Session {
 
     this.stt?.close();
     this.stt = stt;
-    void this.stt.start();
+    void this.stt.start().catch((err: unknown) => {
+      console.error("[Session] STT start failed:", err);
+      this.send({ type: "session:error", error: "Impossible de démarrer la transcription" });
+    });
 
     const sessionId = `session_${Date.now()}`;
     this.send({ type: "session:ready", sessionId });

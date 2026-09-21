@@ -51,7 +51,7 @@ export function useSttProviders(token: string): UseSttProvidersReturn {
         if (cancelled || !Array.isArray(data?.providers)) return;
 
         setProviders(data.providers);
-        setSelected(pickInitialProvider(data, readSavedProvider()));
+        setSelected((prev) => pickInitialProvider(data, prev ?? readSavedProvider()));
       } catch {
         // Liste indisponible : le menu reste masqué et le serveur applique son modèle par défaut.
       }
