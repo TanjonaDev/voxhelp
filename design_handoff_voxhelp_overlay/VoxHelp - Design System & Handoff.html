@@ -1,0 +1,365 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>VoxHelp — Design System & Implementation Handoff</title>
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+<link href="https://fonts.googleapis.com/css2?family=Onest:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet" />
+<style>
+  :root {
+    --font: 'Onest', system-ui, sans-serif;
+    --mono: 'JetBrains Mono', ui-monospace, monospace;
+    --bg: #0b0c10;
+    --bg-2: #101117;
+    --card: hsl(0 0% 100% / 0.04);
+    --card-2: hsl(0 0% 100% / 0.06);
+    --stroke: hsl(0 0% 100% / 0.10);
+    --stroke-2: hsl(0 0% 100% / 0.16);
+    --text: hsl(0 0% 100% / 0.95);
+    --text-2: hsl(0 0% 100% / 0.62);
+    --text-3: hsl(0 0% 100% / 0.40);
+    --accent: oklch(0.70 0.15 268);
+    --indigo: oklch(0.70 0.14 268);
+    --violet: oklch(0.70 0.16 300);
+    --cyan: oklch(0.75 0.12 212);
+    --good: oklch(0.76 0.15 158);
+    --warn: oklch(0.81 0.13 80);
+    --risk: oklch(0.72 0.16 25);
+  }
+  * { box-sizing: border-box; }
+  html { scroll-behavior: smooth; }
+  body {
+    margin: 0; font-family: var(--font); color: var(--text);
+    background:
+      radial-gradient(80% 50% at 80% -5%, oklch(0.4 0.12 285 / 0.5), transparent 60%),
+      radial-gradient(70% 50% at 0% 0%, oklch(0.42 0.1 30 / 0.35), transparent 55%),
+      var(--bg);
+    -webkit-font-smoothing: antialiased; line-height: 1.6;
+  }
+  .wrap { max-width: 940px; margin: 0 auto; padding: 0 28px 120px; }
+
+  /* header */
+  header.hero { padding: 72px 0 40px; }
+  .brandrow { display: flex; align-items: center; gap: 13px; margin-bottom: 26px; }
+  .mark { width: 38px; height: 38px; border-radius: 12px; background: linear-gradient(150deg, var(--indigo), var(--violet)); display: grid; place-items: center; box-shadow: 0 0 0 1px hsl(0 0% 100% / 0.18) inset; }
+  .mark span { display: flex; align-items: center; gap: 2.5px; }
+  .mark i { width: 3px; border-radius: 9px; background: #fff; display: block; }
+  .eyebrow { font-size: 12px; font-weight: 600; letter-spacing: 0.14em; text-transform: uppercase; color: var(--accent); }
+  h1 { font-size: 46px; line-height: 1.05; letter-spacing: -0.025em; margin: 0 0 18px; font-weight: 700; max-width: 18ch; }
+  .lede { font-size: 18px; color: var(--text-2); max-width: 62ch; margin: 0; }
+  .meta { display: flex; gap: 10px; flex-wrap: wrap; margin-top: 28px; }
+  .tag { font-size: 12.5px; font-weight: 500; color: var(--text-2); padding: 6px 12px; border-radius: 99px; background: var(--card); box-shadow: 0 0 0 1px var(--stroke) inset; }
+
+  /* sections */
+  section { padding-top: 64px; }
+  .kicker { font-size: 12px; font-weight: 700; letter-spacing: 0.12em; text-transform: uppercase; color: var(--accent); margin-bottom: 12px; }
+  h2 { font-size: 30px; letter-spacing: -0.02em; margin: 0 0 14px; font-weight: 700; }
+  h3 { font-size: 17px; margin: 28px 0 10px; font-weight: 600; letter-spacing: -0.01em; }
+  p { color: var(--text-2); margin: 0 0 14px; max-width: 70ch; }
+  p strong, li strong { color: var(--text); font-weight: 600; }
+  a { color: var(--accent); }
+  ul { color: var(--text-2); padding-left: 20px; margin: 0 0 16px; max-width: 70ch; }
+  li { margin-bottom: 7px; }
+  hr { border: none; border-top: 1px solid var(--stroke); margin: 64px 0 0; }
+
+  .panel { background: var(--card); border-radius: 18px; box-shadow: 0 0 0 1px var(--stroke) inset; padding: 22px 24px; margin: 18px 0; }
+  .grid2 { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
+  .grid3 { display: grid; grid-template-columns: repeat(3, 1fr); gap: 14px; }
+  @media (max-width: 720px) { .grid2, .grid3 { grid-template-columns: 1fr; } }
+
+  /* swatches */
+  .sw { border-radius: 13px; padding: 14px; box-shadow: 0 0 0 1px var(--stroke) inset; }
+  .sw .dot { width: 100%; height: 46px; border-radius: 9px; margin-bottom: 11px; box-shadow: 0 0 0 1px hsl(0 0% 100% / 0.1) inset; }
+  .sw .nm { font-size: 13px; font-weight: 600; }
+  .sw .vl { font-size: 11.5px; color: var(--text-3); font-family: var(--mono); }
+
+  /* code */
+  pre { background: #07080b; border-radius: 14px; box-shadow: 0 0 0 1px var(--stroke) inset; padding: 18px 20px; overflow-x: auto; margin: 16px 0; }
+  code { font-family: var(--mono); font-size: 12.5px; line-height: 1.7; color: #c8d0e0; }
+  .tok-key { color: var(--cyan); }
+  .tok-str { color: var(--good); }
+  .tok-com { color: var(--text-3); }
+  .tok-kw { color: var(--violet); }
+  p code, li code { background: var(--card-2); padding: 1.5px 6px; border-radius: 6px; font-size: 12px; color: var(--text); box-shadow: 0 0 0 1px var(--stroke) inset; }
+
+  .feat { display: flex; gap: 13px; align-items: flex-start; }
+  .feat .ic { flex: 0 0 auto; width: 34px; height: 34px; border-radius: 9px; display: grid; place-items: center; background: var(--card-2); color: var(--accent); }
+  .feat .ic svg { width: 17px; height: 17px; }
+  .feat h3 { margin: 2px 0 5px; }
+  .feat p { font-size: 14px; margin: 0; }
+
+  .toc { position: sticky; top: 0; background: hsl(230 20% 5% / 0.7); backdrop-filter: blur(14px); -webkit-backdrop-filter: blur(14px); z-index: 10; border-bottom: 1px solid var(--stroke); }
+  .toc .inner { max-width: 940px; margin: 0 auto; padding: 13px 28px; display: flex; gap: 6px; flex-wrap: wrap; align-items: center; }
+  .toc a { font-size: 12.5px; color: var(--text-3); text-decoration: none; padding: 5px 11px; border-radius: 8px; font-weight: 500; }
+  .toc a:hover { color: var(--text); background: var(--card); }
+  .toc .tl { font-weight: 700; color: var(--text); font-size: 13px; margin-right: 6px; }
+  .anat { font-family: var(--mono); font-size: 12px; color: var(--text-2); white-space: pre; line-height: 1.8; }
+  .pill { display: inline-flex; align-items: center; gap: 6px; font-size: 12px; font-weight: 600; padding: 3px 9px; border-radius: 99px; }
+</style>
+</head>
+<body>
+
+<nav class="toc">
+  <div class="inner">
+    <span class="tl">VoxHelp</span>
+    <a href="#principles">Principles</a>
+    <a href="#tokens">Tokens</a>
+    <a href="#components">Components</a>
+    <a href="#motion">Motion</a>
+    <a href="#states">States</a>
+    <a href="#electron">Electron</a>
+    <a href="#react">React + Tailwind</a>
+  </div>
+</nav>
+
+<div class="wrap">
+  <header class="hero">
+    <div class="brandrow">
+      <div class="mark"><span><i style="height:9px"></i><i style="height:15px"></i><i style="height:24px"></i><i style="height:12px"></i></span></div>
+      <div>
+        <div class="eyebrow">Design System &amp; Handoff</div>
+      </div>
+    </div>
+    <h1>VoxHelp — the invisible AI layer on top of any interview.</h1>
+    <p class="lede">VoxHelp listens to live technical interviews on Meet, Teams or Zoom and translates what candidates actually say — in real time — for non-technical recruiters. The interface is a transparent, always-on-top glass overlay that floats beside the call without ever getting in the way.</p>
+    <div class="meta">
+      <span class="tag">Electron · always-on-top</span>
+      <span class="tag">Glassmorphism</span>
+      <span class="tag">React + Tailwind</span>
+      <span class="tag">Onest / JetBrains Mono</span>
+      <span class="tag">FR / EN</span>
+    </div>
+  </header>
+
+  <!-- PRINCIPLES -->
+  <section id="principles">
+    <div class="kicker">01 — Principles</div>
+    <h2>Design principles</h2>
+    <p>Every decision serves one goal: VoxHelp should feel like a thought surfacing next to the conversation, not an app demanding attention.</p>
+    <div class="grid2" style="margin-top:22px">
+      <div class="feat"><div class="ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7"><path d="M2 12s4-7 10-7 10 7 10 7-4 7-10 7S2 12 2 12z"/><circle cx="12" cy="12" r="3"/></svg></div><div><h3>Invisible by default</h3><p>The recruiter must always see the candidate behind the glass. Translucency and blur are non-negotiable, never opaque panels.</p></div></div>
+      <div class="feat"><div class="ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7"><path d="M12 3l1.6 5L18 9.6 13.6 11 12 16l-1.6-5L6 9.6 10.4 8z"/></svg></div><div><h3>AI-native, not a dashboard</h3><p>Insights read as discrete "thoughts" that fade in as they form. No tables, no KPIs, no chrome that says enterprise SaaS.</p></div></div>
+      <div class="feat"><div class="ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7"><path d="M5 12h14M12 5v14"/></svg></div><div><h3>Non-intrusive</h3><p>One column, predictable position, gentle motion. The recruiter glances, absorbs, and returns to the human in front of them.</p></div></div>
+      <div class="feat"><div class="ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7"><path d="M13 2 4.5 13H11l-1 9 8.5-11H12z"/></svg></div><div><h3>Decode, don't transcribe</h3><p>A raw transcript helps no one. Each card answers "what does this mean?" and "what should I ask next?" in plain language.</p></div></div>
+    </div>
+  </section>
+
+  <!-- TOKENS -->
+  <section id="tokens">
+    <div class="kicker">02 — Foundations</div>
+    <h2>Design tokens</h2>
+
+    <h3>Glass &amp; surfaces</h3>
+    <p>The panel is a single translucent surface (<code>backdrop-filter: blur(34px) saturate(170%)</code>) over an <code>hsl(222 28% 9% / 0.52)</code> base. Cards layer subtle white tints on top — never their own blur, to keep one consistent frosted plane.</p>
+    <div class="grid3">
+      <div class="sw"><div class="dot" style="background:hsl(222 28% 9% / 0.6);backdrop-filter:blur(8px)"></div><div class="nm">Panel base</div><div class="vl">hsl(222 28% 9% / .52)</div></div>
+      <div class="sw"><div class="dot" style="background:hsl(0 0% 100% / 0.045)"></div><div class="nm">Card</div><div class="vl">#fff / .045</div></div>
+      <div class="sw"><div class="dot" style="background:hsl(0 0% 100% / 0.075)"></div><div class="nm">Card · hover</div><div class="vl">#fff / .075</div></div>
+      <div class="sw"><div class="dot" style="background:hsl(0 0% 100% / 0.10)"></div><div class="nm">Stroke</div><div class="vl">#fff / .10</div></div>
+      <div class="sw"><div class="dot" style="background:hsl(0 0% 100% / 0.16)"></div><div class="nm">Stroke · strong</div><div class="vl">#fff / .16</div></div>
+      <div class="sw"><div class="dot" style="background:linear-gradient(150deg, oklch(0.70 0.14 268), oklch(0.70 0.16 300))"></div><div class="nm">Brand gradient</div><div class="vl">indigo → violet</div></div>
+    </div>
+
+    <h3>Accent &amp; category hues</h3>
+    <p>One accent (indigo) plus four category hues, all sharing a tight chroma/lightness band in <code>oklch</code> so they read as a family. Tints are the same hue at 16% alpha.</p>
+    <div class="grid3">
+      <div class="sw"><div class="dot" style="background:oklch(0.70 0.14 268)"></div><div class="nm">Accent / Translation</div><div class="vl">oklch(.70 .14 268)</div></div>
+      <div class="sw"><div class="dot" style="background:oklch(0.70 0.16 300)"></div><div class="nm">Violet / Jargon</div><div class="vl">oklch(.70 .16 300)</div></div>
+      <div class="sw"><div class="dot" style="background:oklch(0.75 0.12 212)"></div><div class="nm">Cyan / Level</div><div class="vl">oklch(.75 .12 212)</div></div>
+      <div class="sw"><div class="dot" style="background:oklch(0.76 0.15 158)"></div><div class="nm">Good / Strength</div><div class="vl">oklch(.76 .15 158)</div></div>
+      <div class="sw"><div class="dot" style="background:oklch(0.81 0.13 80)"></div><div class="nm">Warn / Partial</div><div class="vl">oklch(.81 .13 80)</div></div>
+      <div class="sw"><div class="dot" style="background:oklch(0.72 0.16 25)"></div><div class="nm">Risk / Probe</div><div class="vl">oklch(.72 .16 25)</div></div>
+    </div>
+
+    <h3>Text · Type · Radius · Blur</h3>
+    <div class="grid2">
+      <div class="panel" style="margin:8px 0">
+        <p style="margin:0 0 10px"><strong>Type</strong> — <span style="font-family:var(--mono)">Onest</span> for everything UI, <span style="font-family:var(--mono)">JetBrains Mono</span> for timers, counts &amp; timestamps.</p>
+        <div style="font-size:22px;font-weight:700;letter-spacing:-0.02em">Title · 14.5/600</div>
+        <div style="font-size:13px;color:var(--text-2)">Body · 13/400 · line-height 1.5</div>
+        <div style="font-size:10px;font-weight:700;letter-spacing:0.09em;text-transform:uppercase;color:var(--text-3);margin-top:6px">Label · 10/700 · 0.09em</div>
+      </div>
+      <div class="panel" style="margin:8px 0">
+        <p style="margin:0 0 8px"><strong>Text colors</strong></p>
+        <div style="color:var(--text)">Primary · #fff / .95</div>
+        <div style="color:var(--text-2)">Secondary · #fff / .62</div>
+        <div style="color:var(--text-3)">Tertiary · #fff / .40</div>
+        <p style="margin:14px 0 0"><strong>Radius</strong> panel 26 · card 18 · chip 7–12 &nbsp;·&nbsp; <strong>Blur</strong> 34px (12–60 tweakable)</p>
+      </div>
+    </div>
+  </section>
+
+  <!-- COMPONENTS -->
+  <section id="components">
+    <div class="kicker">03 — Components</div>
+    <h2>Component library</h2>
+
+    <h3>Insight card — the floating AI thought</h3>
+    <p>The atom of the product. A semi-transparent card with a colored accent rail, category tag, confidence dots, a plain-language <em>"what this means"</em> body, and an optional highlighted follow-up question.</p>
+    <div class="panel"><div class="anat">┌─────────────────────────────────────────────┐
+│ ◆ TRADUCTION              07:31   ● ● ○      │  ← category tag · timestamp · confidence
+│ Architecture serverless maîtrisée            │  ← title (insight headline, 14.5/600)
+│ ──────────────────────────────────           │
+│ CE QUE ÇA VEUT DIRE                           │  ← body label (10/700 caps)
+│ Pipeline complet : déclencheurs, files…       │  ← plain-language explanation (13/1.5)
+│ ┌─ QUESTION DE RELANCE ───────────────────┐  │  ← optional, accent-tinted sub-card
+│ │ Comment gérez-vous la montée en charge ? │  │
+│ └──────────────────────────────────────────┘  │
+└─────────────────────────────────────────────┘
+        hover → lift 1px · stroke brightens · copy/pin actions fade in</div></div>
+
+    <div class="grid2">
+      <div class="panel">
+        <h3 style="margin-top:0">Confidence indicator</h3>
+        <p style="font-size:14px">Three dots + label. <span class="pill" style="color:var(--good);background:oklch(0.76 0.15 158 / 0.16)">● ● ● Confirmé</span> <span class="pill" style="color:var(--warn);background:oklch(0.81 0.13 80 / 0.16)">● ● ○ Partiel</span> <span class="pill" style="color:var(--risk);background:oklch(0.72 0.16 25 / 0.16)">● ○ ○ À vérifier</span></p>
+      </div>
+      <div class="panel">
+        <h3 style="margin-top:0">Category tags</h3>
+        <p style="font-size:14px">Icon chip + uppercase label, color-coded: <strong style="color:var(--indigo)">Traduction</strong>, <strong style="color:var(--violet)">Jargon décodé</strong>, <strong style="color:var(--good)">Point fort</strong>, <strong style="color:var(--risk)">À creuser</strong>, <strong style="color:var(--cyan)">Niveau technique</strong>.</p>
+      </div>
+    </div>
+
+    <h3>Panel structure</h3>
+    <ul>
+      <li><strong>Header</strong> — brand mark, role subtitle, and a live <strong>status pill</strong> (waveform / spinner / pulse) + hide button.</li>
+      <li><strong>Live caption strip</strong> — the candidate's current sentence, italicised, with a mic glyph and mini-waveform when speaking.</li>
+      <li><strong>Insight feed</strong> — scrollable column of cards, newest appended at the bottom with a one-time glow, auto-scrolled into view.</li>
+      <li><strong>Command bar</strong> — Cluely-style action pills (Assist · Follow-ups · Recap), an "Ask VoxHelp" input, and the recording footer (red pulse · timer · Stop).</li>
+      <li><strong>Floating capsule</strong> — a separate always-on-top control (logo · status · stop) that mirrors the macOS menu-bar companion pattern.</li>
+    </ul>
+  </section>
+
+  <!-- MOTION -->
+  <section id="motion">
+    <div class="kicker">04 — Motion</div>
+    <h2>Animations &amp; micro-interactions</h2>
+    <p>Motion is soft, brief and purposeful — entrances under 600ms, easing <code>cubic-bezier(.2,.8,.2,1)</code>. Everything degrades gracefully under <code>prefers-reduced-motion</code>.</p>
+    <ul>
+      <li><strong>Thought-in</strong> — new cards fade up 10px with a 3px → 0 blur and slight scale, so insights feel like they "resolve" into being.</li>
+      <li><strong>New-card glow</strong> — a colored inset ring on the latest card fades out over 2.4s, then the card settles into the feed.</li>
+      <li><strong>Analyzing shimmer</strong> — during analysis the panel border runs an iridescent violet→cyan→indigo sweep (masked 1.5px ring). The Apple-Intelligence "thinking" cue.</li>
+      <li><strong>Live waveform</strong> — bars scale on staggered loops while the candidate speaks; freezes to a flat idle when listening.</li>
+      <li><strong>Status spinner</strong> — a conic-gradient ring spins during "Analyse…".</li>
+      <li><strong>Hover lift</strong> — cards rise 1px, stroke brightens, copy/pin actions fade in from the top-right.</li>
+      <li><strong>Capsule float</strong> — a 3px vertical drift loop signals "this window is alive and detached."</li>
+    </ul>
+  </section>
+
+  <!-- STATES -->
+  <section id="states">
+    <div class="kicker">05 — States</div>
+    <h2>Status states</h2>
+    <div class="grid3">
+      <div class="panel" style="margin:8px 0">
+        <span class="pill" style="color:var(--good);background:oklch(0.76 0.15 158 / 0.16)">● En écoute</span>
+        <p style="font-size:14px;margin-top:12px">Idle. Slow pulse dot. Waiting for speech; feed is static.</p>
+      </div>
+      <div class="panel" style="margin:8px 0">
+        <span class="pill" style="color:var(--good);background:oklch(0.76 0.15 158 / 0.16)">▮▮▮ Candidat parle</span>
+        <p style="font-size:14px;margin-top:12px">Live. Header + caption show animated waveforms; the transcript strip updates.</p>
+      </div>
+      <div class="panel" style="margin:8px 0">
+        <span class="pill" style="color:var(--accent);background:oklch(0.70 0.14 268 / 0.16)">◌ Analyse…</span>
+        <p style="font-size:14px;margin-top:12px">Thinking. Spinner + iridescent border sweep; a new insight resolves in ~1.1s.</p>
+      </div>
+    </div>
+  </section>
+
+  <!-- ELECTRON -->
+  <section id="electron">
+    <div class="kicker">06 — Desktop shell</div>
+    <h2>Electron integration</h2>
+    <p>VoxHelp ships as a frameless, transparent, always-on-top <code>BrowserWindow</code> docked to the right edge of the display. The web layer is exactly the prototype in <code>VoxHelp Overlay.html</code>.</p>
+    <pre><code><span class="tok-com">// main.js — the overlay window</span>
+<span class="tok-kw">const</span> overlay = <span class="tok-kw">new</span> BrowserWindow({
+  width: <span class="tok-str">420</span>, height: screen.getPrimaryDisplay().workAreaSize.height,
+  x: workArea.width - <span class="tok-str">420</span>, y: <span class="tok-str">0</span>,
+  <span class="tok-key">frame</span>: <span class="tok-kw">false</span>,            <span class="tok-com">// no title bar</span>
+  <span class="tok-key">transparent</span>: <span class="tok-kw">true</span>,       <span class="tok-com">// see the meeting behind the glass</span>
+  <span class="tok-key">hasShadow</span>: <span class="tok-kw">false</span>,
+  <span class="tok-key">alwaysOnTop</span>: <span class="tok-kw">true</span>,
+  <span class="tok-key">resizable</span>: <span class="tok-kw">false</span>,
+  <span class="tok-key">skipTaskbar</span>: <span class="tok-kw">true</span>,
+  <span class="tok-key">vibrancy</span>: <span class="tok-str">'under-window'</span>,  <span class="tok-com">// macOS native blur backing</span>
+  <span class="tok-key">visualEffectState</span>: <span class="tok-str">'active'</span>,
+  <span class="tok-key">webPreferences</span>: { preload, contextIsolation: <span class="tok-kw">true</span> },
+});
+overlay.setAlwaysOnTop(<span class="tok-kw">true</span>, <span class="tok-str">'screen-saver'</span>); <span class="tok-com">// float above full-screen calls</span>
+overlay.setVisibleOnAllWorkspaces(<span class="tok-kw">true</span>);</code></pre>
+    <ul>
+      <li><strong>Click-through</strong> — call <code>overlay.setIgnoreMouseEvents(true, { forward: true })</code> when the cursor is over empty space so clicks pass to the meeting; re-enable over interactive regions via <code>mouseenter/leave</code> from the renderer.</li>
+      <li><strong>Hide / show</strong> — register a global shortcut (e.g. <code>⌘\</code>) to toggle visibility; the floating capsule's Hide button does the same via IPC.</li>
+      <li><strong>Audio</strong> — capture the system/meeting audio with <code>desktopCapturer</code> (or a virtual audio device), stream to your STT + LLM pipeline, and push insight objects to the renderer over IPC. The UI only ever consumes the <code>Insight</code> shape below.</li>
+      <li><strong>Privacy</strong> — exclude the window from screen-share with <code>overlay.setContentProtection(true)</code> so it never leaks into the recorded call.</li>
+    </ul>
+  </section>
+
+  <!-- REACT -->
+  <section id="react">
+    <div class="kicker">07 — Implementation</div>
+    <h2>React + Tailwind notes for Claude Code</h2>
+    <p>The prototype is plain React; porting to a Tailwind production app is mechanical. Map the tokens into <code>tailwind.config</code>, then each component below is a 1:1 translation.</p>
+
+    <h3>tailwind.config.js</h3>
+    <pre><code><span class="tok-kw">export default</span> {
+  <span class="tok-key">theme</span>: { <span class="tok-key">extend</span>: {
+    <span class="tok-key">fontFamily</span>: { sans: [<span class="tok-str">'Onest'</span>, <span class="tok-str">'system-ui'</span>], mono: [<span class="tok-str">'JetBrains Mono'</span>] },
+    <span class="tok-key">colors</span>: {
+      glass: <span class="tok-str">'hsl(222 28% 9% / 0.52)'</span>,
+      stroke: <span class="tok-str">'hsl(0 0% 100% / 0.10)'</span>,
+      indigo: <span class="tok-str">'oklch(0.70 0.14 268)'</span>, violet: <span class="tok-str">'oklch(0.70 0.16 300)'</span>,
+      cyan: <span class="tok-str">'oklch(0.75 0.12 212)'</span>, good: <span class="tok-str">'oklch(0.76 0.15 158)'</span>,
+      warn: <span class="tok-str">'oklch(0.81 0.13 80)'</span>, risk: <span class="tok-str">'oklch(0.72 0.16 25)'</span>,
+    },
+    <span class="tok-key">backdropBlur</span>: { glass: <span class="tok-str">'34px'</span> },
+    <span class="tok-key">borderRadius</span>: { panel: <span class="tok-str">'26px'</span>, card: <span class="tok-str">'18px'</span> },
+    <span class="tok-key">keyframes</span>: {
+      thoughtIn: { from: { opacity: <span class="tok-str">'0'</span>, transform: <span class="tok-str">'translateY(10px) scale(.985)'</span>, filter: <span class="tok-str">'blur(3px)'</span> }, to: { opacity: <span class="tok-str">'1'</span>, transform: <span class="tok-str">'none'</span>, filter: <span class="tok-str">'none'</span> } },
+      shimmer: { to: { backgroundPosition: <span class="tok-str">'200% 0'</span> } },
+    },
+    <span class="tok-key">animation</span>: { thoughtIn: <span class="tok-str">'thoughtIn .55s cubic-bezier(.2,.8,.2,1) both'</span>, shimmer: <span class="tok-str">'shimmer 1.6s linear infinite'</span> },
+  }},
+};</code></pre>
+
+    <h3>The Insight data shape</h3>
+    <pre><code><span class="tok-kw">type</span> <span class="tok-key">Insight</span> = {
+  id: <span class="tok-key">string</span>;
+  cat: <span class="tok-str">'translation'</span> | <span class="tok-str">'jargon'</span> | <span class="tok-str">'strength'</span> | <span class="tok-str">'risk'</span> | <span class="tok-str">'level'</span>;
+  confidence: <span class="tok-str">'confirmed'</span> | <span class="tok-str">'partial'</span> | <span class="tok-str">'low'</span>;
+  t: <span class="tok-key">string</span>;                 <span class="tok-com">// '07:31' timestamp in the call</span>
+  title: <span class="tok-key">string</span>;             <span class="tok-com">// the insight headline</span>
+  body: <span class="tok-key">string</span>;              <span class="tok-com">// plain-language "what this means"</span>
+  relance?: <span class="tok-key">string</span>;         <span class="tok-com">// optional suggested follow-up</span>
+  level?: <span class="tok-key">number</span>;           <span class="tok-com">// 0–1, only for cat: 'level'</span>
+};</code></pre>
+
+    <h3>InsightCard.tsx (Tailwind)</h3>
+    <pre><code><span class="tok-kw">function</span> <span class="tok-key">InsightCard</span>({ ins, isNew }: { ins: Insight; isNew: boolean }) {
+  <span class="tok-kw">return</span> (
+    &lt;article className={cn(
+      <span class="tok-str">"group relative rounded-card bg-white/[.045] p-3.5 ring-1 ring-stroke"</span>,
+      <span class="tok-str">"transition hover:bg-white/[.075] hover:-translate-y-px"</span>,
+      isNew &amp;&amp; <span class="tok-str">"animate-thoughtIn"</span>,
+    )}&gt;
+      &lt;span className={`absolute left-0 inset-y-3 w-[3px] rounded-full bg-${catColor(ins.cat)}`} /&gt;
+      &lt;header className=<span class="tok-str">"flex items-center gap-2 mb-2"</span>&gt;
+        &lt;CategoryTag cat={ins.cat} /&gt;
+        &lt;time className=<span class="tok-str">"ml-auto font-mono text-[10.5px] text-white/40"</span>&gt;{ins.t}&lt;/time&gt;
+        &lt;Confidence level={ins.confidence} /&gt;
+      &lt;/header&gt;
+      &lt;h3 className=<span class="tok-str">"text-[14.5px] font-semibold leading-snug text-balance"</span>&gt;{ins.title}&lt;/h3&gt;
+      &lt;p className=<span class="tok-str">"mt-2 text-[13px] leading-relaxed text-white/60"</span>&gt;{ins.body}&lt;/p&gt;
+      {ins.relance &amp;&amp; &lt;FollowUp&gt;{ins.relance}&lt;/FollowUp&gt;}
+    &lt;/article&gt;
+  );
+}</code></pre>
+    <p style="margin-top:18px"><strong>Recommended stack:</strong> React 18 · Tailwind 3.4+ (needs <code>oklch</code> / arbitrary alpha) · <code>framer-motion</code> for list entrance &amp; layout animations (<code>AnimatePresence</code> on the feed) · <code>clsx</code>/<code>cn</code> for variants · <code>lucide-react</code> for icons. Keep the feed a controlled list driven by IPC insight events; never block the render thread on the STT stream.</p>
+
+    <hr />
+    <p style="margin-top:32px;color:var(--text-3);font-size:13px">VoxHelp · interview copilot overlay — companion to <strong style="color:var(--text-2)">VoxHelp Overlay.html</strong>. All tokens, components and motion specs above are realised in that prototype.</p>
+  </section>
+</div>
+</body>
+</html>

@@ -1,0 +1,124 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>VoxHelp — AI Interview Copilot</title>
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+<link href="https://fonts.googleapis.com/css2?family=Onest:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet" />
+<style>
+  :root {
+    --font: 'Onest', -apple-system, system-ui, sans-serif;
+    --mono: 'JetBrains Mono', ui-monospace, monospace;
+
+    /* ---- glass system (dark, Cluely/Apple-Intelligence) ---- */
+    --glass-tint: 222 28% 9%;                  /* hsl base for the panel */
+    --glass-alpha: 0.52;
+    --blur: 34px;
+
+    --panel: hsl(var(--glass-tint) / var(--glass-alpha));
+    --card: hsl(0 0% 100% / 0.045);
+    --card-hi: hsl(0 0% 100% / 0.075);
+    --card-lift: hsl(0 0% 100% / 0.10);
+    --stroke: hsl(0 0% 100% / 0.10);
+    --stroke-2: hsl(0 0% 100% / 0.16);
+    --stroke-inset: hsl(0 0% 100% / 0.06);
+
+    --text: hsl(0 0% 100% / 0.95);
+    --text-2: hsl(220 12% 100% / 0.62);
+    --text-3: hsl(220 12% 100% / 0.40);
+
+    /* accent + category hues (oklch, shared chroma family) */
+    --accent: oklch(0.68 0.15 268);
+    --accent-soft: oklch(0.68 0.15 268 / 0.18);
+    --indigo: oklch(0.70 0.14 268);
+    --violet: oklch(0.70 0.16 300);
+    --cyan: oklch(0.75 0.12 212);
+    --good: oklch(0.76 0.15 158);
+    --warn: oklch(0.81 0.13 80);
+    --risk: oklch(0.72 0.16 25);
+
+    --good-soft: oklch(0.76 0.15 158 / 0.16);
+    --warn-soft: oklch(0.81 0.13 80 / 0.16);
+    --risk-soft: oklch(0.72 0.16 25 / 0.16);
+    --indigo-soft: oklch(0.70 0.14 268 / 0.16);
+    --violet-soft: oklch(0.70 0.16 300 / 0.16);
+    --cyan-soft: oklch(0.75 0.12 212 / 0.16);
+
+    --radius: 26px;
+    --radius-card: 18px;
+    --shadow-panel: 0 1px 0 hsl(0 0% 100% / 0.08) inset, 0 24px 70px -12px hsl(230 40% 4% / 0.7), 0 8px 28px -8px hsl(230 40% 4% / 0.55);
+    --shadow-card: 0 1px 0 var(--stroke-inset) inset, 0 8px 24px -10px hsl(230 40% 4% / 0.5);
+  }
+
+  /* Frost / Indigo tint variants (tweakable) */
+  [data-tint="indigo"] { --glass-tint: 248 40% 12%; }
+  [data-tint="frost"]  { --glass-tint: 220 18% 16%; --glass-alpha: 0.46; }
+  [data-tint="graphite"] { --glass-tint: 222 10% 9%; }
+
+  * { box-sizing: border-box; }
+  html, body { margin: 0; height: 100%; }
+  body {
+    font-family: var(--font);
+    color: var(--text);
+    -webkit-font-smoothing: antialiased;
+    text-rendering: optimizeLegibility;
+    overflow: hidden;
+    background: #0a0a0c;
+  }
+  #root { height: 100vh; width: 100vw; }
+
+  /* ---- desktop wallpaper (warm Sonoma-style, gives glass something to refract) ---- */
+  .vh-wallpaper {
+    position: absolute; inset: 0; z-index: 0;
+    background:
+      radial-gradient(120% 90% at 12% 8%, oklch(0.72 0.16 35) 0%, transparent 46%),
+      radial-gradient(120% 100% at 92% 12%, oklch(0.78 0.13 70) 0%, transparent 50%),
+      radial-gradient(140% 120% at 78% 96%, oklch(0.66 0.17 300) 0%, transparent 52%),
+      radial-gradient(130% 120% at 6% 98%, oklch(0.60 0.16 250) 0%, transparent 50%),
+      linear-gradient(135deg, oklch(0.70 0.15 45), oklch(0.62 0.17 285));
+  }
+  .vh-wallpaper::after {
+    content: ''; position: absolute; inset: 0;
+    background: radial-gradient(100% 100% at 50% 50%, transparent 60%, hsl(230 40% 4% / 0.35));
+  }
+
+  ::-webkit-scrollbar { width: 8px; }
+  ::-webkit-scrollbar-thumb { background: hsl(0 0% 100% / 0.14); border-radius: 99px; border: 2px solid transparent; background-clip: content-box; }
+  ::-webkit-scrollbar-thumb:hover { background: hsl(0 0% 100% / 0.24); background-clip: content-box; }
+
+  /* ---- animations ---- */
+  @keyframes vh-thought-in {
+    from { opacity: 0; transform: translateY(10px) scale(0.985); filter: blur(3px); }
+    to   { opacity: 1; transform: none; filter: none; }
+  }
+  @keyframes vh-pulse { 0%,100% { opacity: 1; } 50% { opacity: 0.35; } }
+  @keyframes vh-bar { 0%,100% { transform: scaleY(0.3); } 50% { transform: scaleY(1); } }
+  @keyframes vh-ring { 0% { transform: scale(0.7); opacity: 0.7; } 100% { transform: scale(2.4); opacity: 0; } }
+  @keyframes vh-shimmer { to { background-position: 200% 0; } }
+  @keyframes vh-spin { to { transform: rotate(360deg); } }
+  @keyframes vh-glow-fade { from { opacity: 0.9; } to { opacity: 0; } }
+  @keyframes vh-caption-in { from { opacity: 0; transform: translateY(4px); } to { opacity: 1; transform: none; } }
+  @keyframes vh-float { 0%,100% { transform: translateY(0); } 50% { transform: translateY(-3px); } }
+
+  @media (prefers-reduced-motion: reduce) {
+    .vh-anim, .vh-anim * { animation-duration: 0.001s !important; }
+  }
+</style>
+</head>
+<body>
+<div id="root"></div>
+
+<script src="https://unpkg.com/react@18.3.1/umd/react.development.js" integrity="sha384-hD6/rw4ppMLGNu3tX5cjIb+uRZ7UkRJ6BPkLpg4hAu/6onKUg4lLsHAs9EBPT82L" crossorigin="anonymous"></script>
+<script src="https://unpkg.com/react-dom@18.3.1/umd/react-dom.development.js" integrity="sha384-u6aeetuaXnQ38mYT8rp6sbXaQe3NL9t+IBXmnYxwkUI2Hw4bsp2Wvmx4yRQF1uAm" crossorigin="anonymous"></script>
+<script src="https://unpkg.com/@babel/standalone@7.29.0/babel.min.js" integrity="sha384-m08KidiNqLdpJqLq95G/LEi8Qvjl/xUYll3QILypMoQ65QorJ9Lvtp2RXYGBFj1y" crossorigin="anonymous"></script>
+
+<script src="overlay-data.js"></script>
+<script type="text/babel" src="tweaks-panel.jsx"></script>
+<script type="text/babel" src="overlay-ui.jsx"></script>
+<script type="text/babel" src="overlay-scene.jsx"></script>
+<script type="text/babel" src="overlay-panel.jsx"></script>
+<script type="text/babel" src="overlay-app.jsx"></script>
+</body>
+</html>
