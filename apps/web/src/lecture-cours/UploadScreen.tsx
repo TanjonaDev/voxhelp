@@ -22,6 +22,9 @@ export function UploadScreen({ analysis, onOpenCourse }: UploadScreenProps) {
     error,
     analyze,
     abort,
+    sttProviders,
+    sttProvider,
+    setSttProvider,
   } = analysis;
 
   function handleActionClick() {
@@ -161,6 +164,21 @@ export function UploadScreen({ analysis, onOpenCourse }: UploadScreenProps) {
               <option value="en">English</option>
             </Select>
           </Field>
+          {sttProviders.length > 0 && (
+            <Field label="Modèle de transcription">
+              <Select
+                value={sttProvider ?? ""}
+                disabled={runState === "running"}
+                onChange={(e) => setSttProvider(e.target.value)}
+              >
+                {sttProviders.map((provider) => (
+                  <option key={provider.id} value={provider.id} disabled={!provider.available}>
+                    {provider.available ? provider.label : `${provider.label} (non configuré)`}
+                  </option>
+                ))}
+              </Select>
+            </Field>
+          )}
           <Field label="Date du cours">
             <Input
               type="date"

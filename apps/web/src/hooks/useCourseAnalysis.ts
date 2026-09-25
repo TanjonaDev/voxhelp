@@ -9,6 +9,7 @@ import type {
   TranscriptSegment,
 } from "@voxhelp/lecture";
 import { useAuth } from "./useAuth";
+import { useSttProviders } from "./useSttProviders";
 import { uploadAudioChunked } from "../lib/chunkedAudioUpload";
 
 // Same underlying calls as the /lecture-test debug page (transcribe-audio ->
@@ -53,6 +54,7 @@ async function postJson<T>(url: string, body: unknown, token: string, signal: Ab
 
 export function useCourseAnalysis() {
   const { session } = useAuth();
+  const stt = useSttProviders(session?.access_token ?? "", "batch");
 
   const [course, setCourse] = useState<CourseContext>({
     title: "",
@@ -153,7 +155,8 @@ export function useCourseAnalysis() {
         existingGlossary,
         token,
         controller.signal,
-        (fraction) => setProgress(fraction * 25)
+        (fraction) => setProgress(fraction * 25),
+        stt.selected ?? undefined
       );
       setTranscript(transcribed.transcript);
       setProgress(25);
@@ -300,6 +303,9 @@ export function useCourseAnalysis() {
     error,
     analyze,
     abort,
+    sttProviders: stt.providers,
+    sttProvider: stt.selected,
+    setSttProvider: stt.select,
     synthesis,
     synthesisLoading,
     synthesisError,
