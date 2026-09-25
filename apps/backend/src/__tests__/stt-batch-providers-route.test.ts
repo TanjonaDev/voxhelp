@@ -25,7 +25,10 @@ describe("GET /api/stt/batch-providers", () => {
     expect(res.status).toBe(200);
     expect(await res.json()).toEqual({
       default: "deepgram",
-      providers: [{ id: "deepgram", label: "Deepgram Nova-3", available: true }],
+      providers: [
+        { id: "deepgram", label: "Deepgram Nova-3", available: true },
+        { id: "inworld", label: "Inworld", available: false },
+      ],
     });
   });
 

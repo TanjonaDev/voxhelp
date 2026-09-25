@@ -1,6 +1,7 @@
 import type { SttProviderInfo } from "@voxhelp/shared";
 import { FluxSTT } from "./providers/deepgram-flux.js";
 import { deepgramBatchStt } from "./providers/deepgram-batch.js";
+import { inworldBatchStt } from "./providers/inworld-batch.js";
 import { InworldSTT } from "./providers/inworld-live.js";
 import type { BatchStt, LiveStt, LiveSttCallbacks, LiveSttOptions } from "./types.js";
 
@@ -45,6 +46,11 @@ const BATCH_PROVIDERS: Record<string, BatchProviderEntry> = {
     label: "Deepgram Nova-3",
     requiredEnv: "DEEPGRAM_API_KEY",
     transcriber: deepgramBatchStt,
+  },
+  inworld: {
+    label: "Inworld",
+    requiredEnv: "INWORLD_API_KEY",
+    transcriber: inworldBatchStt,
   },
 };
 

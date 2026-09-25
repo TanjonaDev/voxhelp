@@ -23,11 +23,16 @@ vi.mock("../stt/providers/deepgram-batch.js", () => ({
   deepgramBatchStt: { transcribe: vi.fn() },
 }));
 
+vi.mock("../stt/providers/inworld-batch.js", () => ({
+  inworldBatchStt: { transcribe: vi.fn() },
+}));
+
 const {
   createLiveStt, getBatchStt, assertSttConfig, listLiveProviders, defaultLiveProviderId, SttProviderError,
   listBatchProviders, defaultBatchProviderId,
 } = await import("../stt/index.js");
 const { deepgramBatchStt } = await import("../stt/providers/deepgram-batch.js");
+const { inworldBatchStt } = await import("../stt/providers/inworld-batch.js");
 
 const callbacks = { onTranscript: vi.fn(), onListening: vi.fn(), onError: vi.fn() };
 
@@ -104,9 +109,9 @@ describe("getBatchStt", () => {
   });
 
   it("throws on an unknown STT_BATCH_PROVIDER", () => {
-    process.env.STT_BATCH_PROVIDER = "inworld";
+    process.env.STT_BATCH_PROVIDER = "whisper";
 
-    expect(() => getBatchStt()).toThrow(/STT_BATCH_PROVIDER "inworld".*deepgram/);
+    expect(() => getBatchStt()).toThrow(/STT_BATCH_PROVIDER "whisper".*deepgram/);
   });
 });
 
@@ -144,6 +149,10 @@ describe("getBatchStt with an explicit provider id", () => {
     expect(getBatchStt("deepgram")).toBe(deepgramBatchStt);
   });
 
+  it("returns the Inworld batch adapter for its id", () => {
+    expect(getBatchStt("inworld")).toBe(inworldBatchStt);
+  });
+
   it("throws a SttProviderError for an unknown id", () => {
     expect(() => getBatchStt("whisper")).toThrow(SttProviderError);
     expect(() => getBatchStt("whisper")).toThrow('Modèle STT inconnu : "whisper"');
@@ -154,7 +163,10 @@ describe("listBatchProviders", () => {
   it("lists the batch providers with their label and whether their API key is configured", () => {
     process.env.DEEPGRAM_API_KEY = "dg-test";
 
-    expect(listBatchProviders()).toEqual([{ id: "deepgram", label: "Deepgram Nova-3", available: true }]);
+    expect(listBatchProviders()).toEqual([
+      { id: "deepgram", label: "Deepgram Nova-3", available: true },
+      { id: "inworld", label: "Inworld", available: false },
+    ]);
   });
 });
 

@@ -42,7 +42,7 @@ pnpm --filter @voxhelp/shared add <package>
 - **Langage** : TypeScript strict, ESM (`"type": "module"`)
 - **Frontend** : React 19, Vite 6, Tailwind CSS 3.4
 - **Backend** : Fastify 5, @fastify/websocket
-- **STT** : ports `LiveStt` / `BatchStt` (`apps/backend/src/stt/`), fournisseur choisi par env — live : Deepgram Flux Multilingual streaming v2 (défaut) ou Inworld STT (PCM 16kHz mono) + correction Haiku ; batch (cours) : Deepgram Nova-3
+- **STT** : ports `LiveStt` / `BatchStt` (`apps/backend/src/stt/`), fournisseur choisi par env — live : Deepgram Flux Multilingual streaming v2 (défaut) ou Inworld STT (PCM 16kHz mono) + correction Haiku ; batch (cours) : Deepgram Nova-3 (défaut) ou Inworld (API synchrone via ffmpeg)
 - **LLM** : Claude Sonnet 4.6 via @anthropic-ai/sdk (JSON)
 
 ## Conventions
@@ -59,7 +59,8 @@ pnpm --filter @voxhelp/shared add <package>
 Fichier `apps/backend/.env` (copier `.env.example`) :
 - `DEEPGRAM_API_KEY` — STT live (Flux) et batch (Nova-3)
 - `STT_LIVE_PROVIDER` — modèle STT live **par défaut** : `deepgram` (défaut) ou `inworld` (expérimental : validé sur un cours, pas encore sur un entretien ; tours coupés à ~30 s en parole continue ; `zh` non supporté). L'utilisateur peut en choisir un autre par session via le menu en haut à droite.
-- `STT_BATCH_PROVIDER` — `deepgram` (seule valeur pour l'instant)
+- `STT_BATCH_PROVIDER` — modèle de transcription **par défaut** des cours (fichiers) : `deepgram` (Nova-3, défaut) ou `inworld` (expérimental : conversion ffmpeg, découpage en morceaux ≤ 12 min). L'utilisateur peut en choisir un autre par cours sur l'écran d'import.
+- `FFMPEG_PATH` — binaire ffmpeg utilisé par Inworld pour les cours (optionnel : sinon celui du paquet `ffmpeg-static`, sous licence GPL)
 - `INWORLD_API_KEY` — clé « Basic (Base64) » du portail Inworld : rend Inworld sélectionnable dans le menu (requise aussi si `STT_LIVE_PROVIDER=inworld`)
 - `ANTHROPIC_API_KEY` — Claude Sonnet (assist + JSON)
 - `PORT` — port backend (default 3001)
