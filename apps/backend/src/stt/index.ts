@@ -13,6 +13,13 @@ interface LiveProviderEntry {
   create: LiveSttFactory;
 }
 
+interface BatchProviderEntry {
+  label: string;
+  /** Variable d'env dont la présence rend le fournisseur utilisable (clé API). */
+  requiredEnv: string;
+  transcriber: BatchStt;
+}
+
 const DEFAULT_PROVIDER = "deepgram";
 
 // Source de vérité des modèles STT live : ajouter un fournisseur = un adapter +
@@ -31,8 +38,14 @@ const LIVE_PROVIDERS: Record<string, LiveProviderEntry> = {
   },
 };
 
-const BATCH_PROVIDERS: Record<string, BatchStt> = {
-  deepgram: deepgramBatchStt,
+// Source de vérité des modèles STT batch (transcription de fichiers, cours) : même
+// principe que LIVE_PROVIDERS (GET /api/stt/batch-providers alimente le menu).
+const BATCH_PROVIDERS: Record<string, BatchProviderEntry> = {
+  deepgram: {
+    label: "Deepgram Nova-3",
+    requiredEnv: "DEEPGRAM_API_KEY",
+    transcriber: deepgramBatchStt,
+  },
 };
 
 /** Identifiant de modèle STT inconnu, demandé par un client. */
@@ -59,12 +72,24 @@ export function defaultLiveProviderId(): string {
   return providerName("STT_LIVE_PROVIDER");
 }
 
-export function listLiveProviders(): SttProviderInfo[] {
-  return Object.entries(LIVE_PROVIDERS).map(([id, entry]) => ({
+export function defaultBatchProviderId(): string {
+  return providerName("STT_BATCH_PROVIDER");
+}
+
+function listProviders(registry: Record<string, { label: string; requiredEnv: string }>): SttProviderInfo[] {
+  return Object.entries(registry).map(([id, entry]) => ({
     id,
     label: entry.label,
     available: Boolean(process.env[entry.requiredEnv]),
   }));
+}
+
+export function listLiveProviders(): SttProviderInfo[] {
+  return listProviders(LIVE_PROVIDERS);
+}
+
+export function listBatchProviders(): SttProviderInfo[] {
+  return listProviders(BATCH_PROVIDERS);
 }
 
 /**
@@ -81,8 +106,18 @@ export function createLiveStt(options: LiveSttOptions, callbacks: LiveSttCallbac
   return LIVE_PROVIDERS[providerId].create(options, callbacks);
 }
 
-export function getBatchStt(): BatchStt {
-  return resolveProvider("STT_BATCH_PROVIDER", BATCH_PROVIDERS);
+/**
+ * `providerId` (choisi par le client) l'emporte sur STT_BATCH_PROVIDER ; absent ou vide = défaut
+ * du serveur. Un modèle connu mais sans clé n'est pas bloqué ici : l'adapter échoue clairement.
+ */
+export function getBatchStt(providerId?: string): BatchStt {
+  if (providerId === undefined || providerId === "") {
+    return resolveProvider("STT_BATCH_PROVIDER", BATCH_PROVIDERS).transcriber;
+  }
+  if (!Object.hasOwn(BATCH_PROVIDERS, providerId)) {
+    throw new SttProviderError(`Modèle STT inconnu : "${describeProviderId(providerId)}"`);
+  }
+  return BATCH_PROVIDERS[providerId].transcriber;
 }
 
 /** À appeler au démarrage du serveur : échoue vite sur une valeur d'env invalide. */

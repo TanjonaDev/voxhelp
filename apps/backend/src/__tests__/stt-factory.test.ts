@@ -23,8 +23,10 @@ vi.mock("../stt/providers/deepgram-batch.js", () => ({
   deepgramBatchStt: { transcribe: vi.fn() },
 }));
 
-const { createLiveStt, getBatchStt, assertSttConfig, listLiveProviders, defaultLiveProviderId, SttProviderError } =
-  await import("../stt/index.js");
+const {
+  createLiveStt, getBatchStt, assertSttConfig, listLiveProviders, defaultLiveProviderId, SttProviderError,
+  listBatchProviders, defaultBatchProviderId,
+} = await import("../stt/index.js");
 const { deepgramBatchStt } = await import("../stt/providers/deepgram-batch.js");
 
 const callbacks = { onTranscript: vi.fn(), onListening: vi.fn(), onError: vi.fn() };
@@ -134,5 +136,34 @@ describe("defaultLiveProviderId", () => {
     process.env.STT_LIVE_PROVIDER = "inworld";
 
     expect(defaultLiveProviderId()).toBe("inworld");
+  });
+});
+
+describe("getBatchStt with an explicit provider id", () => {
+  it("returns the requested batch adapter", () => {
+    expect(getBatchStt("deepgram")).toBe(deepgramBatchStt);
+  });
+
+  it("throws a SttProviderError for an unknown id", () => {
+    expect(() => getBatchStt("whisper")).toThrow(SttProviderError);
+    expect(() => getBatchStt("whisper")).toThrow('Modèle STT inconnu : "whisper"');
+  });
+});
+
+describe("listBatchProviders", () => {
+  it("lists the batch providers with their label and whether their API key is configured", () => {
+    process.env.DEEPGRAM_API_KEY = "dg-test";
+
+    expect(listBatchProviders()).toEqual([{ id: "deepgram", label: "Deepgram Nova-3", available: true }]);
+  });
+});
+
+describe("defaultBatchProviderId", () => {
+  it("is deepgram by default and follows STT_BATCH_PROVIDER", () => {
+    expect(defaultBatchProviderId()).toBe("deepgram");
+
+    process.env.STT_BATCH_PROVIDER = "inworld";
+
+    expect(defaultBatchProviderId()).toBe("inworld");
   });
 });

@@ -20,7 +20,15 @@ import {
   type CourseContext,
   type GlossaryEntry,
 } from "@voxhelp/lecture";
-import { defaultLiveProviderId, getBatchStt, listLiveProviders } from "./stt/index.js";
+import {
+  SttProviderError,
+  defaultBatchProviderId,
+  defaultLiveProviderId,
+  getBatchStt,
+  listBatchProviders,
+  listLiveProviders,
+} from "./stt/index.js";
+import type { BatchStt } from "./stt/types.js";
 import { startUploadSession, writeChunk, assembleUpload, cleanupUpload } from "./audio-upload-sessions.js";
 import type { TranscriptSegment } from "@voxhelp/lecture";
 
@@ -49,12 +57,26 @@ function resolveCvFormat(mimetype: string, filename: string): CvFormat | null {
   return EXTENSION_TO_FORMAT[extension] ?? null;
 }
 
+/** Résout le modèle batch demandé (chaîne du client, non fiable). `undefined` = défaut du serveur. */
+function resolveBatchStt(requested: unknown): { ok: true; batchStt: BatchStt } | { ok: false; error: string } {
+  if (requested !== undefined && typeof requested !== "string") {
+    return { ok: false, error: "Invalid sttProvider" };
+  }
+  try {
+    return { ok: true, batchStt: getBatchStt(requested) };
+  } catch (err) {
+    if (err instanceof SttProviderError) return { ok: false, error: err.message };
+    throw err;
+  }
+}
+
 async function runTranscription(
   buffer: Buffer,
   language: string,
-  existingGlossary: GlossaryEntry[]
+  existingGlossary: GlossaryEntry[],
+  batchStt: BatchStt
 ): Promise<TranscriptSegment[]> {
-  const utterances = await getBatchStt().transcribe(buffer, {
+  const utterances = await batchStt.transcribe(buffer, {
     language,
     keyterms: selectKeyterms(existingGlossary),
   });
@@ -76,6 +98,23 @@ export function registerRoutes(app: FastifyInstance): void {
     }
 
     const body: SttProvidersResponse = { default: defaultLiveProviderId(), providers: listLiveProviders() };
+    return reply.send(body);
+  });
+
+  app.get("/api/stt/batch-providers", async (request, reply) => {
+    if (supabaseAdmin) {
+      const auth = request.headers.authorization;
+      const token = auth?.startsWith("Bearer ") ? auth.slice(7) : null;
+      if (!token) {
+        return reply.code(401).send({ error: "Missing token" });
+      }
+      const { data, error } = await supabaseAdmin.auth.getUser(token);
+      if (error || !data.user) {
+        return reply.code(401).send({ error: "Invalid token" });
+      }
+    }
+
+    const body: SttProvidersResponse = { default: defaultBatchProviderId(), providers: listBatchProviders() };
     return reply.send(body);
   });
 
@@ -207,6 +246,12 @@ export function registerRoutes(app: FastifyInstance): void {
       }
     }
 
+    const requestedProvider = (file.fields.sttProvider as { value?: string } | undefined)?.value;
+    const resolved = resolveBatchStt(requestedProvider);
+    if (!resolved.ok) {
+      return reply.code(400).send({ error: resolved.error });
+    }
+
     let buffer: Buffer;
     try {
       buffer = await file.toBuffer();
@@ -215,7 +260,7 @@ export function registerRoutes(app: FastifyInstance): void {
     }
 
     try {
-      const transcript = await runTranscription(buffer, language, existingGlossary);
+      const transcript = await runTranscription(buffer, language, existingGlossary, resolved.batchStt);
       return reply.send({ transcript });
     } catch (err) {
       console.error("[Routes] Audio transcription failed:", err instanceof Error ? err.message : err);
@@ -291,7 +336,13 @@ export function registerRoutes(app: FastifyInstance): void {
     }
 
     const body = request.body as
-      | Partial<{ uploadId: string; totalChunks: number; language: string; existingGlossary: GlossaryEntry[] }>
+      | Partial<{
+          uploadId: string;
+          totalChunks: number;
+          language: string;
+          existingGlossary: GlossaryEntry[];
+          sttProvider: unknown;
+        }>
       | undefined;
     const uploadId = body?.uploadId;
     const totalChunks = body?.totalChunks;
@@ -300,11 +351,16 @@ export function registerRoutes(app: FastifyInstance): void {
     }
     const language = body?.language ?? "fr";
     const existingGlossary = Array.isArray(body?.existingGlossary) ? body.existingGlossary : [];
+    const resolved = resolveBatchStt(body?.sttProvider);
+    if (!resolved.ok) {
+      await cleanupUpload(uploadId).catch(() => {});
+      return reply.code(400).send({ error: resolved.error });
+    }
 
     try {
       const buffer = await assembleUpload(uploadId, totalChunks);
       try {
-        const transcript = await runTranscription(buffer, language, existingGlossary);
+        const transcript = await runTranscription(buffer, language, existingGlossary, resolved.batchStt);
         return reply.send({ transcript });
       } catch (err) {
         console.error("[Routes] Audio transcription failed:", err instanceof Error ? err.message : err);
