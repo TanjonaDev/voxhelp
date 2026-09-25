@@ -56,6 +56,20 @@ describe("inworldBatchStt.transcribe", () => {
     expect(result).toEqual([{ start: 0, end: 0.5, transcript: "Bonjour.", confidence: UNKNOWN_CONFIDENCE }]);
   });
 
+  it("drops an utterance that only echoes the prompts", async () => {
+    const words = ["Bonjour", "Genèse", "MECC", "C", "sharp"].map((word, i) => ({
+      word,
+      startTimeMs: i * 500,
+      endTimeMs: i * 500 + 400,
+    }));
+    const fetchFn = vi.fn(async (_url: string, _init: RequestInit) => ok("Bonjour. Genèse, MECC, C sharp.", words));
+    const stt = createInworldBatchStt({ fetchFn, convert: fakeConvert(5), plan: PLAN, sleep: noSleep });
+
+    const result = await stt.transcribe(Buffer.from("x"), { language: "fr", keyterms: ["Genèse", "MECC", "C#"] });
+
+    expect(result.map((u) => u.transcript)).toEqual(["Bonjour."]);
+  });
+
   it("omits prompts when there are no keyterms", async () => {
     const fetchFn = vi.fn(async (_url: string, _init: RequestInit) => ok("Hello.", HELLO));
     const stt = createInworldBatchStt({ fetchFn, convert: fakeConvert(5), plan: PLAN, sleep: noSleep });

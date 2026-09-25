@@ -96,3 +96,32 @@ export function buildUtterances(
   }
   return utterances;
 }
+
+function normalizedWords(text: string): string[] {
+  return [...text.normalize("NFC").toLowerCase().matchAll(WORD)].map((match) => match[0]);
+}
+
+/**
+ * Inworld recopie parfois ses `prompts` dans le texte quand l'audio n'est que du silence (mesuré
+ * sur un cours réel : « Genèse, MECC, C sharp. » en fin de morceau). Un énoncé est un écho s'il
+ * ne contient, dans l'ordre, que des termes entiers consécutifs de la liste, au moins deux : une
+ * phrase qui cite un seul terme reste une vraie phrase.
+ */
+export function isPromptEcho(transcript: string, prompts: readonly string[]): boolean {
+  const spoken = normalizedWords(transcript);
+  if (spoken.length === 0) return false;
+
+  const terms = prompts.map(normalizedWords).filter((words) => words.length > 0);
+  for (let first = 0; first < terms.length - 1; first++) {
+    let position = 0;
+    let matched = 0;
+    for (let term = first; term < terms.length && position < spoken.length; term++) {
+      const words = terms[term];
+      if (words.some((word, i) => spoken[position + i] !== word)) break;
+      position += words.length;
+      matched++;
+    }
+    if (matched >= 2 && position === spoken.length) return true;
+  }
+  return false;
+}

@@ -7,7 +7,7 @@ import type { BatchStt, BatchTranscribeOptions } from "../types.js";
 import { convertToWav16kMono } from "./ffmpeg.js";
 import { DEFAULT_PLAN, planCuts, type PlanOptions, type Silence } from "./inworld-batch-plan.js";
 import { sanitizeInworldPrompts } from "./inworld-prompts.js";
-import { buildUtterances, type InworldWord } from "./inworld-utterances.js";
+import { buildUtterances, isPromptEcho, type InworldWord } from "./inworld-utterances.js";
 import { BYTES_PER_SECOND, findDataChunk, wavFromPcm } from "./inworld-wav.js";
 
 const INWORLD_STT_URL = "https://api.inworld.ai/stt/v1/transcribe";
@@ -164,7 +164,12 @@ async function transcribeWav(
       if (bytesRead !== pcm.length) throw new Error("Lecture incomplète du WAV converti");
 
       const result = await transcribeSegment(wavFromPcm(pcm), options.language, prompts, apiKey, deps);
-      return buildUtterances(result.transcript, result.words, segment.start, segment.end - segment.start);
+      const utterances = buildUtterances(result.transcript, result.words, segment.start, segment.end - segment.start);
+      const kept = utterances.filter((utterance) => !isPromptEcho(utterance.transcript ?? "", prompts));
+      if (kept.length < utterances.length) {
+        console.warn(`[Inworld batch] ${utterances.length - kept.length} énoncé(s) écarté(s) : écho des prompts`);
+      }
+      return kept;
     });
     return perSegment.flat();
   } finally {

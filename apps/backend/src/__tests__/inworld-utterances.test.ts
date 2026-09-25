@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { buildUtterances, UNKNOWN_CONFIDENCE, type InworldWord } from "../stt/providers/inworld-utterances.js";
+import { buildUtterances, isPromptEcho, UNKNOWN_CONFIDENCE, type InworldWord } from "../stt/providers/inworld-utterances.js";
 
 /** Un mot toutes les 500 ms, chacun durant 400 ms (comme les mots horodatés d'Inworld : sans ponctuation). */
 function timedWords(words: string[]): InworldWord[] {
@@ -76,5 +76,34 @@ describe("buildUtterances", () => {
 
   it("returns nothing for a blank transcript", () => {
     expect(buildUtterances("   ", timedWords(["a"]), 0, 10)).toEqual([]);
+  });
+});
+
+describe("isPromptEcho", () => {
+  const prompts = ["Genèse", "MECC", "C sharp", "Ancien Testament"];
+
+  it("detects the prompt list copied into the transcript over silence (measured on a real course)", () => {
+    expect(isPromptEcho("Genèse, MECC, C sharp.", prompts)).toBe(true);
+  });
+
+  it("detects a run of at least two whole consecutive prompts, whatever the case and punctuation", () => {
+    expect(isPromptEcho("c sharp ancien testament", prompts)).toBe(true);
+    expect(isPromptEcho("MECC. C sharp !", prompts)).toBe(true);
+  });
+
+  it("keeps a sentence that names a single term", () => {
+    expect(isPromptEcho("Genèse.", prompts)).toBe(false);
+    expect(isPromptEcho("Ancien Testament.", prompts)).toBe(false);
+  });
+
+  it("keeps real speech: other words, another order, or a term cut in half", () => {
+    expect(isPromptEcho("Oui, Genèse, MECC, C sharp.", prompts)).toBe(false);
+    expect(isPromptEcho("MECC, Genèse.", prompts)).toBe(false);
+    expect(isPromptEcho("Sharp, Ancien Testament.", prompts)).toBe(false);
+  });
+
+  it("never matches without prompts or on a blank transcript", () => {
+    expect(isPromptEcho("Genèse, MECC.", [])).toBe(false);
+    expect(isPromptEcho("  ", prompts)).toBe(false);
   });
 });
