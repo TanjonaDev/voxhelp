@@ -30,7 +30,8 @@ export async function uploadAudioChunked(
   token: string,
   signal: AbortSignal,
   onProgress?: (fraction: number) => void,
-  sttProvider?: string
+  sttProvider?: string,
+  jobId?: string
 ): Promise<{ transcript: TranscriptSegment[] }> {
   const startRes = await fetch("/api/lecture/audio-chunk/start", {
     method: "POST",
@@ -66,7 +67,14 @@ export async function uploadAudioChunked(
 
   return postJson<{ transcript: TranscriptSegment[] }>(
     "/api/lecture/audio-chunk/finalize",
-    { uploadId, totalChunks, language, existingGlossary, ...(sttProvider ? { sttProvider } : {}) },
+    {
+      uploadId,
+      totalChunks,
+      language,
+      existingGlossary,
+      ...(sttProvider ? { sttProvider } : {}),
+      ...(jobId ? { jobId } : {}),
+    },
     token,
     signal
   );

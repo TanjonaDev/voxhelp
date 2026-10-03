@@ -93,6 +93,12 @@ export function useCourseAnalysis() {
   const [revisionError, setRevisionError] = useState<string | null>(null);
 
   const abortRef = useRef<AbortController | null>(null);
+  // Stable across retries on the same file, so a retry after a mid-pipeline
+  // error reuses the same server-side checkpoint cache instead of starting
+  // from zero. Reset to null on a new file selection, and again once the
+  // pipeline succeeds end to end (the server cache is wiped on success, so
+  // the next run — even on the same file — must get a fresh jobId).
+  const jobIdRef = useRef<string | null>(null);
   // Condense runs have their own abort controller (they outlive analyze()'s
   // own controller, which is cleared as soon as the rewrite ends) and a run
   // counter: a condense still in flight when a new course starts must neither
@@ -123,6 +129,7 @@ export function useCourseAnalysis() {
     setPass1(null);
     setFinalDocument("");
     resetCondensed();
+    jobIdRef.current = null;
   }
 
   function addPdfFiles(files: FileList | null) {
@@ -147,6 +154,8 @@ export function useCourseAnalysis() {
     const controller = new AbortController();
     abortRef.current = controller;
     const token = session.access_token;
+    if (!jobIdRef.current) jobIdRef.current = crypto.randomUUID();
+    const jobId = jobIdRef.current;
 
     try {
       const transcribed = await uploadAudioChunked(
@@ -156,7 +165,8 @@ export function useCourseAnalysis() {
         token,
         controller.signal,
         (fraction) => setProgress(fraction * 25),
-        stt.selected ?? undefined
+        stt.selected ?? undefined,
+        jobId
       );
       setTranscript(transcribed.transcript);
       setProgress(25);
@@ -172,7 +182,7 @@ export function useCourseAnalysis() {
 
       const pass1Result = await postJson<Pass1Output>(
         "/api/lecture/analyze-pass1",
-        { transcript: transcribed.transcript, course, existingGlossary },
+        { transcript: transcribed.transcript, course, existingGlossary, jobId },
         token,
         controller.signal
       );
@@ -190,6 +200,7 @@ export function useCourseAnalysis() {
           references: pass1Result.references,
           uncertainZones: pass1Result.uncertainZones,
           pdfAnalyses: analyses.length > 0 ? analyses : undefined,
+          jobId,
         }),
         signal: controller.signal,
       });
@@ -212,6 +223,10 @@ export function useCourseAnalysis() {
       setFinalDocument(acc);
       setProgress(100);
       setRunState("done");
+      // Pipeline succeeded end to end: the server already wiped this jobId's
+      // checkpoint cache, so the next analyze() — even on the same file —
+      // must start with a fresh one.
+      jobIdRef.current = null;
 
       // Fire-and-forget: the analysis itself is finished, and both condensed
       // versions fill in behind the upload screen. pass1Result/acc are passed
