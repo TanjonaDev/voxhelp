@@ -1,5 +1,6 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import { createTestHttpServer, type TestHttpServer } from "./helpers/http-server.js";
+import { buildAnnexesMarkdown, type PdfAnalysis } from "@voxhelp/lecture";
 
 const mockStreamAssist = vi.hoisted(() => vi.fn());
 
@@ -46,7 +47,7 @@ describe("POST /api/lecture/rewrite-pass2", () => {
 
     expect(res.status).toBe(200);
     const text = await res.text();
-    expect(text).toBe("# Cours test\n\n## Introduction\nOn commence.\n");
+    expect(text).toBe(`# Cours test\n\n## Introduction\nOn commence.\n${buildAnnexesMarkdown([], [])}`);
     expect(mockStreamAssist).toHaveBeenCalledWith(
       expect.any(String),
       expect.any(String),
@@ -152,7 +153,7 @@ describe("POST /api/lecture/rewrite-pass2", () => {
       return "# Cours test\n";
     });
 
-    const pdfAnalyses = [
+    const pdfAnalyses: PdfAnalysis[] = [
       {
         sourceFilename: "slides.pdf",
         blocks: [{ page: 1, type: "heading", anchorTitle: "Intro", content: "Introduction aux slides" }],
@@ -167,7 +168,7 @@ describe("POST /api/lecture/rewrite-pass2", () => {
 
     expect(res.status).toBe(200);
     const text = await res.text();
-    expect(text).toBe("# Cours test\n");
+    expect(text).toBe(`# Cours test\n${buildAnnexesMarkdown([], [], pdfAnalyses)}`);
     expect(receivedUserPrompt).toContain("Introduction aux slides");
   });
 

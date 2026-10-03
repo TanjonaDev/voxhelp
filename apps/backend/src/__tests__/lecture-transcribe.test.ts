@@ -7,6 +7,14 @@ vi.mock("../stt/index.js", () => ({
   getBatchStt: () => ({ transcribe: mockTranscribeAudioBatch }),
 }));
 vi.mock("../supabase.js", () => ({ supabaseAdmin: null }));
+// The STT chunking (ffmpeg conversion, silence-aware cut plan) is covered by
+// chunked-transcribe.test.ts in isolation — these route tests only care that
+// the route wires the uploaded buffer and options through to the batch
+// provider, so chunking is bypassed entirely here.
+vi.mock("../stt/chunked-transcribe.js", () => ({
+  transcribeChunked: (buffer: Buffer, options: unknown, batchStt: { transcribe: typeof mockTranscribeAudioBatch }) =>
+    batchStt.transcribe(buffer, options),
+}));
 
 function buildForm(options: {
   mimetype?: string;

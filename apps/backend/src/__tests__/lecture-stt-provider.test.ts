@@ -15,6 +15,12 @@ vi.mock("../stt/index.js", () => {
   };
 });
 vi.mock("../supabase.js", () => ({ supabaseAdmin: null }));
+// Chunking mechanics (ffmpeg, cut plan) are covered by chunked-transcribe.test.ts;
+// these tests only care about provider selection, so bypass chunking entirely.
+vi.mock("../stt/chunked-transcribe.js", () => ({
+  transcribeChunked: (buffer: Buffer, options: unknown, batchStt: { transcribe: (...args: unknown[]) => unknown }) =>
+    batchStt.transcribe(buffer, options),
+}));
 
 const { SttProviderError } = await import("../stt/index.js");
 

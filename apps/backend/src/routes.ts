@@ -29,8 +29,12 @@ import {
   listLiveProviders,
 } from "./stt/index.js";
 import type { BatchStt } from "./stt/types.js";
+import { transcribeChunked } from "./stt/chunked-transcribe.js";
 import { startUploadSession, writeChunk, assembleUpload, cleanupUpload } from "./audio-upload-sessions.js";
+import { readStep, writeStep, cleanupJob } from "./lecture-job-cache.js";
+import { randomUUID } from "node:crypto";
 import type { TranscriptSegment } from "@voxhelp/lecture";
+import type { Pass1Cache, Pass2Cache } from "@voxhelp/lecture";
 
 const MIMETYPE_TO_FORMAT: Record<string, CvFormat> = {
   "application/pdf": "pdf",
@@ -74,13 +78,32 @@ async function runTranscription(
   buffer: Buffer,
   language: string,
   existingGlossary: GlossaryEntry[],
-  batchStt: BatchStt
+  batchStt: BatchStt,
+  jobId: string
 ): Promise<TranscriptSegment[]> {
-  const utterances = await batchStt.transcribe(buffer, {
-    language,
-    keyterms: selectKeyterms(existingGlossary),
-  });
+  const utterances = await transcribeChunked(
+    buffer,
+    { language, keyterms: selectKeyterms(existingGlossary) },
+    batchStt,
+    jobId
+  );
   return mapUtterancesToSegments(utterances);
+}
+
+function pass1CacheFor(jobId: string | undefined): Pass1Cache | undefined {
+  if (!jobId) return undefined;
+  return {
+    get: (index) => readStep(jobId, `pass1-window-${index}`),
+    set: (index, output) => writeStep(jobId, `pass1-window-${index}`, output),
+  };
+}
+
+function pass2CacheFor(jobId: string | undefined): Pass2Cache | undefined {
+  if (!jobId) return undefined;
+  return {
+    get: (index) => readStep<string>(jobId, `pass2-section-${index}`),
+    set: (index, text) => writeStep(jobId, `pass2-section-${index}`, text),
+  };
 }
 
 export function registerRoutes(app: FastifyInstance): void {
@@ -186,7 +209,7 @@ export function registerRoutes(app: FastifyInstance): void {
       }
     }
 
-    const body = request.body as Partial<Pass1Input> | undefined;
+    const body = request.body as (Partial<Pass1Input> & { jobId?: string }) | undefined;
     if (!body || !Array.isArray(body.transcript) || body.transcript.length === 0 || !body.course) {
       return reply.code(400).send({ error: "Missing transcript or course context" });
     }
@@ -198,8 +221,10 @@ export function registerRoutes(app: FastifyInstance): void {
     };
 
     try {
-      const output = await analyzePass1(input, (system, user) =>
-        callClaudeJSON(system, user, "claude-sonnet-5", 16000, undefined, true)
+      const output = await analyzePass1(
+        input,
+        (system, user) => callClaudeJSON(system, user, "claude-sonnet-5", 16000, undefined, true),
+        pass1CacheFor(body.jobId)
       );
       return reply.send(output);
     } catch (err) {
@@ -252,6 +277,12 @@ export function registerRoutes(app: FastifyInstance): void {
       return reply.code(400).send({ error: resolved.error });
     }
 
+    const jobIdField = (file.fields.jobId as { value?: string } | undefined)?.value;
+    // This route has no client-tracked jobId (used by the /lecture-test debug
+    // page): a fresh one is generated so the chunker still has somewhere to
+    // checkpoint, it just won't survive a retry from this caller.
+    const jobId = jobIdField ?? randomUUID();
+
     let buffer: Buffer;
     try {
       buffer = await file.toBuffer();
@@ -260,7 +291,7 @@ export function registerRoutes(app: FastifyInstance): void {
     }
 
     try {
-      const transcript = await runTranscription(buffer, language, existingGlossary, resolved.batchStt);
+      const transcript = await runTranscription(buffer, language, existingGlossary, resolved.batchStt, jobId);
       return reply.send({ transcript });
     } catch (err) {
       console.error("[Routes] Audio transcription failed:", err instanceof Error ? err.message : err);
@@ -342,6 +373,7 @@ export function registerRoutes(app: FastifyInstance): void {
           language: string;
           existingGlossary: GlossaryEntry[];
           sttProvider: unknown;
+          jobId: string;
         }>
       | undefined;
     const uploadId = body?.uploadId;
@@ -356,11 +388,15 @@ export function registerRoutes(app: FastifyInstance): void {
       await cleanupUpload(uploadId).catch(() => {});
       return reply.code(400).send({ error: resolved.error });
     }
+    // Distinct from uploadId: uploadId is the raw byte transfer, cleaned up
+    // right after assembly below. jobId is the pipeline-wide checkpoint
+    // cache — it must outlive this call, until pass2 finishes.
+    const jobId = body?.jobId ?? randomUUID();
 
     try {
       const buffer = await assembleUpload(uploadId, totalChunks);
       try {
-        const transcript = await runTranscription(buffer, language, existingGlossary, resolved.batchStt);
+        const transcript = await runTranscription(buffer, language, existingGlossary, resolved.batchStt, jobId);
         return reply.send({ transcript });
       } catch (err) {
         console.error("[Routes] Audio transcription failed:", err instanceof Error ? err.message : err);
@@ -442,7 +478,7 @@ export function registerRoutes(app: FastifyInstance): void {
       }
     }
 
-    const body = request.body as Partial<Pass2Input> | undefined;
+    const body = request.body as (Partial<Pass2Input> & { jobId?: string }) | undefined;
     if (!body || !Array.isArray(body.transcript) || body.transcript.length === 0 || !body.course || !Array.isArray(body.plan)) {
       return reply.code(400).send({ error: "Missing transcript, course context, or plan" });
     }
@@ -487,13 +523,17 @@ export function registerRoutes(app: FastifyInstance): void {
         (chunk) => {
           ensureHijacked();
           reply.raw.write(chunk);
-        }
+        },
+        pass2CacheFor(body.jobId)
       );
       if (hijacked) {
         reply.raw.end();
       } else {
         reply.send("");
       }
+      // The whole pipeline (STT + pass1 + pass2) just succeeded end to end:
+      // drop every checkpoint, there is nothing left to resume.
+      if (body.jobId) await cleanupJob(body.jobId).catch(() => {});
     } catch (err) {
       console.error("[Routes] Lecture pass2 rewrite failed:", err instanceof Error ? err.message : err);
       if (hijacked) {

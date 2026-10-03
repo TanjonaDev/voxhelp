@@ -7,6 +7,12 @@ vi.mock("../stt/index.js", () => ({
   getBatchStt: () => ({ transcribe: mockTranscribeAudioBatch }),
 }));
 vi.mock("../supabase.js", () => ({ supabaseAdmin: null }));
+// Chunking mechanics (ffmpeg, cut plan) are covered by chunked-transcribe.test.ts;
+// these tests only care about the upload/assemble/finalize wiring.
+vi.mock("../stt/chunked-transcribe.js", () => ({
+  transcribeChunked: (buffer: Buffer, options: unknown, batchStt: { transcribe: (...args: unknown[]) => unknown }) =>
+    batchStt.transcribe(buffer, options),
+}));
 
 async function startUpload(port: number): Promise<string> {
   const res = await fetch(`http://127.0.0.1:${port}/api/lecture/audio-chunk/start`, { method: "POST" });
