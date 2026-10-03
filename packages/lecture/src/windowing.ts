@@ -2,7 +2,13 @@ import type { LectureSection, TranscriptSegment } from "./types.js";
 
 export const WINDOW_DURATION_MS = 30 * 60 * 1000;
 export const WINDOW_OVERLAP_MS = 90 * 1000;
-export const LONG_TRANSCRIPT_THRESHOLD_MS = 2.5 * 60 * 60 * 1000;
+// Was 2.5h: windowing only kicked in for exceptionally long recordings, so a
+// crash mid-pass1 on an ordinary 45min-2h course (the common case) always
+// meant redoing the whole analysis from scratch. Lowering the threshold to
+// 20 minutes makes windowing — and therefore the per-window cache in
+// analyzePass1's `cache` param — the normal path for real courses, not just
+// an edge case.
+export const LONG_TRANSCRIPT_THRESHOLD_MS = 20 * 60 * 1000;
 
 function transcriptEndMs(transcript: TranscriptSegment[]): number {
   return transcript.reduce((max, segment) => Math.max(max, segment.endMs), 0);

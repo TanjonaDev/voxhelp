@@ -97,4 +97,30 @@ describe("analyzePass1 — windowing", () => {
     expect(callJSON.mock.calls.length).toBeGreaterThan(1);
     expect(result.glossary.some((entry) => entry.term === "midrash")).toBe(true);
   });
+
+  it("consults the cache per window and skips the call when a window is already cached", async () => {
+    const LONG_MS = 3 * 60 * 60 * 1000;
+    const longInput: Pass1Input = { ...baseInput, transcript: [segment(0, LONG_MS)] };
+    const windowCount = (await import("../windowing.js")).splitIntoWindows(longInput.transcript).length;
+    expect(windowCount).toBeGreaterThan(1);
+
+    const cachedWindow0 = validOutput({ detectedLanguage: "fr", transcriptQuality: 0.42 });
+    const store = new Map<number, Pass1Output>([[0, cachedWindow0]]);
+    const cache = {
+      get: vi.fn(async (index: number) => store.get(index) ?? null),
+      set: vi.fn(async (index: number, output: Pass1Output) => {
+        store.set(index, output);
+      }),
+    };
+    const callJSON = vi.fn().mockResolvedValue(validOutput());
+
+    await analyzePass1(longInput, callJSON, cache);
+
+    expect(cache.get).toHaveBeenCalledTimes(windowCount);
+    // Window 0 was already cached: callJSON must not have been called for it,
+    // and cache.set must not have overwritten it either.
+    expect(callJSON).toHaveBeenCalledTimes(windowCount - 1);
+    expect(cache.set).toHaveBeenCalledTimes(windowCount - 1);
+    expect(store.get(0)).toBe(cachedWindow0);
+  });
 });

@@ -39,14 +39,10 @@ RÈGLES DE RÉÉCRITURE :
   blocs "heading" et "paragraph" ne servent QUE de contexte pour recaler
   le vocabulaire et la structure — ne les recopie jamais tels quels dans
   le document.
-- Termine le document par deux annexes, dans cet ordre :
-  "## Glossaire" (une entrée par terme du glossaire, avec sa définition
-  courte si connue) et "## Références citées" (une entrée par référence,
-  sous sa forme normalisée si connue, sinon sa citation brute telle
-  qu'entendue). Si une référence orale correspond à une citation PDF déjà
-  insérée dans le corps du document, ne la liste qu'une fois dans les
-  annexes.
-- Réponds uniquement par le document Markdown final, sans texte avant ou
+- Ne génère PAS d'annexe "Glossaire" ou "Références citées" : elles sont
+  ajoutées séparément après ta réponse, à partir des données structurées.
+  Rédige uniquement le corps du cours.
+- Réponds uniquement par le corps du document Markdown, sans texte avant ou
   après, sans balises de code englobantes.`;
 }
 
@@ -95,6 +91,47 @@ function formatPdfBlocks(pdfAnalyses?: PdfAnalysis[]): string {
 
 function formatSegments(transcript: TranscriptSegment[]): string {
   return transcript.map((segment) => `[${segment.startMs}–${segment.endMs}] ${segment.text}`).join("\n");
+}
+
+/**
+ * Deterministic replacement for the two annexes the LLM used to generate
+ * itself: same content rules (one entry per glossary term with its short
+ * definition when known, one entry per reference in its normalized form or
+ * else the raw citation), produced straight from the structured data instead
+ * of asking the model to restate it — cheaper and exactly reproducible.
+ * A reference whose normalized form matches a PDF citation block already
+ * quoted in the body (via `reference`) is skipped here, so it isn't listed
+ * twice.
+ */
+export function buildAnnexesMarkdown(
+  glossary: GlossaryEntry[],
+  references: Reference[],
+  pdfAnalyses?: PdfAnalysis[]
+): string {
+  const citedInBody = new Set(
+    (pdfAnalyses ?? [])
+      .flatMap((analysis) => analysis.blocks)
+      .map((block) => block.reference)
+      .filter((reference): reference is string => Boolean(reference))
+  );
+
+  const glossaryLines =
+    glossary.length === 0
+      ? ["(aucun terme)"]
+      : glossary.map((entry) =>
+          entry.shortDefinition ? `- **${entry.term}** — ${entry.shortDefinition}` : `- **${entry.term}**`
+        );
+
+  const keptReferences = references.filter((reference) => {
+    const normalized = reference.normalized;
+    return !normalized || !citedInBody.has(normalized);
+  });
+  const referenceLines =
+    keptReferences.length === 0
+      ? ["(aucune référence)"]
+      : keptReferences.map((reference) => `- ${reference.normalized ?? reference.rawCitation}`);
+
+  return ["\n\n## Glossaire\n", ...glossaryLines, "\n## Références citées\n", ...referenceLines].join("\n");
 }
 
 export function buildPass2UserPrompt(input: Pass2Input): string {

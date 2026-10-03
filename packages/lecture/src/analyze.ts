@@ -6,6 +6,18 @@ import { mergeGlossary, selectNewGlossaryEntries } from "./postprocess.js";
 
 export type CallJSON = (system: string, user: string) => Promise<unknown>;
 
+/**
+ * Injectable checkpoint for the per-window pass1 calls. This package stays
+ * pure (no fs access, unit-testable without disk) — the backend wires this
+ * up to a disk-backed cache (see lecture-job-cache.ts) when a jobId is
+ * available, so a crash partway through a long course's pass1 doesn't
+ * redo the windows that already succeeded.
+ */
+export interface Pass1Cache {
+  get(windowIndex: number): Promise<Pass1Output | null>;
+  set(windowIndex: number, output: Pass1Output): Promise<void>;
+}
+
 const ONE_LINE_SUMMARY_MAX = 120;
 
 /**
@@ -43,7 +55,7 @@ async function analyzeSingleCall(input: Pass1Input, callJSON: CallJSON): Promise
   throw new Error(`Pass 1 analysis failed after retry: ${formatZodError(secondResult.error)}`);
 }
 
-export async function analyzePass1(input: Pass1Input, callJSON: CallJSON): Promise<Pass1Output> {
+export async function analyzePass1(input: Pass1Input, callJSON: CallJSON, cache?: Pass1Cache): Promise<Pass1Output> {
   if (!needsWindowing(input.transcript)) {
     return analyzeSingleCall(input, callJSON);
   }
@@ -56,11 +68,17 @@ export async function analyzePass1(input: Pass1Input, callJSON: CallJSON): Promi
   const qualityScores: number[] = [];
   let detectedLanguage = input.course.language;
 
-  for (const windowSegments of windows) {
-    const windowOutput = await analyzeSingleCall(
-      { ...input, transcript: windowSegments, existingGlossary: consolidatedGlossary },
-      callJSON
-    );
+  for (let index = 0; index < windows.length; index++) {
+    const windowSegments = windows[index];
+    const cached = await cache?.get(index);
+    const windowOutput =
+      cached ??
+      (await analyzeSingleCall(
+        { ...input, transcript: windowSegments, existingGlossary: consolidatedGlossary },
+        callJSON
+      ));
+    if (!cached) await cache?.set(index, windowOutput);
+
     consolidatedGlossary = mergeGlossary(consolidatedGlossary, windowOutput.glossary);
     plans.push(windowOutput.plan);
     allReferences.push(...windowOutput.references);

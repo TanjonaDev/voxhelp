@@ -7,11 +7,11 @@ function segment(startMs: number, endMs: number): TranscriptSegment {
 }
 
 describe("needsWindowing", () => {
-  it("is false for a 90-minute transcript", () => {
-    expect(needsWindowing([segment(0, 90 * 60 * 1000)])).toBe(false);
+  it("is false for a transcript under the threshold", () => {
+    expect(needsWindowing([segment(0, LONG_TRANSCRIPT_THRESHOLD_MS - 1000)])).toBe(false);
   });
 
-  it("is true past the 2h30 threshold", () => {
+  it("is true past the threshold", () => {
     expect(needsWindowing([segment(0, LONG_TRANSCRIPT_THRESHOLD_MS + 1000)])).toBe(true);
   });
 

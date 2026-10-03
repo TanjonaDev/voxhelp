@@ -1,6 +1,7 @@
 import { describe, it, expect } from "vitest";
-import { buildPass2SystemPrompt, buildPass2UserPrompt } from "../pass2/prompts.js";
+import { buildPass2SystemPrompt, buildPass2UserPrompt, buildAnnexesMarkdown } from "../pass2/prompts.js";
 import type { Pass2Input } from "../pass2/types.js";
+import type { GlossaryEntry, Reference } from "../types.js";
 
 const baseInput: Pass2Input = {
   transcript: [
@@ -51,10 +52,48 @@ describe("buildPass2SystemPrompt", () => {
     expect(prompt).toContain("ne les recopie jamais tels quels");
   });
 
-  it("requires the glossary and references appendices", () => {
+  it("forbids the model from generating the glossary/references annexes itself", () => {
     const prompt = buildPass2SystemPrompt();
-    expect(prompt).toContain("## Glossaire");
-    expect(prompt).toContain("## Références citées");
+    expect(prompt).toContain("Ne génère PAS d'annexe");
+  });
+});
+
+describe("buildAnnexesMarkdown", () => {
+  const glossary: GlossaryEntry[] = [
+    { term: "Septante", heardVariants: ["Sept-Ante"], category: "proper_noun", occurrences: 2, confidence: 0.85, shortDefinition: "Traduction grecque de l'Ancien Testament" },
+    { term: "Midrash", heardVariants: [], category: "foreign_term", occurrences: 1, confidence: 0.7 },
+  ];
+  const references: Reference[] = [
+    { type: "scripture", rawCitation: "Romains chapitre 1", normalized: "Romains 1,1-4", contextMs: 12000, confidence: 0.8 },
+    { type: "author", rawCitation: "comme dit Paul", contextMs: 20000, confidence: 0.6 },
+  ];
+
+  it("produces a Glossaire entry per term, with its short definition when known", () => {
+    const md = buildAnnexesMarkdown(glossary, []);
+    expect(md).toContain("## Glossaire");
+    expect(md).toContain("**Septante** — Traduction grecque de l'Ancien Testament");
+    expect(md).toContain("**Midrash**");
+  });
+
+  it("produces a Références citées entry per reference, normalized form or raw citation", () => {
+    const md = buildAnnexesMarkdown([], references);
+    expect(md).toContain("## Références citées");
+    expect(md).toContain("Romains 1,1-4");
+    expect(md).toContain("comme dit Paul");
+  });
+
+  it("reports explicit placeholders when glossary/references are empty", () => {
+    const md = buildAnnexesMarkdown([], []);
+    expect(md).toContain("(aucun terme)");
+    expect(md).toContain("(aucune référence)");
+  });
+
+  it("skips a reference already quoted in the body via a matching PDF citation block", () => {
+    const md = buildAnnexesMarkdown([], references, [
+      { sourceFilename: "x.pdf", blocks: [{ page: 1, type: "citation", content: "...", reference: "Romains 1,1-4" }] },
+    ]);
+    expect(md).not.toContain("Romains 1,1-4");
+    expect(md).toContain("comme dit Paul");
   });
 });
 
