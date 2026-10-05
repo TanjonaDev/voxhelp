@@ -56,6 +56,11 @@ describe("buildPass2SystemPrompt", () => {
     const prompt = buildPass2SystemPrompt();
     expect(prompt).toContain("Ne génère PAS d'annexe");
   });
+
+  it("requires an invisible section-index marker before every heading", () => {
+    const prompt = buildPass2SystemPrompt();
+    expect(prompt).toContain("<!-- s:{index} -->");
+  });
 });
 
 describe("buildAnnexesMarkdown", () => {

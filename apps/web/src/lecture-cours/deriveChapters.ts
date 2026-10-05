@@ -15,32 +15,60 @@ export interface ChapterBlock {
 
 const ANNEX_TITLES = new Set(["Glossaire", "Références citées"]);
 
-/** Splits the rewritten Markdown into one paragraph list per plan section, in order. */
+// Each "## " heading the rewrite/condense prompts produce is preceded by an
+// invisible "<!-- s:{index} -->" marker carrying the plan section's own
+// index (see pass2/prompts.ts and condense/prompts.ts). Matching sections by
+// this id — instead of by the Nth heading found in the document — survives
+// the model dropping or merging a section it judged too minor for its own
+// heading: real run, one skipped "## " among ~75 silently shifted every
+// section after it by one position, cascading all the way to "no content"
+// on several real chapters near the end. An id-keyed map only loses the one
+// section that's actually missing.
+const SECTION_MARKER = /^<!--\s*s:\s*(\d+)\s*-->\s*$/;
+
+/** Splits the rewritten/condensed Markdown into one paragraph list per plan section. */
 export function splitCleanDocumentByChapter(markdown: string, plan: LectureSection[]): ChapterBlock[][] {
   const lines = markdown.split(/\r?\n/);
-  const chapterTexts: string[] = [];
+  const sectionTexts = new Map<number, string>();
+  let pendingIndex: number | null = null;
+  let currentIndex: number | null = null;
   let current: string[] | null = null;
 
+  const flush = () => {
+    if (currentIndex !== null && current !== null) sectionTexts.set(currentIndex, current.join("\n"));
+    current = null;
+    currentIndex = null;
+  };
+
   for (const line of lines) {
+    const marker = line.match(SECTION_MARKER);
+    if (marker) {
+      pendingIndex = Number(marker[1]);
+      continue;
+    }
     const heading = line.match(/^##\s+(.*)$/);
     if (heading) {
-      if (current !== null) chapterTexts.push(current.join("\n"));
+      flush();
       const title = heading[1].replace(/^Digression\s*—\s*/, "").trim();
-      current = ANNEX_TITLES.has(title) || chapterTexts.length >= plan.length ? null : [];
+      if (pendingIndex !== null && !ANNEX_TITLES.has(title)) {
+        currentIndex = pendingIndex;
+        current = [];
+      }
+      pendingIndex = null;
       continue;
     }
     if (current !== null) current.push(line);
   }
-  if (current !== null) chapterTexts.push(current.join("\n"));
+  flush();
 
-  return plan.map((_, index) => {
-    const raw = chapterTexts[index] ?? "";
+  return plan.map((section) => {
+    const raw = sectionTexts.get(section.index) ?? "";
     const paragraphs = raw
       .split(/\n{2,}/)
       .map((p) => p.replace(/^>\s?/gm, "").trim())
       .filter(Boolean);
     return paragraphs.map((text, pIndex) => ({
-      timestampMs: pIndex === 0 ? plan[index].startMs : null,
+      timestampMs: pIndex === 0 ? section.startMs : null,
       text,
     }));
   });

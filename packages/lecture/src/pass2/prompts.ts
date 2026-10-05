@@ -24,6 +24,14 @@ RÈGLES DE RÉÉCRITURE :
   "digression", "student_question" et "administrative" restent dans le
   document, à leur place, mais leur titre le signale explicitement
   (ex: "## Digression — {titre}").
+- IMPÉRATIF : juste avant CHAQUE titre de section (jamais avant les
+  citations ">" ou ailleurs), insère sur sa propre ligne le marqueur
+  "<!-- s:{index} -->" où {index} est le numéro de section donné dans
+  LE PLAN DU COURS — même pour les sections administratives ou de
+  digression. Ce marqueur est invisible à la lecture mais sert à recaler
+  automatiquement le document : une seule section sans son marqueur casse
+  ce recalage pour tout le reste du document. N'en saute aucune, même
+  une section d'une seule phrase.
 - Corrige silencieusement dans le texte les termes du glossaire :
   remplace toute variante fautive ("heardVariants") par la forme
   correcte ("term"). Ne signale pas la correction, elle fait partie du

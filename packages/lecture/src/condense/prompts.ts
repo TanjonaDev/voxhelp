@@ -11,12 +11,17 @@ export function buildCondenseSystemPrompt(mode: CondenseMode): string {
 courte, destinée à une relecture rapide avant un examen — sans perdre le fil du
 raisonnement.
 
-Pour chaque section du plan fourni, dans l'ordre, produis un titre de niveau 2
-(##) reprenant EXACTEMENT le titre de la section, suivi d'un paragraphe court
-(3 à 6 phrases) qui condense l'essentiel : la thèse défendue, les définitions
-clés, l'articulation des idées. Préserve verbatim toute citation centrale à
-l'argumentation (entre guillemets), mais ne recopie pas les exemples
-secondaires ni les digressions.
+Pour chaque section du plan fourni que tu décides de garder, dans l'ordre,
+fais précéder son titre de niveau 2 (##) — reprenant EXACTEMENT le titre de
+la section — du marqueur "<!-- s:{index} -->" sur sa propre ligne, où
+{index} est le numéro donné dans le plan. Ce marqueur est invisible à la
+lecture mais sert à recaler le document condensé sur le plan d'origine :
+mets-le sur CHAQUE section que tu gardes, même résumée en une phrase —
+seules les sections omises n'ont ni marqueur ni titre. Suis chaque titre
+d'un paragraphe court (3 à 6 phrases) qui condense l'essentiel : la thèse
+défendue, les définitions clés, l'articulation des idées. Préserve verbatim
+toute citation centrale à l'argumentation (entre guillemets), mais ne
+recopie pas les exemples secondaires ni les digressions.
 
 RÈGLES ABSOLUES :
 
@@ -32,9 +37,14 @@ RÈGLES ABSOLUES :
 dense, pensée pour une relecture très rapide avant un examen — pas de prose,
 du repère.
 
-Pour chaque section du plan fourni, dans l'ordre, produis un titre de niveau
-2 (##) reprenant EXACTEMENT le titre de la section, suivi d'une liste à
-puces (une ligne par puce, préfixée par "- ") couvrant : définitions clés,
+Pour chaque section du plan fourni que tu décides de garder, dans l'ordre,
+fais précéder son titre de niveau 2 (##) — reprenant EXACTEMENT le titre de
+la section — du marqueur "<!-- s:{index} -->" sur sa propre ligne, où
+{index} est le numéro donné dans le plan. Ce marqueur est invisible à la
+lecture mais sert à recaler la fiche sur le plan d'origine : mets-le sur
+CHAQUE section que tu gardes, même réduite à une puce — seules les sections
+omises n'ont ni marqueur ni titre. Suis chaque titre d'une liste à puces
+(une ligne par puce, préfixée par "- ") couvrant : définitions clés,
 distinctions importantes, arguments principaux, citations essentielles
 (entre guillemets, verbatim). Chaque puce est courte et autonome (une idée
 par puce).

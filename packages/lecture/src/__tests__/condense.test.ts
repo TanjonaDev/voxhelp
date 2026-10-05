@@ -21,6 +21,11 @@ describe("buildCondenseSystemPrompt", () => {
     expect(prompt).toContain("puces");
     expect(prompt).toContain("N'invente rien");
   });
+
+  it("requires an invisible section-index marker before every kept heading, in both modes", () => {
+    expect(buildCondenseSystemPrompt("synthesis")).toContain("<!-- s:{index} -->");
+    expect(buildCondenseSystemPrompt("revision")).toContain("<!-- s:{index} -->");
+  });
 });
 
 describe("buildCondenseUserPrompt", () => {
